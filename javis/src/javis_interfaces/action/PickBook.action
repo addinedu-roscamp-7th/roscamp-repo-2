@@ -1,0 +1,14 @@
+# PickBook.action                  
+
+# Goal         
+string book_id
+geometry_msgs/Pose book_pose    
+int32 carrier_slot_id
+---
+# Result         
+bool success         
+string book_id         
+string message # "1번 도서 픽업에 성공했습니다."
+---
+# Feedback         
+string current_action         

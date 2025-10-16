@@ -1,0 +1,11 @@
+
+#책장 식별
+# Request
+# (요청 데이터 없음)
+
+---
+# Response
+bool detected                         # 감지 성공 여부
+string bookshelf_id                   # 식별된 책장 ID
+geometry_msgs/Pose bookshelf_pose     # 책장 위치
+geometry_msgs/Pose[] available_slots  # 책을 꽂을 수 있는 빈 슬롯 위치 목록

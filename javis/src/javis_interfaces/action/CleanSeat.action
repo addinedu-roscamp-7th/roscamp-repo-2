@@ -1,0 +1,18 @@
+# 좌석 정리 작업
+
+# Goal
+int32 task_id
+string seat_id
+geometry_msgs/Pose2D return_desk_location # 좌석 위치 
+geometry_msgs/Pose2D bin_location # 쓰레기통 위치
+---
+# Result
+bool success
+string message
+int32 trash_collected_count
+string[] trash_types
+float64 total_distance_m
+float64 total_time_sec
+---
+# Feedback
+int32 progress_percent
