@@ -5,12 +5,9 @@ int32 task_id
 string book_id
 geometry_msgs/Pose2D shelf_approach_location # 책장 앞 접근 위치
 geometry_msgs/Pose book_pick_pose 
-
-int32 storage_id 
-# 보관함 정보 (좌표)                
-geometry_msgs/Pose2D storage_approach_location # 보관함 앞 접근 위치
+int32 storage_id # 도비 운반함 id               
+geometry_msgs/Pose2D storage_approach_location # 보관함 정보 (좌표) 
 geometry_msgs/Pose storage_slot_pose # 어느 칸인지
-
 ---
 # Result 
 int32 task_id 

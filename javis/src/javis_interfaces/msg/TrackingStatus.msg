@@ -1,7 +1,7 @@
 # 피안내자 추적 상태
 std_msgs/Header header             # 메시지 헤더
-bool person_detected               # 사람 감지 여부
 string tracking_id                 # 추적 중인 ID
+bool person_detected               # 사람 감지 여부
 geometry_msgs/Pose person_pose     # 사람의 위치
 float32 distance_to_person         # 사람과의 거리
 float32 confidence                 # 감지 신뢰도

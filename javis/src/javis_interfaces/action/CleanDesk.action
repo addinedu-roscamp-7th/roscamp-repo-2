@@ -1,15 +1,12 @@
 # CleanDesk.action
-
 # Goal (목표)
-int32 task_id 
 int32 seat_id
 geometry_msgs/Pose seat_location
 ---
 # Result (결과)
-int32 task_id
 bool success
 int32 trash_collected # 수거된 쓰레기 총 개수
-string[] trash_types # 수거된 쓰레기 종류 목록(ex. {"휴지", "음료캔"})
+string[] trash_types # 수거된 쓰레기 종류
 string message # 결과 메시지
 ---
 # Feedback (피드백)

@@ -1,5 +1,3 @@
-# CollectTrash.action
-
 # Goal (목표)
 string trash_type
 geometry_msgs/Pose trash_pose

@@ -2,12 +2,12 @@
 # Goal
 string book_id                      # 정리할 책 ID
 int32 carrier_slot_id               # 책이 실린 캐리어 슬롯 ID
-geometry_msgs/Pose bookshelf_pose   # 책꽂이 위치
 string bookshelf_id                 # 책꽂이 ID
+geometry_msgs/Pose bookshelf_pose   # 책꽂이 위치
 ---
 # Result
-bool success                        # 성공 여부
 string book_id                      # 정리 완료된 책 ID
+bool success                        # 성공 여부
 string message                      # 결과 메시지
 ---
 # Feedback

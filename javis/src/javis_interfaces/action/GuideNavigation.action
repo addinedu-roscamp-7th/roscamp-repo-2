@@ -8,7 +8,7 @@ float32 person_follow_distance  # 사람을 따라갈 때 유지할 최소 거�
 # Result: 작업 완료 후의 최종 결과를 나타냅니다.
 bool success                    # 내비게이션 성공 여부
 geometry_msgs/Pose final_pose   # 작업 종료 시점의 로봇 위치
-string termination_reason       # 작업이 종료된 이유 (예: "목표 도달", "경로 차단됨")
+string message      
 ---
 # Feedback: 작업이 진행되는 동안의 상태 정보를 제공합니다.
 geometry_msgs/Pose current_pose # 로봇의 현재 위치 및 방향

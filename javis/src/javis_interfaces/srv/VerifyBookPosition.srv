@@ -5,7 +5,7 @@ string book_id  # 확인할 책 ID
 
 ---
 # Response
-bool is_correct_position  # 올바른 위치인지 여부
 string book_id            # 확인된 책 ID
+bool is_correct_position  # 올바른 위치인지 여부
 string error_type          # 오류 유형
 string message             # 결과 메시지

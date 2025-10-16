@@ -8,10 +8,12 @@ int32 member_id
 ---
 #Result
 int32 task_id
+int32 member_id
 bool success
-string message
 int32 pick_up_num # 음료 픽업대 번호
+string message
 ---
 #Feedback
 int32 task_id
+int32 member_id
 float32 progress_percentage

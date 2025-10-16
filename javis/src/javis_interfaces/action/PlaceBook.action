@@ -1,13 +1,13 @@
 # Goal
 string book_id                        # 도서 ID
 int32 carrier_slot_id                 # 보관함 ID (도비 내부)
-geometry_msgs/Pose storage_box_pose   # 픽업대 위치 (도서관 내)
 int32 storage_box_id                  # 픽업대 ID
-
+geometry_msgs/Pose storage_box_pose   # 픽업대 위치 (도서관 내)
 ---
 # Result
-bool success                          # 작업 성공 여부
 string book_id                        # 처리된 도서 ID
+int32 storage_box_id                  # 픽업대 ID
+bool success                          # 작업 성공 여부
 string message                        # 결과 메시지
 
 ---

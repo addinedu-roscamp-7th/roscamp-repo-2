@@ -7,9 +7,10 @@ geometry_msgs/Pose2D dest_location # 목적지 위치
 # Result
 int32 task_id 
 bool success
-string error_code # 에러코드 규칙 정해야 함 ex) "err_01"
+int32 error_code # 에러코드 규칙 정해야 함
 float64 total_distance_m # 총 이동 거리
 float64 total_time_sec # 총 작업 시간
+string message
 ---
 # Feedback
 float64 distance_remaining_m # 남은 거리

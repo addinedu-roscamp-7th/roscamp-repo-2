@@ -5,6 +5,6 @@ sensor_msgs/Image camera_image     # 카메라 이미지
 float32 registration_timeout       # 등록 대기 시간
 ---
 # Response
-bool success                       # 등록 성공 여부
 string tracking_id                 # 추적을 위한 ID
+bool success                       # 등록 성공 여부
 string message                     # 결과 메시지
