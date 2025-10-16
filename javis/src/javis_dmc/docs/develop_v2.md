@@ -7,45 +7,114 @@ v2.02025-10-16-
 • 도서 픽업/반납 시나리오 정정<br>
 • SMACH 기반 설계 확정
 
+dobby_main_controller/
+├── dobby_main_controller/          # Python 패키지
+│   ├── __init__.py
+│   ├── core/                       # 핵심 로직
+│   │   ├── __init__.py
+│   │   ├── state_machine_manager.py    # SMACH 관리
+│   │   ├── battery_manager.py          # 배터리 관리
+│   │   └── voice_command_handler.py    # 음성 명령 처리
+│   ├── interfaces/                 # 인터페이스
+│   │   ├── __init__.py
+│   │   ├── base_interface.py           # Abstract Base
+│   │   ├── drive_interface.py
+│   │   ├── arm_interface.py
+│   │   ├── ai_interface.py
+│   │   ├── gui_interface.py
+│   │   ├── llm_interface.py
+│   │   ├── tts_interface.py
+│   │   └── stt_interface.py
+│   ├── mock/                       # Mock 구현
+│   │   ├── __init__.py
+│   │   ├── mock_drive.py
+│   │   ├── mock_arm.py
+│   │   ├── mock_ai.py
+│   │   ├── mock_gui.py
+│   │   ├── mock_llm.py
+│   │   ├── mock_tts.py
+│   │   └── mock_stt.py
+│   ├── states/                     # SMACH State 클래스
+│   │   ├── __init__.py
+│   │   ├── main_states.py              # Main State 클래스들
+│   │   ├── pickup_states.py            # 도서 픽업 States
+│   │   ├── reshelving_states.py        # 반납 정리 States
+│   │   ├── guiding_states.py           # 길안내 States
+│   │   ├── cleaning_states.py          # 좌석 정리 States
+│   │   └── sorting_states.py           # 서가 정리 States
+│   ├── utils/                      # 유틸리티
+│   │   ├── __init__.py
+│   │   ├── logger.py
+│   │   └── ros_utils.py
+│   └── dmc_node.py                 # Main ROS2 Node
+├── test_gui/                       # Test GUI
+│   ├── __init__.py
+│   ├── test_gui_node.py
+│   └── test_gui_widget.py
+├── config/                         # 설정 파일
+│   ├── dmc_params.yaml
+│   ├── battery_config.yaml
+│   └── action_timeouts.yaml
+├── launch/                         # Launch 파일
+│   ├── dmc_single.launch.py
+│   ├── dmc_multi.launch.py
+│   └── dmc_test.launch.py
+├── msg/                            # Custom 메시지
+│   ├── DobbyState.msg
+│   ├── BatteryStatus.msg
+│   └── TaskData.msg
+├── srv/                            # Custom 서비스
+│   └── SetBattery.srv
+├── action/                         # Custom 액션
+│   └── AssignTask.action
+├── test/                           # 테스트
+│   ├── test_battery_manager.py
+│   ├── test_state_machine.py
+│   └── test_interfaces.py
+├── package.xml
+├── setup.py
+└── README.md
+
+
 
 1. 시스템 컨텍스트
 1.1 DMC의 위치와 역할
                     ┌─────────────────────────────────────┐
                     │  Robot Control Service (RCS)        │
-                    │  ================================    │
+                    │  ================================   │
                     │  [역할]                              │
-                    │  - 작업 큐 관리                      │
-                    │  - 여러 로봇에게 작업 분배            │
-                    │  - 작업 우선순위 결정                 │
-                    │  - 작업 이력 관리                    │
-                    │  - 스케줄링 (반납 정리: 1시간마다)    │
+                    │  - 작업 큐 관리                       │
+                    │  - 여러 로봇에게 작업 분배               │
+                    │  - 작업 우선순위 결정                   │
+                    │  - 작업 이력 관리                      │
+                    │  - 스케줄링 (반납 정리: 1시간마다)        │
                     └──────────────┬──────────────────────┘
                                    │ ROS2 Action/Topic
                     ┌──────────────▼──────────────────────┐
                     │  DMC (Dobby Main Controller)        │
                     │  ===========================        │
                     │  [역할]                              │
-                    │  - 단일 작업 실행 (한 번에 1개)      │
-                    │  - 상태 관리 (SMACH)                 │
-                    │  - 하위 컨트롤러 조율                 │
-                    │  - 배터리 모니터링                    │
-                    │  - 음성 인식 처리                     │
-                    │                                      │
+                    │  - 단일 작업 실행 (한 번에 1개)          │
+                    │  - 상태 관리 (SMACH)                  │
+                    │  - 하위 컨트롤러 조율                   │
+                    │  - 배터리 모니터링                      │
+                    │  - 음성 인식 처리                      │
+                    │                                     │
                     │  [책임]                              │
-                    │  - 작업 수락/거부 판단                │
-                    │  - 작업 성공/실패 보고                │
+                    │  - 작업 수락/거부 판단                  │
+                    │  - 작업 성공/실패 보고                  │
                     │  - 긴급 상황 처리                     │
                     │  - 현재 작업 상태 발행                │
                     └──────┬────────┬──────────┬──────────┘
                            │        │          │
             ┌──────────────┤        │          └─────────────┐
             │ ROS2         │        │ ROS2                   │ ROS2
-    ┌───────▼────────┐ ┌──▼────────▼──┐ ┌─────────────┐ ┌───▼──────────┐
-    │ DDC            │ │ DAC           │ │ AIS         │ │ Dobby GUI    │
-    │ (Drive)        │ │ (Arm)         │ │ (Vision)    │ │              │
-    │ - Nav2 주행    │ │ - MoveIt 제어 │ │ - 객체 인식 │ │ - 사용자 UI  │
-    │ - 추종 모드    │ │ - 그리퍼 제어 │ │ - 사람 추적 │ │ - 터치 입력  │
-    │ - 충돌 회피    │ │ - 내부 운반함 │ │ - 장애물    │ │ - 상태 표시  │
+    ┌───────▼────────┐ ┌──▼────────▼──┐ ┌─────────────┐ ┌────▼──────────┐
+    │ DDC            │ │ DAC          │ │ AIS         │ │ Dobby GUI     │
+    │ (Drive)        │ │ (Arm)        │ │ (Vision)    │ │               │
+    │ - Nav2 주행     │ │ - MoveIt 제어 │ │ - 객체 인식   │ │ - 사용자 UI    │
+    │ - 추종 모드      │ │ - 그리퍼 제어  │ │ - 사람 추적    │ │ - 터치 입력    │
+    │ - 충돌 회피      │ │ - 내부 운반함   │ │ - 장애물      │ │ - 상태 표시    │
     └────────────────┘ └───────────────┘ └─────────────┘ └──────────────┘
 
     ┌─────────────────────────────────────────────────────────────────┐
@@ -61,13 +130,13 @@ v2.02025-10-16-
 
 ### 1.2 DMC가 관리하는 것 vs 관리하지 않는 것
 
-| 구분 | DMC 관리 ✅ | 다른 컴포넌트 관리 ❌ |
-|------|------------|---------------------|
-| **상태** | Main State (IDLE, EXECUTING_TASK, CHARGING, LISTENING 등) | Sub State는 SMACH Sub-SM에서 관리 |
-| **작업 큐** | 현재 작업 1개만 (`current_task`) | RCS가 전체 큐 관리 |
+| 구분         | DMC 관리 ✅ | 다른 컴포넌트 관리 ❌ |
+|------       |------------|---------------------|
+| **상태**     | Main State (IDLE, EXECUTING_TASK, CHARGING, LISTENING 등) | Sub State는 SMACH Sub-SM에서 관리 |
+| **작업 큐**   | 현재 작업 1개만 (`current_task`) | RCS가 전체 큐 관리 |
 | **작업 흐름** | 작업 시작/종료 판단, State 전환 | 각 하위 컨트롤러가 세부 실행 |
-| **타임아웃** | 전체 작업 타임아웃 (SMACH Timeout) | Action 레벨 타임아웃은 각 컨트롤러 |
-| **배터리** | 전체 로봇 배터리 상태 관리 및 긴급 처리 | - |
+| **타임아웃**   | 전체 작업 타임아웃 (SMACH Timeout) | Action 레벨 타임아웃은 각 컨트롤러 |
+| **배터리**    | 전체 로봇 배터리 상태 관리 및 긴급 처리 | - |
 | **음성 인식** | Wake word 감지, LLM 호출, 의도→작업 변환 | STT/TTS는 외부 서비스 |
 | **경로 계획** | - | DDC가 Nav2로 처리 |
 | **암 제어** | - | DAC가 MoveIt으로 처리 |
@@ -119,37 +188,37 @@ v2.02025-10-16-
 
 ## 2. 컴포넌트 아키텍처
 
-### 2.1 DMC 내부 구조 (TaskManager 제거)
+### 2.1 DMC 내부 구조 
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │              DobbyMainControllerNode (rclpy.Node)              │
 │                                                                │
-│  [멤버 변수]                                                    │
-│  - namespace: str (dobby1, dobby2, ...)                       │
-│  - current_task: Optional[Task]  ← 현재 작업 1개만 저장        │
-│  - is_emergency_stop: bool                                    │
+│  [멤버 변수]                                                     │
+│  - namespace: str (dobby1, dobby2, ...)                        │
+│  - current_task: Optional[Task]  ← 현재 작업 1개만 저장            │
+│  - is_emergency_stop: bool                                     │
 │                                                                │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  ┌──────────────────────────────────────────────────────┐     │
-│  │ StateMachineManager                                  │     │
-│  │                                                      │     │
-│  │  - main_sm: MainStateMachine (SMACH)                │     │
-│  │    • IDLE, CHARGING, EXECUTING_TASK, LISTENING...   │     │
-│  │                                                      │     │
-│  │  - task_sms: Dict[TaskType, SMACH.StateMachine]     │     │
-│  │    • PICKUP_BOOK_SM                                 │     │
-│  │    • RESHELVING_BOOK_SM                             │     │
-│  │    • GUIDING_SM                                     │     │
-│  │    • CLEANING_DESK_SM                               │     │
-│  │    • SORTING_SHELVES_SM                             │     │
-│  │                                                      │     │
-│  │  [메서드]                                             │     │
-│  │  + initialize_state_machines()                      │     │
-│  │  + execute_main_sm()                                │     │
-│  │  + get_current_state() → (main, sub)               │     │
-│  │  + trigger(event_name)                              │     │
-│  │  + preempt_current_task()                           │     │
+│  ┌──────────────────────────────────────────────────────┐      │
+│  │ StateMachineManager                                  │      │
+│  │                                                      │      │
+│  │  - main_sm: MainStateMachine (SMACH)                │       │
+│  │    • IDLE, CHARGING, EXECUTING_TASK, LISTENING...   │       │
+│  │                                                      │      │
+│  │  - task_sms: Dict[TaskType, SMACH.StateMachine]     │       │
+│  │    • PICKUP_BOOK_SM                                 │       │
+│  │    • RESHELVING_BOOK_SM                             │       │
+│  │    • GUIDING_SM                                     │       │
+│  │    • CLEANING_DESK_SM                               │       │
+│  │    • SORTING_SHELVES_SM                             │       │
+│  │                                                      │      │
+│  │  [메서드]                                             │      │
+│  │  + initialize_state_machines()                      │       │
+│  │  + execute_main_sm()                                │      │
+│  │  + get_current_state() → (main, sub)               │        │
+│  │  + trigger(event_name)                              │       │
+│  │  + preempt_current_task()                           │       │
 │  └──────────────────────────────────────────────────────┘     │
 │                          ↕                                     │
 │  ┌──────────────────────────────────────────────────────┐     │
@@ -1561,40 +1630,40 @@ note over DMC: State: CHARGING → IDLE
 ### 9.1 테스트 레벨 구조
 ```
 ┌───────────────────────────────────────────────────────────┐
-│ Level 4: 시스템 통합 테스트 (End-to-End)                  │
+│ Level 4: 시스템 통합 테스트 (End-to-End)                      │
 │  ────────────────────────────────────────────────────     │
-│  • 실제 RCS + DMC + Mock 하위 컨트롤러                    │
-│  • 전체 시나리오 검증                                      │
-│  • 멀티 로봇 동시 실행 테스트                              │
-│  • 장시간 스트레스 테스트                                  │
+│  • 실제 RCS + DMC + Mock 하위 컨트롤러                        │
+│  • 전체 시나리오 검증                                         │
+│  • 멀티 로봇 동시 실행 테스트                                  │
+│  • 장시간 스트레스 테스트                                      │
 └───────────────────────────────────────────────────────────┘
                             ▲
 ┌───────────────────────────────────────────────────────────┐
-│ Level 3: 컴포넌트 통합 테스트                             │
+│ Level 3: 컴포넌트 통합 테스트                                 │
 │  ────────────────────────────────────────────────────     │
 │  • DMC + Mock Interfaces                                  │
 │  • SMACH State Machine + Interface Manager                │
-│  • 배터리 시나리오 (충전/소모/긴급복귀)                    │
-│  • 음성 인식 플로우 (Wake word → LLM → Task)              │
+│  • 배터리 시나리오 (충전/소모/긴급복귀)                          │
+│  • 음성 인식 플로우 (Wake word → LLM → Task)                 │
 └───────────────────────────────────────────────────────────┘
                             ▲
 ┌───────────────────────────────────────────────────────────┐
-│ Level 2: 모듈 단위 테스트                                  │
+│ Level 2: 모듈 단위 테스트                                    │
 │  ────────────────────────────────────────────────────     │
-│  • StateMachineManager 독립 테스트                        │
-│  • BatteryManager 독립 테스트                             │
-│  • InterfaceManager 독립 테스트                           │
-│  • VoiceCommandHandler 독립 테스트                        │
-│  • Task SM 독립 실행 (PickupBookSM, GuidingSM 등)         │
+│  • StateMachineManager 독립 테스트                          │
+│  • BatteryManager 독립 테스트                               │
+│  • InterfaceManager 독립 테스트                             │
+│  • VoiceCommandHandler 독립 테스트                          │
+│  • Task SM 독립 실행 (PickupBookSM, GuidingSM 등)           │
 └───────────────────────────────────────────────────────────┘
                             ▲
 ┌───────────────────────────────────────────────────────────┐
-│ Level 1: 유닛 테스트 (Unit Test)                          │
+│ Level 1: 유닛 테스트 (Unit Test)                            │
 │  ────────────────────────────────────────────────────     │
-│  • SMACH State 클래스 (execute 메서드)                    │
-│  • Transition 조건 함수 (is_critical, can_accept_task)    │
-│  • 배터리 계산 로직 (update, clamp)                        │
-│  • LLM 파싱 로직 (parse_book_query, parse_guide_query)   │
+│  • SMACH State 클래스 (execute 메서드)                       │
+│  • Transition 조건 함수 (is_critical, can_accept_task)      │
+│  • 배터리 계산 로직 (update, clamp)                          │
+│  • LLM 파싱 로직 (parse_book_query, parse_guide_query)      │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -1606,12 +1675,12 @@ note over DMC: State: CHARGING → IDLE
 │           Dobby DMC Test GUI (RQt Plugin)                   │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  ┌─── Control Panel ────────────────────────────────────┐  │
+│  ┌─── Control Panel ─────────────────────────────────────┐  │
 │  │                                                       │  │
 │  │  [Battery Control]                                    │  │
 │  │  Current: 45.2%  [▓▓▓▓▓▓▓▓▓░░░░░░░░░░░]               │  │
 │  │  Set Level: [60] % [Apply]                            │  │
-│  │  ☑ Enable Test Mode (freeze battery)                 │  │
+│  │  ☑ Enable Test Mode (freeze battery)                  │  │
 │  │                                                       │  │
 │  │  [State Control]                                      │  │
 │  │  Current Main: EXECUTING_TASK (3)                     │  │
@@ -1639,7 +1708,7 @@ note over DMC: State: CHARGING → IDLE
 │  │                                                       │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                                                             │
-│  ┌─── State Monitor ────────────────────────────────────┐  │
+│  ┌─── State Monitor ─────────────────────────────────────┐  │
 │  │                                                       │  │
 │  │  Main State:    EXECUTING_TASK (3)                    │  │
 │  │  Sub State:     MOVE_TO_PICKUP (101)                  │  │
@@ -1657,7 +1726,7 @@ note over DMC: State: CHARGING → IDLE
 │  │                                                       │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                                                             │
-│  ┌─── Timeline (최근 10개 이벤트) ──────────────────────┐  │
+│  ┌─── Timeline (최근 10개 이벤트) ──────────────────────────┐  │
 │  │                                                       │  │
 │  │  12:34:56  [INFO] State: IDLE → EXECUTING_TASK        │  │
 │  │  12:35:12  [INFO] SubState: MOVE_TO_PICKUP            │  │
@@ -1670,7 +1739,7 @@ note over DMC: State: CHARGING → IDLE
 │  │  [Clear] [Export Log]                                 │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                                                             │
-│  ┌─── Mock Interface Responses ─────────────────────────┐  │
+│  ┌─── Mock Interface Responses ─────────────────────────┐   │
 │  │                                                       │  │
 │  │  [DDC Mock]                                           │  │
 │  │  Next move_to_target will:                            │  │
@@ -1690,9 +1759,9 @@ note over DMC: State: CHARGING → IDLE
 │  │                                                       │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                                                             │
-│  ┌─── Scenario Playback ────────────────────────────────┐  │
+│  ┌─── Scenario Playback ────────────────────────────────┐   │
 │  │                                                       │  │
-│  │  Load Scenario: [pickup_success.yaml ▼] [Load]       │  │
+│  │  Load Scenario: [pickup_success.yaml ▼] [Load]        │  │
 │  │                                                       │  │
 │  │  Steps:                                               │  │
 │  │  1. Set battery=80%                                   │  │
@@ -1702,7 +1771,7 @@ note over DMC: State: CHARGING → IDLE
 │  │  5. Mock DAC: success, 3s                             │  │
 │  │  ...                                                  │  │
 │  │                                                       │  │
-│  │  [▶️ Play] [⏸️ Pause] [⏹️ Stop] [⏭️ Step]              │  │
+│  │  [▶️ Play] [⏸️ Pause] [⏹️ Stop] [⏭️ Step]             │  │
 │  │                                                       │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
