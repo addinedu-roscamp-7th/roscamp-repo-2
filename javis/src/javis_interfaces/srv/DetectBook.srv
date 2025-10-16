@@ -1,0 +1,12 @@
+# DetectBook.srv
+
+#도서 감지
+
+# Request (요청)
+int32 book_id
+---
+# Response (응답)
+bool detected
+int32 book_id
+geometry_msgs/Pose book_pose # 감지된 도서의 위치
+float32 confidence # 감지 신뢰도

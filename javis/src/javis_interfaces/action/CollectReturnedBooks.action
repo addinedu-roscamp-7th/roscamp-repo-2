@@ -1,0 +1,15 @@
+# 반납도서 회수
+# Goal
+string[] book_ids # 수거할 책 ID 목록
+geometry_msgs/Pose[] book_poses # 책들의 위치 목록
+int32 carrier_slot_ids # 책을 담을 캐리어 슬롯 ID 목록
+---
+# Result 
+bool success # 성공 여부
+int32 books_collected # 수거된 책의 총 개수
+string[] collected_book_ids # 실제로 수거된 책 ID 목록
+string message 결과 메시지
+---
+# Feedback 
+string current_book_id # 현재 수거 중인 책 ID
+int32 books_collected_count # 지금까지 수거한 책의 개수
