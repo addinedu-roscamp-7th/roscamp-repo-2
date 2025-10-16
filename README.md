@@ -54,46 +54,62 @@ ROS2와 AI를 활용한 자율주행 로봇개발자 부트캠프 2팀 저장소
 ### commit 규칙
 
 
-1. 기본 형식
-<type>(<scope>): <subject>
-예시: feat(dmc): 도서 픽업 기능 추가
+#### 1. 기본 형식
 
-2. Type (커밋 종류)
-Type설명feat새 기능fix버그 수정refactor코드 개선 (기능 변화 없음)docs문서 수정test테스트 추가/수정chore빌드, 설정 변경style코드 포맷팅
+       
+```
+ <type>(<scope>): <subject>
+    예시: feat(dmc): 도서 픽업 기능 추가
+```
 
-3. Scope (영향 범위)
-GUI
+#### 2. Type (커밋 종류)
 
-gui/cafe - 카페 주문 GUI
-gui/info-desk - 안내 데스크 GUI
-gui/admin - 관리자 GUI
+```
+    Type설명
+        feat 새 기능
+        fix 버그 수정
+        refactor 코드 개선 (기능 변화 없음)
+        docs 문서 수정
+        est 테스트 추가/수정
+        chore 빌드, 설정 변경
+        style 코드 포맷팅
+```
 
-Service
 
-service/llm - LLM 서비스
-service/app - 애플리케이션 서비스
+#### 3. Scope (영향 범위)
 
-ROS2
 
-rcs - Robot Control Service
-dmc - Dobby Main Controller
-dac - Dobby Arm Controller
-ddc - Dobby Drive Controller
-dis - Dobby Image Service
-kc - Kreacher Controller
-kis - Kreacher Image Service
-interfaces - 메시지/액션 정의
+```
+    GUI
+    gui/cafe - 카페 주문 GUI
+    gui/info-desk - 안내 데스크 GUI
+    gui/admin - 관리자 GUI
 
-Firmware
+    Service
+    service/llm - LLM 서비스
+    service/app - 애플리케이션 서비스
 
-fw/auth - 인증 컨트롤러
-fw/payment - 결제 컨트롤러
+    ROS2
+    rcs - Robot Control Service
+    dmc - Dobby Main Controller
+    dac - Dobby Arm Controller
+    ddc - Dobby Drive Controller
+    dis - Dobby Image Service
+    kc - Kreacher Controller
+    kis - Kreacher Image Service
+    interfaces - 메시지/액션 정의
 
-기타
+    Firmware
+    fw/auth - 인증 컨트롤러
+    fw/payment - 결제 컨트롤러
 
-docs - 문서
-asset - 이미지/비디오
+    기타
+    docs - 문서
+    asset - 이미지/비디오
 
-~ - 전체 프로젝트
+    ~ - 전체 프로젝트
+
+```
+
 
 ---
