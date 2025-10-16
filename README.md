@@ -6,7 +6,7 @@ ROS2와 AI를 활용한 자율주행 로봇개발자 부트캠프 2팀 저장소
 
 ###  프로젝트 규칙
 1. dev에서 개발하기
-2. ros2ws 루트 폴더에서 colcon build
+2. javis 루트 폴더에서 colcon build
 3. 동영상 이미지 (readme 에서 사용하는 asset은 제외) 지양
 4. 폴더 구조대로 개발
 
