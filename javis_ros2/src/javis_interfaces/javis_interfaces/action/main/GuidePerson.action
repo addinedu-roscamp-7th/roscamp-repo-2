@@ -1,11 +1,9 @@
 # 길안내 작업
 
 # Goal
-int32 task_id 
 geometry_msgs/Pose2D dest_location # 목적지 위치
 ---
 # Result
-int32 task_id 
 bool success
 int32 error_code # 에러코드 규칙 정해야 함
 float64 total_distance_m # 총 이동 거리
