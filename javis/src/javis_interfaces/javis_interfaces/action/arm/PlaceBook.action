@@ -1,0 +1,17 @@
+# Goal
+string book_id                        # 도서 ID
+int32 carrier_slot_id                 # 보관함 ID (도비 내부)
+int32 storage_box_id                  # 픽업대 ID
+geometry_msgs/Pose storage_box_pose   # 픽업대 위치 (도서관 내)
+---
+# Result
+string book_id                        # 처리된 도서 ID
+int32 storage_box_id                  # 픽업대 ID
+bool success                          # 작업 성공 여부
+string message                        # 결과 메시지
+
+---
+# Feedback
+string current_action                 # 현재 수행 중인 액션
+# 보관함 == 도비내에 있는 도서 보관함
+# 픽업대 == 도서관내에 있는 도서 픽업대

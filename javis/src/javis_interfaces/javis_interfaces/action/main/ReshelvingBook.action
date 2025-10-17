@@ -1,0 +1,19 @@
+# 반납도서 정리 작업
+
+# Goal
+int32 task_id
+int32 return_desk_id
+geometry_msgs/Pose2D return_desk_location # 반납대 위치
+geometry_msgs/Pose return_desk_pose # 반납대 좌표
+---
+# Result         
+int32 task_id         
+bool success               
+int32 books_processed     # 3 (성공한 수)
+string[] failed_book_ids  # ["책C", "책E"]
+float64 total_distance_m
+float64 total_time_sec
+string message            # "5권 중 3권 성공, 2권 실패"
+---
+# Feedback         
+int32 progress_percent
