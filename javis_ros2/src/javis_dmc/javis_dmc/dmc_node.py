@@ -284,11 +284,7 @@ class JavisDmcNode(Node):
             self.get_logger().warn(f'현재 상태({self.state_machine.main_state.name})에서는 {main_state.name} 작업을 수락할 수 없습니다.')
             return GoalResponse.REJECT
 
-        task_id = self._extract_task_id(goal_request)
-        if task_id is not None:
-            self.get_logger().info(f'{main_state.name} 작업 Goal 수락 (task_id={task_id})')
-        else:
-            self.get_logger().info(f'{main_state.name} 작업 Goal 수락')
+        self.get_logger().info(f'{main_state.name} 작업 Goal 수락')
         return GoalResponse.ACCEPT
 
     def _cancel_callback(self, goal_handle) -> CancelResponse:
@@ -305,12 +301,9 @@ class JavisDmcNode(Node):
     def _execute_task(self, goal_handle, main_state: MainState):
         '''Goal 실행 콜백을 처리한다.'''
         goal = goal_handle.request
-        task_id = self._extract_task_id(goal)
-
-        if not self.state_machine.start_task(main_state, task_id):
+        if not self.state_machine.start_task(main_state):
             message = '현재 상태에서 작업을 시작할 수 없습니다.'
             self.get_logger().warn(message)
-            self.state_machine.clear_task()
             result_msg = self._build_result(main_state, False, message)
             goal_handle.abort()
             return result_msg
@@ -355,7 +348,6 @@ class JavisDmcNode(Node):
             self.state_machine.set_main_state(next_state)
 
         self.state_machine.set_sub_state(SubState.NONE)
-        self.state_machine.clear_task()
         self._active_goal_handle = None
         self._active_main_state = None
         self._publish_state_immediately()
@@ -403,11 +395,8 @@ class JavisDmcNode(Node):
 
     def _build_result(self, main_state: MainState, success: bool, message: str):
         '''작업 유형에 맞는 결과 메시지를 생성한다.'''
-        task_id = self.state_machine.current_task_id or 0
-
         if main_state == MainState.PICKING_UP_BOOK:
             result = PickupBook.Result()
-            result.task_id = task_id
             result.success = success
             result.message = message
             result.total_distance_m = 0.0
@@ -416,7 +405,6 @@ class JavisDmcNode(Node):
 
         if main_state == MainState.RESHELVING_BOOK:
             result = ReshelvingBook.Result()
-            result.task_id = task_id
             result.success = success
             result.books_processed = 0 if not success else 1
             result.failed_book_ids = []
@@ -427,7 +415,6 @@ class JavisDmcNode(Node):
 
         if main_state == MainState.GUIDING:
             result = GuidePerson.Result()
-            result.task_id = task_id
             result.success = success
             result.error_code = 0 if success else 1
             result.total_distance_m = 0.0
@@ -437,7 +424,6 @@ class JavisDmcNode(Node):
 
         if main_state == MainState.CLEANING_DESK:
             result = CleanSeat.Result()
-            result.task_id = task_id
             result.success = success
             result.trash_collected_count = 0
             result.trash_types = []
@@ -454,13 +440,6 @@ class JavisDmcNode(Node):
             return result
 
         raise ValueError(f'지원하지 않는 메인 상태입니다: {main_state}')
-
-    def _extract_task_id(self, goal) -> Optional[int]:
-        '''Goal 메시지에서 task_id를 추출한다.'''
-        if hasattr(goal, 'task_id'):
-            return getattr(goal, 'task_id')
-        return None
-
 
 def main(args=None) -> None:
     '''ROS 2 엔트리 포인트.'''

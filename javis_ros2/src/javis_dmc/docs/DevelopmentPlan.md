@@ -191,7 +191,6 @@ javis_dmc_test_msgs/               # 테스트용 메시지 패키지
 │ - namespace: str                                        │
 │ - main_sm: smach.StateMachine                           │
 │ - current_executor: Optional[BaseExecutor]              │
-│ - current_task_id: int                                  │
 │ - current_pose: Pose2D                                  │
 │                                                         │
 │ - battery: BatteryManager                               │
@@ -217,7 +216,6 @@ DobbyMainController
 │   ├── namespace: str
 │   ├── main_sm: StateMachine
 │   ├── current_executor: Optional[BaseExecutor]
-│   ├── current_task_id: int
 │   └── current_pose: Pose2D
 │
 ├── [컴포넌트]
