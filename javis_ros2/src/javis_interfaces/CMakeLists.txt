@@ -9,44 +9,48 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(unique_identifier_msgs REQUIRED)
+find_package(action_msgs REQUIRED)
 
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "srv/ChangeArmPose.srv"
-"srv/ChangeTrackingMode.srv"
-"srv/CheckStorageBox.srv"
-"srv/DetectBook.srv"
-"srv/DetectTrash.srv"
-"srv/DriveControlCommand.srv"
-"srv/IdentifyBookShelf.srv"
-"srv/RegisterPerson.srv"
-"srv/VerifyBookPosition.srv"
-"action/CleanDesk.action"
-"action/CleanSeat.action"
-"action/CollectReturnedBooks.action"
-"action/CollectTrash.action"
-"action/DisposeTrash.action"
-"action/GuideNavigation.action"
-"action/GuidePerson.action"
-"action/MoveToTarget.action"
-"action/PerformTask.action"
-"action/PickBook.action"
-"action/PickupBook.action"
-"action/PlaceBook.action"
-"action/RearrangeBook.action"
-"action/ReshelvingBook.action"
-"msg/BatteryStatus.msg"
-"msg/CurrentPose.msg"
-"msg/DetectedObjects.msg"
-"msg/DobbyState.msg"
-"msg/Obstacles.msg"
-"msg/TrackingStatus.msg"
+  "msg/main/BatteryStatus.msg"
+  "msg/main/CurrentPose.msg"
+  "msg/main/DobbyState.msg"
+  "msg/ai/DetectedObjects.msg"
+  "msg/ai/Obstacles.msg"
+  "msg/ai/TrackingStatus.msg"
+  "srv/ai/DetectTrash.srv"
+  "srv/arm/ChangeArmPose.srv"
+  "srv/drive/ChangeTrackingMode.srv"
+  "srv/drive/CheckStorageBox.srv"
+  "srv/drive/DetectBook.srv"
+  "srv/drive/DriveControlCommand.srv"
+  "srv/drive/IdentifyBookShelf.srv"
+  "srv/drive/RegisterPerson.srv"
+  "srv/drive/VerifyBookPosition.srv"
+  "action/arm/CleanDesk.action"
+  "action/arm/CollectReturnedBooks.action"
+  "action/arm/CollectTrash.action"
+  "action/arm/DisposeTrash.action"
+  "action/arm/PickBook.action"
+  "action/arm/PlaceBook.action"
+  "action/arm/RearrangeBook.action"
+  "action/drive/GuideNavigation.action"
+  "action/drive/MoveToTarget.action"
+  "action/main/CleanSeat.action"
+  "action/main/GuidePerson.action"
+  "action/main/PerformTask.action"
+  "action/main/PickupBook.action"
+  "action/main/ReshelvingBook.action"
 
   DEPENDENCIES 
   std_msgs
   builtin_interfaces
   geometry_msgs
   sensor_msgs
+  unique_identifier_msgs
+  action_msgs
 
 )
 
