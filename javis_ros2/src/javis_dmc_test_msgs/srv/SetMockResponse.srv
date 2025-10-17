@@ -1,0 +1,11 @@
+# 타깃 인터페이스 이름 (예: drive, arm)
+string interface_name
+# 시나리오 식별자
+string scenario
+# 응답을 성공으로 강제할지 여부
+bool success_override
+---
+# 설정 결과
+bool success
+# 상세 메시지
+string message
