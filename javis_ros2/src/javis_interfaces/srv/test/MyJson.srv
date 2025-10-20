@@ -1,0 +1,4 @@
+string payload
+---
+bool ok
+string message
