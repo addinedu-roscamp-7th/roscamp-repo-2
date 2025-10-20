@@ -1,0 +1,17 @@
+battery:
+  initial_level: 100.0  # %
+  
+  rates:
+    charging: 10.0      # %/min
+    idle: 0.0           # %/min
+    working: -1.0       # %/min
+  
+  thresholds:
+    critical: 20.0      # %
+    warning: 40.0       # %
+    charge_target: 80.0 # %
+    emergency: 5.0      # %
+  
+  test_mode:
+    enabled: false
+    manual_control: true

@@ -1,0 +1,20 @@
+# 좌석 정리 작업
+
+# Goal
+int32 seat_id
+geometry_msgs/Pose2D return_desk_location # 좌석 위치(좌석까지 이동이 목적이라 2D 좌표)
+geometry_msgs/Pose return_desk_pose # 좌석 좌표(좌석 정리가 목적이라 3D 좌표)
+geometry_msgs/Pose2D bin_location # 쓰레기통 위치(쓰레기통까지 이동이 목적이라 2D 좌표)
+geometry_msgs/Pose bin_pose # 쓰레기통 좌표(쓰레기를 버리기가 목적이라 3D 좌표)
+---
+# Result
+int32 seat_id
+bool success
+int32 trash_collected_count
+string[] trash_types
+float64 total_distance_m
+float64 total_time_sec
+string message
+---
+# Feedback
+int32 progress_percent

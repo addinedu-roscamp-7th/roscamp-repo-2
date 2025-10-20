@@ -1,0 +1,8 @@
+# 요청하는 배터리 레벨 (0.0 ~ 100.0)
+float32 level
+bool simulate_charging
+---
+# 명령 수행 성공 여부
+bool success
+# 부가 정보
+string message

@@ -1,0 +1,16 @@
+# PerformTask.action
+
+# 음료제조 작업
+
+# Goal
+int32 member_id
+---
+#Result
+int32 member_id
+bool success
+int32 pick_up_num # 음료 픽업대 번호
+string message
+---
+#Feedback
+int32 member_id
+float32 progress_percentage

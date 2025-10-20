@@ -1,0 +1,12 @@
+# 쓰레기 감지
+
+# Request
+geometry_msgs/Pose seat_location   # 확인할 좌석 위치
+
+---
+# Response
+bool trash_found                   # 쓰레기 발견 여부
+int32 trash_count                  # 발견된 쓰레기 수
+string[] trash_types               # 쓰레기 종류 목록
+geometry_msgs/Pose[] trash_poses   # 쓰레기 위치 목록
+float32[] confidence_scores        # 감지 신뢰도 목록
