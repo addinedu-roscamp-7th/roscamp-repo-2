@@ -84,11 +84,11 @@ class MyCobotController(Node):
         
         self.get_logger().info('get_coordinates 서비스에 연결되었습니다.')
         
-        # 좌표 요청 타이머 생성 (1초마다 한 번씩 서비스 호출)
-        self.coordinate_timer = self.create_timer(1.0, self.request_coordinates)
-        
         # 좌표 수신 플래그
         self.coordinate_received = False
+        
+        # 서비스 연결 후 바로 한 번만 호출
+        self.request_coordinates()
 
     def broadcast_timer_callback(self):
         coords = self.mc.get_coords()
@@ -106,11 +106,8 @@ class MyCobotController(Node):
         self.tf_broadcaster.sendTransform(t)
 
     def request_coordinates(self):
-        """주기적으로 좌표 서비스를 호출"""
-        # 이미 좌표를 받았으면 더 이상 요청하지 않음
-        if self.coordinate_received:
-            return
-        
+        """좌표 서비스를 한 번 호출"""
+        self.get_logger().info('좌표 서비스 호출 중...')
         req = GetCoordinates.Request()
         future = self.cli.call_async(req)
         future.add_done_callback(self.handle_coordinates_response)
@@ -119,11 +116,6 @@ class MyCobotController(Node):
         """서비스 응답 처리"""
         try:
             response = future.result()
-            
-            # 좌표가 모두 0이면 아직 유효한 데이터가 없는 것으로 간주
-            if response.x == 0.0 and response.y == 0.0 and response.z == 0.0:
-                self.get_logger().info('좌표 대기 중... (0, 0, 0 수신)')
-                return
             
             # 수신된 좌표 (camera_link 기준)
             x_cam = response.x
@@ -189,9 +181,7 @@ class MyCobotController(Node):
                 # mode=0: 직선 보간 이동, speed=20
                 self.mc.send_coords(target_coords, 20, 0)
                 
-                # 좌표를 성공적으로 처리했으므로 플래그 설정
-                self.coordinate_received = True
-                self.get_logger().info("좌표 처리 완료. 더 이상 새로운 좌표를 요청하지 않습니다.")
+                self.get_logger().info("좌표 처리 완료!")
             else:
                 self.get_logger().warn("로봇의 현재 좌표를 읽을 수 없어 이동 명령을 건너뜁니다.")
 
