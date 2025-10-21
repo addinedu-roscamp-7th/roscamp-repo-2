@@ -21,7 +21,7 @@ class PickupClient(Node):
         self.get_logger().info(f'Flask Server running on port {flask_port}')
     
     def _run_flask_server(self, port):
-        # Flask 앱 컨텍스트에 ROS 노드 인스턴스를 저장합니다.
+        # Flask 앱 컨텍스트에 ROS 노드 인스턴스를 저장합니다.1
         app.config['ros_node'] = self
         app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
     
