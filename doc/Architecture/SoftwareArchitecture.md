@@ -9,7 +9,7 @@ AVIS 음성 인식 통합 시스템 아키텍처 v3.0 (최종 확정안)
 계층 구조
 
 
-1. 시스템 개요
+## 1. 시스템 개요
 JAVIS(Library Automation System)는 도서관 자동화를 위한 통합 로봇 시스템으로, 음성 인식 기반 사용자 상호작용, 도서 관리, 좌석 정리, 음료 제조 등의 서비스를 제공합니다.
 핵심 구성:
 
@@ -25,39 +25,111 @@ Kreacher 로봇: 도서관 카페 음료 제조
 작업 스케줄링: 우선순위 기반 다중 로봇 작업 할당
 실시간 모니터링: 로봇 상태, 작업 진행률, 배터리 관리
 
+## 2. 소프트웨어 컴포넌트 역할
 
+<<<<<<< Updated upstream
 2. 소프트웨어 컴포넌트 역할
 2.1 Client GUIs
 구성 요소위치역할 및 책임dobby_guiDobby Robot도비 로봇 터치스크린 인터페이스<br/>• 길안내 목적지 선택 및 경로 표시<br/>• 도서 픽업 진행상황 실시간 표시<br/>• 사용자 인터랙션 화면 제공 (음성 인식 시작 버튼 등)<br/>• 피안내자 인식 안내 화면<br/>• 로봇 상태 및 배터리 표시<br/>통신: ROS2 ↔ DMCinformation_desk_guiInformation Desk PC도서관 안내데스크 키오스크<br/>• 도서 검색 및 조회 (제목, 저자, ISBN)<br/>• 도서 예약 및 픽업 요청<br/>• 좌석 예약 및 현황 조회<br/>• 회원 인증 (RFID 스캔)<br/>• 픽업 보관함 상태 표시 및 개폐 제어<br/>통신: TCP ↔ App Service, Serial ↔ Authentication Controlleradmin_guiAdmin PC관리자 모니터링 및 제어 인터페이스<br/><br/>• 로봇 모드 관리 (standby/roaming)<br/>• 로봇 상태/위치 실시간 모니터링 (지도 기반)<br/>• 작업 큐 및 진행 상황 모니터링<br/>• 로봇 모드 전환 (대기/자율이동)<br/>• 긴급 제어 (정지, 작업 취소, IDLE 복귀)<br/>• 시스템 통계 및 작업 이력 조회<br/>• 알림 수신 (에러, 배터리 경고 등)<br/>통신: TCP ↔ App Service & RCS, ROS2 ↔ DMC (긴급)cafe_order_guiCafe Order PC카페 주문 키오스크<br/>• 메뉴 조회 및 주문<br/>• 주문 상태 표시 (대기, 제조중, 완료)<br/>• 픽업 알림<br/>• 결제 처리 (RFID 간편결제)<br/>통신: TCP ↔ App Service, Serial ↔ Payment Controller
+=======
+### 2.1 Client GUIs
+| 구성 요소                    | 위치                  | 역할 및 책임    |
+| ------------------------ | ------------------- | ------------- |
+| **dobby_gui**            | Dobby Robot         | - 도비 로봇 터치스크린 인터페이스<br>  - 길안내 목적지 선택 및 경로 표시<br>  - 도비 상태 실시간 표시 <br>  - 사용자 인터랙션 화면 제공 (음성 인식 시작 버튼 등)<br>  - 피안내자 인식 안내 화면<br>  - 로봇 상태 및 배터리 표시<br>**통신:** ROS2 ↔ DMC                                                                                                              |
+| **information_desk_gui** | Information Desk PC | - 도서관 안내데스크 키오스크<br>  - 도서 검색 및 조회 (제목, 저자, ISBN)<br>  - 도서 예약 및 픽업 요청<br>  - 좌석 예약 및 현황 조회<br>  - 회원 인증 (RFID 스캔)<br>  - 픽업 보관함 상태 표시 및 개폐 제어<br>**통신:** TCP ↔ App Service, Serial ↔ Authentication Controller                                                                            |
+| **admin_gui**            | Admin PC            | - 관리자 모니터링 및 제어 인터페이스<br>  - 로봇 모드 관리 (standby/autonomy)<br>  - 로봇 상태/위치 실시간 모니터링 (지도 기반)<br>  - 작업 큐 및 진행 상황 모니터링<br>  - 로봇 모드 전환 (대기/자율이동)<br>  - 긴급 제어 (정지, 작업 취소, IDLE 복귀)<br>  - 시스템 통계 및 작업 이력 조회<br>  - 알림 수신 (에러, 배터리 경고 등)<br>**통신:** TCP ↔ App Service & RCS, ROS2 ↔ DMC (긴급 제어) |
+| **cafe_order_gui**       | Cafe Order PC       | - 카페 주문 키오스크<br>  - 메뉴 조회 및 주문<br>  - 주문 상태 표시 (대기, 제조 중, 완료)<br>  - 픽업 알림<br>  - 결제 처리 (RFID 간편결제)<br>**통신:** TCP ↔ App Service, Serial ↔ Payment Controller  |
+>>>>>>> Stashed changes
 
-2.2 Servers
-구성 요소위치역할 및 책임llm_serviceLLM Server (독립 서버)음성 명령 처리 및 대화형 인터페이스 제공<br/>• 자연어 이해 및 의도 파악 (Intent Parsing)<br/>• 대화 문맥 관리 (로봇별 세션 유지)<br/>• 자연어 응답 생성<br/>• OpenAI API 또는 로컬 LLM 호출<br/>• DMC에 작업 요청 (필요 시)<br/>• Application Service 정보 조회 (Phase 2)<br/>• 지원 Intent: navigation, query, confirmation, cancel<br/>타입: HTTP REST Server (FastAPI/Flask)<br/>통신: HTTP ↔ STT/TTS Manager, ROS2 Service ↔ DMC, HTTPS ↔ OpenAI, TCP ↔ App Service (Phase 2)robot_control_service (RCS)JAVIS Server로봇 작업 관리 및 스케줄링<br/>• 작업 생성, 검증 및 큐 관리 (우선순위 기반)<br/>• 작업 할당 및 로봇 선택 (가용성, 배터리, 위치 기반)<br/>• 로봇 상태 모니터링 (Main/Sub State, 배터리, 위치)<br/>• 작업 실패 시 재할당<br/>• 작업 이력 및 통계 관리<br/>• Admin GUI에 실시간 상태 발행<br/>타입: ROS2 Python Node<br/>통신: ROS2 Action/Topic ↔ DMC, TCP ↔ App Serviceapplication_serviceJAVIS Server비즈니스 로직 처리 및 데이터 관리<br/>• 도서 정보 관리 (CRUD, 위치, 재고)<br/>• 회원 정보 관리 (인증, 대출 이력)<br/>• 좌석 예약 및 현황 관리<br/>• 도서관 공간 정보 제공 (시설 위치, 좌표)<br/>• GUI 요청 처리 및 응답<br/>• RCS 작업 검증 지원<br/>• LLM Service 정보 제공 (Phase 2)<br/>• 외부 시스템(ILS) 연동<br/>• 작업 이력 로깅<br/>타입: TCP HTTP Server (FastAPI/Spring Boot)<br/>통신: TCP ↔ GUIs, RCS, LLM Service, SQL ↔ DBdbJAVIS Server시스템 데이터베이스<br/>• 도서/회원/좌석 영구 데이터 저장<br/>• 작업 이력 및 통계 저장<br/>• 위치 정보 (책장, 시설) 저장<br/>• 트랜잭션 관리 및 무결성 보장<br/>타입: PostgreSQL / MySQL<br/>통신: SQL ↔ App Service
 
+<<<<<<< Updated upstream
 2.3 Dobby Robot
 구성 요소타입역할 및 책임dobby_main_controller (DMC)ROS2 Python Node도비 로봇 통합 제어 및 오케스트레이션<br/>• Main/Sub State 관리 (SMACH 기반 State Machine)<br/>• 작업 실행 (Executor 패턴)<br/>• 하위 컨트롤러 조율 (DDC, DAC, DVS)<br/>• 음성 세션 상태 관리 (listening_mode)<br/>• 배터리 자동 관리 및 충전 제어<br/>• RCS 작업 할당 수락 (Action Server)<br/>• LLM Service 작업 요청 수락 (Service Server)<br/>• STT/TTS 상태 전환 요청 수락<br/>• 긴급 제어 처리 (정지, 취소, 복귀)<br/>• 로봇 상태 실시간 발행 (10Hz)<br/>지원 작업: Pickup Book, Reshelving Book, Guide Person, Clean Seat, Sorting Shelves<br/>통신: ROS2 ↔ 모든 하위 컨트롤러 & RCS & STT/TTS & GUIstt_tts_managerROS2 Python Node음성 인식 및 합성 관리<br/>• 마이크 입력 → 텍스트 변환 (STT)<br/>• Wake Word 감지 ("도비야", 로컬 처리)<br/>• DMC 상태 모니터링 (음성 인식 활성화 조건 판단)<br/>  - IDLE or ROAMING → 음성 인식 활성화<br/>  - 작업 수행 중 → 음성 인식 비활성화<br/>• LLM Service HTTP 통신 (의도 파싱 요청)<br/>• 텍스트 → 음성 변환 (TTS) 및 스피커 출력<br/>• DMC listening 모드 제어 (Service Call)<br/>• 타임아웃 관리 (20초)<br/>• 세션 종료 처리<br/>통신: Serial ↔ d_mic & d_speaker, HTTP ↔ LLM Service, ROS2 ↔ DMCdobby_vision_service (DVS)ROS2 Python Node도비 비전 AI 처리<br/>• 객체 감지 및 인식 (도서, 쓰레기, 사람)<br/>• 6D Pose Estimation (도서 위치 추정)<br/>• 피안내자 등록 및 추적<br/>• 장애물 감지 (동적/정적)<br/>• 책장/보관함 위치 식별<br/>• 도서 정위치 판별<br/>• DAC에 객체 좌표 제공<br/>• DDC에 장애물 정보 제공<br/>통신: Serial ↔ Camera & Depth Camera, ROS2 ↔ DAC & DDCdobby_arm_controller (DAC)ROS2 Python Node도비 로봇팔 제어<br/>• 매니퓰레이터 동작 계획 및 실행<br/>• 그리퍼 제어 (개폐, 파지력 조절)<br/>• 픽앤플레이스 작업 수행<br/>  - 도서 픽업/배치<br/>  - 쓰레기 수거/배출<br/>• DVS 좌표 기반 정밀 제어<br/>• 충돌 회피 및 안전 제어<br/>• 관측 자세 제어<br/>통신: Serial ↔ Robot Arm, ROS2 ↔ DMC & DVSdobby_drive_controller (DDC)ROS2 Python Node도비 주행 제어<br/>• 자율 내비게이션 (Nav2 기반)<br/>• 경로 계획 및 실행<br/>• 장애물 회피 (동적/정적)<br/>• 사람 추종 주행 (Guide Navigation)<br/>• 웨이포인트 순찰 (ROAMING 모드)<br/>• 수동 제어 명령 처리 (정지, 재개)<br/>• SLAM 및 Localization<br/>• Docking (충전소)<br/>통신: Serial ↔ Wheels & LiDAR & Depth Camera, ROS2 ↔ DMC & DVS
+=======
+### 2.2 Servers
+>>>>>>> Stashed changes
 
-2.4 Dobby Hardware
-구성 요소타입역할d_micHardware마이크 - 사용자 음성 입력 캡처d_speakerHardware스피커 - TTS 음성 출력 및 알림음d_cam (Camera1)HardwareRGB 카메라 - 객체 인식용 (도서, 사람, 쓰레기)d_depth (RGBDCamera1)HardwareRGBD 카메라 1 - 객체 거리 측정 및 3D 인식 (로봇팔 작업용)RGBDCamera2HardwareRGBD 카메라 2 - 주행 장애물 감지 및 사람 추적d_joint (Arm1)Hardware로봇팔 1 - 6축 관절 모터 (도서 픽업, 쓰레기 수거)d_wheelHardware구동 휠 모터 - 차동 구동 방식 이동d_lidarHardwareLiDAR - 2D/3D SLAM 및 장애물 감지
+| 구성 요소                           | 위치                 | 역할 및 책임             |
+| ------------------------------- | ------------------ | -------------------------------- |
+| **llm_service**                 | LLM Server (독립 서버) | - 음성 명령 처리 및 대화형 인터페이스 제공<br>  - 자연어 이해 및 의도 파악 (Intent Parsing)<br>  - 대화 문맥 관리 (로봇별 세션 유지)<br>  - 자연어 응답 생성<br>  - OpenAI API 또는 로컬 LLM 호출<br>  - DMC에 작업 요청 (필요 시)<br>  - Application Service 정보 조회 (Phase 2)<br>**타입:** HTTP REST Server (FastAPI/Flask)<br>**통신:** HTTP ↔ STT/TTS Manager, TCP ↔ App Service (Phase 2) |
+| **robot_control_service (RCS)** | JAVIS Server       | - 로봇 작업 관리 및 스케줄링<br>  - 작업 생성, 검증 및 큐 관리 (우선순위 기반)<br>  - 작업 할당 및 로봇 선택 (가용성, 배터리, 위치 기반)<br>  - 로봇 상태 모니터링 (Main/Sub State, 배터리, 위치)<br>  - 작업 실패 시 재할당<br>  - 작업 이력 및 통계 관리<br>  - Admin GUI에 실시간 상태 발행<br>**타입:** ROS2 Python Node<br>**통신:** ROS2 Action/Topic ↔ DMC, TCP ↔ App Service    |
+| **application_service**         | JAVIS Server       | - 비즈니스 로직 처리 및 데이터 관리<br>  - 도서 정보 관리 (CRUD, 위치, 재고)<br>  - 회원 정보 관리 (인증, 대출 이력)<br>  - 좌석 예약 및 현황 관리<br>  - 도서관 공간 정보 제공 (시설 위치, 좌표)<br>  - GUI 요청 처리 및 응답<br>  - RCS 작업 검증 지원<br>  - LLM Service 정보 제공 (Phase 2)<br>  - 외부 시스템(ILS) 연동<br>  - 작업 이력 로깅<br>**타입:** TCP HTTP Server (FastAPI / Spring Boot)<br>**통신:** TCP ↔ GUIs, RCS, LLM Service / SQL ↔ DB                                                                    |
+| **db**                          | JAVIS Server       | - 시스템 데이터베이스<br>  - 도서/회원/좌석 영구 데이터 저장<br>  - 작업 이력 및 통계 저장<br>  - 위치 정보 (책장, 시설) 저장<br>  - 트랜잭션 관리 및 무결성 보장<br>**타입:** PostgreSQL / MySQL<br>**통신:** SQL ↔ App Service       |
 
-2.5 Kreacher Robot
-구성 요소타입역할 및 책임kreacher_controller (KC)ROS2 Python Node크리처 로봇팔 통합 제어<br/>• 음료 제조 시퀀스 실행<br/>• 비전 시스템 조율 (그리퍼/컵/버튼 좌표 획득)<br/>• 작업 상태 보고 (RCS에)<br/>• 정밀 동작 제어 (컵 배치, 버튼 누르기)<br/>통신: Serial ↔ k_joint, ROS2 ↔ KVS & RCSkreacher_vision_service (KVS)ROS2 Python Node크리처 비전 AI 처리<br/>• 그리퍼 위치 감지<br/>• 컵 좌표 감지<br/>• 버튼 좌표 감지<br/>• KC에 좌표 정보 제공<br/>통신: Serial ↔ k_depth (Camera1 & Depthcamera1), ROS2 ↔ KC
+### 2.3 Dobby Robot
 
-2.6 Kreacher Hardware
-구성 요소타입역할k_joint (Arm2)Hardware로봇팔 2 - 6축 관절 모터 (음료 제조)k_depthHardwareDepth 카메라 - 작업 공간 3D 인식 (컵, 그리퍼, 버튼 위치)Camera1HardwareRGB 카메라 - 객체 인식용
+| 구성 요소                            | 타입               | 역할 및 책임    |
+| -------------------------------- | ---------------- | --------------------------------------------- |
+| **dobby_main_controller (DMC)**  | ROS2 Python Node | - 도비 로봇 통합 제어 및 오케스트레이션<br>  - Main/Sub State 관리 (SMACH 기반 State Machine)<br>  - 작업 실행 (Executor 패턴)<br>  - 하위 컨트롤러 조율 (DDC, DAC, DVS)<br>  - 음성 세션 상태 관리 (listening_mode)<br>  - 배터리 자동 관리 및 충전 제어<br>  - RCS 작업 할당 수락 (Action Server)<br>  - STT/TTS 상태 전환,작업  요청 수락<br>  - 긴급 제어 처리 (정지, 취소, 복귀)<br>  - 로봇 상태 실시간 발행 (10Hz)<br>  - 지원 작업: Pickup Book, Reshelving Book, Guide Person, Clean Seat, Sorting Shelves<br>  - 길안내 작업 요청(rcs) <br>**통신:** ROS2 ↔ 하위 컨트롤러, RCS, STT/TTS, GUI |
+| **stt_tts_manager**              | ROS2 Python Node | - 음성 인식 및 합성 관리<br>  - 마이크 입력 → 텍스트 변환 (STT)<br>  - Wake Word 감지 ("도비야", 로컬 처리)<br>  - DMC 상태 모니터링 (음성 인식 활성화 조건 판단)<br>  - DMC listening 모드 제어 (Service Call)<br>  - TTS 출력 및 타임아웃 관리 (20초)<br>  - 작업관련 llm service에서 수신 후 dmc에 전달 (Ros2 Service) <br>  - 세션 종료 처리<br>**통신:** Serial ↔ d_mic & d_speaker, HTTP ↔ LLM Service, ROS2 ↔ DMC       |
+| **dobby_vision_service (DVS)**   | ROS2 Python Node | - 객체 감지 및 인식 (도서, 쓰레기, 사람)<br>  - 6D Pose Estimation (도서 위치 추정)<br>  - 피안내자 등록 및 추적<br>  - 장애물 감지 (동적/정적)<br>  - 책장/보관함 위치 식별<br>  - DMC에 피안내자 등록,추적모드 변경 요청 받음 <br>  - DAC에 객체 좌표 제공 / DDC에 장애물 정보 제공<br>**통신:** Serial ↔ Camera & Depth Camera, ROS2 ↔ DAC & DDC      |
+| **dobby_arm_controller (DAC)**   | ROS2 Python Node | - 매니퓰레이터 동작 계획 및 실행<br>  - 그리퍼 제어 (개폐, 파지력 조절)<br>  - 픽앤플레이스 작업 수행 (도서 픽업/배치, 쓰레기 수거)<br>  - DVS 좌표 기반 정밀 제어 및 충돌 회피<br>  - 관측 자세 제어<br>**통신:** Serial ↔ Robot Arm, ROS2 ↔ DMC & DVS    |
+| **dobby_drive_controller (DDC)** | ROS2 Python Node | - 자율 내비게이션 (Nav2 기반)<br>  - 경로 계획 및 실행<br>  - 장애물 회피 (동적/정적)<br>  - 사람 추종 주행 (Guide Navigation)<br>  - 웨이포인트 순찰 (AUTONOMY 모드)<br>  - SLAM 및 Localization, Docking<br>  - 책장, 반납대 , 보관함 근접 시 도킹 모드  (충전소)<br>**통신:** Serial ↔ Wheels & LiDAR & Depth Camera, ROS2 ↔ DMC & DVS    |
 
-2.7 Information Desk
-구성 요소타입역할 및 책임authentication_controllerROS2/Embedded Node안내데스크 인증 장치 제어<br/>• RFID 리더 관리<br/>• 회원증 스캔 및 ID 전송<br/>• 보관함 도어락 제어 (개폐)<br/>• App Service 인증 요청<br/>통신: Serial ↔ desk_rfid & door_motor, TCP ↔ App Service
 
-2.8 Desk Hardware
-구성 요소타입역할desk_rfidHardwareRFID 리더 - 회원 인증 (회원증 태깅)door_motorHardware도어 모터 - 보관함 잠금/해제
 
-2.9 Cafe Order Payment
-구성 요소타입역할 및 책임payment_controllerEmbedded Controller카페 결제 처리<br/>• 결제 단말 연동<br/>• RFID 간편 결제 처리<br/>• 거래 승인 및 영수증 발행<br/>• 주문 확정 트리거<br/>• App Service 결제 정보 전송<br/>통신: Serial ↔ cafe_rfid, TCP ↔ App Service
 
-2.10 Cafe Hardware
-구성 요소타입역할cafe_rfidHardwareRFID 리더 - 회원증 기반 간편 결제
+### 2.4 Dobby Hardware
+```
+d_mic (Microphone) — Hardware : 사용자 음성 입력 캡처
+d_speaker (Speaker) — Hardware : TTS 음성 출력 및 알림음 재생
+d_cam (Camera1, RGB) — Hardware : 객체 인식(도서, 사람, 쓰레기)용 RGB 카메라
+d_depth (RGBDCamera1, 작업용) — Hardware : 로봇팔 작업용 거리 측정 및 3D 인식
+RGBDCamera2 (주행용) — Hardware : 주행 장애물 감지 및 사람 추적
+d_joint (Arm1, 6축) — Hardware : 도서 픽업, 쓰레기 수거 등 매니퓰레이션
+d_wheel — Hardware : 차동 구동 휠 모터
+d_lidar — Hardware : 2D/3D SLAM 및 장애물 감지
+```
 
-3. 시스템 아키텍처 다이어그램
+### 2.5 Kreacher Robot
+
+**kreacher_controller (KC)** — ROS2 Python Node 
+- 음료 제조 시퀀스 실행
+- 비전 시스템 조율(그리퍼, 컵, 버튼 좌표 획득)
+- 작업 상태를 RCS로 보고
+- 정밀 동작 제어(컵 배치, 버튼 누르기)
+- 통신: Serial ↔ k_joint, ROS2 ↔ KVS, RCS
+- kreacher_vision_service (KVS) — ROS2 Python Node
+- 그리퍼, 컵, 버튼 좌표 감지
+- KC에 좌표 정보 제공
+- 통신: Serial ↔ k_depth, Camera1 / ROS2 ↔ KC
+
+### 2.6 Kreacher Hardware
+```
+k_joint (Arm2, 6축) — Hardware : 음료 제조용 로봇팔
+k_depth (Depthcamera1) — Hardware : 객체 인식, 작업 공간 3D 인식(컵, 그리퍼, 버튼 위치)
+```
+
+### 2.7 Information Desk
+**authentication_controller** — ROS2/Embedded Node
+- RFID 리더 관리
+- 회원증 스캔 및 ID 전송
+- 보관함 도어락 제어(개폐)
+- App Service에 인증 요청
+- 통신: Serial ↔ desk_rfid, door_motor / TCP ↔ App Service
+
+### 2.8 Desk Hardware
+```
+desk_rfid — Hardware : 회원 인증용 RFID 리더(회원증 태깅)
+door_motor — Hardware : 보관함 잠금/해제 모터
+```
+
+### 2.9 Cafe Order Payment
+**payment_controller** — Embedded Controller
+- 결제 단말 연동
+- RFID 간편 결제 처리
+- 거래 승인 및 영수증 발행
+- 주문 확정 트리거
+- App Service로 결제 정보 전송
+- 통신: Serial ↔ cafe_rfid / TCP ↔ App Service
+
+### 2.10 Cafe Hardware
+```
+cafe_rfid — Hardware : 회원증 기반 간편 결제용 RFID 리더
+```
+
+## 3. 시스템 아키텍처 다이어그램
+```
 mermaid
     graph TB
         %% 스타일 정의
@@ -85,7 +157,6 @@ mermaid
         subgraph Servers[JAVIS Servers]
             subgraph LLMServer[LLM Server]
                 LLMService[LLM Service<br/>HTTP REST Server<br/>대화 처리]:::serverNode
-                LLMModel[LLM Model<br/>OpenAI/Local<br/>의도 파싱]:::aiNode
             end
             
             RCS[Robot Control Service<br/>ROS2 Node<br/>작업 스케줄링]:::robotNode
@@ -153,7 +224,6 @@ mermaid
         %% 음성 처리 핵심 흐름 (강조)
         STTTTS <-->|HTTP<br/>REST API| LLMService
         STTTTS <-->|ROS2<br/>Service/Topic| DMC
-        LLMService <-->|ROS2<br/>Service| DMC
         
         %% LLM 내부
         LLMService <-.->|HTTPS<br/>API Call| LLMModel
@@ -169,6 +239,7 @@ mermaid
         KC <-->|ROS2| KVS
         
         %% 작업 관리
+        DMC <-->|ROS2<br/>Action/Topic| STTTTS
         DMC <-->|ROS2<br/>Action/Topic| RCS
         KC <-->|ROS2<br/>Action/Topic| RCS
         RCS <-->|TCP| AppService
@@ -185,12 +256,32 @@ mermaid
         %% 스타일 적용
         linkStyle 14,15,16 stroke:#e91e63,stroke-width:4px
         linkStyle 17,18 stroke:#9c27b0,stroke-width:2px,stroke-dasharray:5
+```
+---
 
-4. 통신 프로토콜 매트릭스
-통신 구간프로토콜데이터 타입용도비고User ↔ HardwarePhysicalAudio/Touch사용자 입력/출력-Hardware ↔ Robot SWSerialBinary센서/액추에이터 제어UART, USBDobby Robot 내부ROS2Topic/Service/Action실시간 제어 및 통신DDSKreacher Robot 내부ROS2Topic/Service/Action실시간 제어 및 통신DDSSTT/TTS ↔ LLM ServiceHTTP RESTJSON음성 텍스트 파싱 요청/응답동기 방식, 5초 타임아웃STT/TTS ↔ DMCROS2Service/Topiclistening 모드 제어, 상태 수신-STT/TTS ↔ DMCROS2Service작업 요청-DMC ↔ RCSROS2Service/Action/Topic작업 생성/할당, 상태 보고-KC ↔ RCSROS2Action/Topic음료 제조 작업 할당-GUI ↔ App ServiceTCP HTTPJSON데이터 조회/수정REST APIGUI ↔ RCSTCPJSON작업 모니터링-Admin GUI ↔ DMCROS2Service긴급 제어 (정지, 취소)-LLM ↔ App ServiceTCP HTTPJSON정보 조회 (Phase 2)-App Service ↔ DBSQLSQL데이터 영속화PostgreSQL/MySQLRCS ↔ App ServiceTCP HTTPJSON작업 검증, 이력 로깅-
+## 4. 통신 프로토콜 매트릭스
 
-5. 계층 구조
-┌──────────────────────────────────────────────────────────┐
+| 통신 구간                 | 프로토콜          | 데이터 타입        | 용도            | 비고            |
+| ------------------------- | ----------------------------- | ------------------------ | ------------------------ | ------------------ |
+| **User ↔ Hardware**       | Physical | Audio / Touch | 사용자 입력 및 출력 | -           |
+| **Hardware ↔ Robot SW**   | Serial | Binary | 센서 / 액추에이터 제어 | UART, USB          |
+| **Dobby Robot 내부**        | ROS2  | Topic / Service / Action | 실시간 제어 및 통신  | DDS 기반  |
+| **Kreacher Robot 내부**     | ROS2  | Topic / Service / Action | 실시간 제어 및 통신  | DDS 기반  |
+| **STT/TTS ↔ LLM Service** | HTTP REST  | JSON  | 음성 → 텍스트 변환, 의도 파싱 요청/응답 | 동기 방식, 5초 타임아웃     |
+| **STT/TTS ↔ DMC**         | ROS2 Service / Topic  | -  | Listening 모드 제어, 상태 수신 , 파싱된 작업 요청  | -  |
+| **DMC ↔ RCS**             | ROS2 Service / Action / Topic | JSON  | 작업 생성·할당, 상태 보고  | -  |
+| **KC ↔ RCS**              | ROS2 Action / Topic  | JSON  | 음료 제조 작업 할당  | -  |
+| **INFO GUI, ORDER GUI ↔ App Service**     | TCP HTTP  | JSON  | 데이터 조회 및 수정  | REST API  |
+| **Admin GUI ↔ RCS**             | TCP  | JSON  | 작업 상태 모니터링  | -  
+| **Admin GUI ↔ DMC**       | ROS2 Service  | JSON  | 긴급 제어(정지, 취소 등)  | -   |
+| **LLM ↔ App Service**     | TCP HTTP  | JSON  | 정보 조회 (Phase 2)  | -    |
+| **App Service ↔ DB**      | SQL  | SQL Query   | 데이터 영속화   | PostgreSQL / MySQL |
+| **RCS ↔ App Service**     | TCP HTTP   | JSON   | 작업 검증, 이력 로깅   | -  |
+
+
+
+## 5. 계층 구조
+```┌──────────────────────────────────────────────────────────┐
 │                Layer 0: User Interface                   │
 │  • 음성 명령 (Wake Word "도비야", 자연어 대화)                 │
 │  • 터치 입력 (GUI 버튼, 메뉴 선택)                            │
@@ -198,42 +289,44 @@ mermaid
 └──────────────────────────────────────────────────────────┘
                           ↓
 ┌──────────────────────────────────────────────────────────┐
-│         Layer 1: Presentation (Client GUIs)               │
-│  • Dobby GUI - 로봇 터치스크린                              │
-│  • Information Desk GUI - 안내데스크 키오스크                 │
-│  • Admin GUI - 관리자 모니터링 및 제어                        │
-│  • Cafe Order GUI - 카페 주문                              │
+│         Layer 1: Presentation (Client GUIs)              │
+│  • Dobby GUI  · 터치 스크린 · 경로/진행상황 · 상태/배터리       │
+│  • Information Desk GUI  · 도서/좌석 · 예약 · 인증             │
+│  • Admin GUI  · 모니터링 · 모드 전환 · 긴급 제어              │
+│  • Cafe Order GUI  · 메뉴/주문 · 결제 · 픽업 알림              │
 └──────────────────────────────────────────────────────────┘
                           ↓
 ┌──────────────────────────────────────────────────────────┐
-│      Layer 2: Application Services (Business Logic)       │
-│  • LLM Service - 음성 대화 처리 [HTTP Server]            │
-│  • RCS - 작업 스케줄링 및 할당 [ROS2 Node]               │
-│  • Application Service - 데이터 관리 [TCP Server]         │
+│   Layer 2: Application Services (Business Logic)         │
+│  • LLM Service  · 의도 파싱 · 대화 관리 · 응답 생성            │
+│  • RCS  · 작업 생성/검증 · 우선순위 큐 · 로봇 할당             │
+│  • Application Service  · 도서/회원/좌석/공간 데이터           │
+│                         · 외부 ILS · 로그/이력                │
 └──────────────────────────────────────────────────────────┘
                           ↓
 ┌──────────────────────────────────────────────────────────┐
-│     Layer 3: Robot Coordination (Main Controllers)        │
-│  • Dobby Main Controller - 통합 제어 및 오케스트레이션    │
-│  • Kreacher Controller - 음료 제조 제어                  │
-│  • STT/TTS Manager - 음성 입출력 및 세션 관리            │
+│   Layer 3: Robot Coordination (Main Controllers)         │
+│  • DMC  · 통합 오케스트레이션 · 상태/모드 관리 · 액션 수락     │
+│  • KC   · 음료 제조 시퀀스 · RCS 연동                        │
+│  • STT/TTS Manager  · 세션/타임아웃 · listening 모드          │
 └──────────────────────────────────────────────────────────┘
                           ↓
 ┌──────────────────────────────────────────────────────────┐
-│   Layer 4: Device Control (Specialized Controllers)      │
-│  • Vision Service - 객체 인식 및 추적                    │
-│  • Arm Controller - 로봇팔 정밀 제어                     │
-│  • Drive Controller - 주행 및 내비게이션                     │
+│  Layer 4: Device Control (Specialized Controllers)       │
+│  • Vision Service  · 객체 인식 · 포즈 추정 · 추적              │
+│  • Arm Controller  · 플래닝 · 파지력 · 충돌 회피              │
+│  • Drive Controller · Nav2 · SLAM/Localization · 도킹        │
 └──────────────────────────────────────────────────────────┘
-↓
+                          ↓
 ┌──────────────────────────────────────────────────────────┐
-│      Layer 5: Hardware (Sensors & Actuators)             │
-│  • 센서: Mic, Camera, Depth Camera, LiDAR                │
+│     Layer 5: Hardware (Sensors & Actuators)              │
+│  • 센서: Mic, RGB/RGBD Cameras, LiDAR                    │
 │  • 액추에이터: Speaker, Robot Arm, Wheels, Door Motor    │
-│  • 인증: RFID Reader, Payment Terminal                   │
+│  • 인증/결제: RFID Readers, Payment Terminal             │
 └──────────────────────────────────────────────────────────┘
 
----
+```
+
 
 ## 6. 주요 데이터 흐름
 
@@ -434,6 +527,7 @@ mermaid
 ```
 
 ### 6.5 관리자 로봇 모드 변경 플로우
+```
 [Admin GUI]
     └─ "Dobby1" 선택 → "roaming" 모드 버튼 클릭
          ↓
@@ -469,7 +563,7 @@ mermaid
          ↓
 [Admin GUI]
     └─ 알림: "Dobby1 긴급 정지 해제됨. IDLE 상태로 복귀."
-
+```
 ---
 
 ## 7. 상태 관리
