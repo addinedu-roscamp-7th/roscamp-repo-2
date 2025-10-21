@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'javis_rcs'
 
@@ -10,6 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yma]*'))),
     ],
     install_requires=['setuptools', 'flask'],
     zip_safe=True,
@@ -24,7 +27,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'pickup_book = javis_rcs.pickup_book:main'
+            'pickup_book = javis_rcs.pickup_book:main',
+            'clean_seat = javis_rcs.clean_seate:main'
         ],
     },
 )
