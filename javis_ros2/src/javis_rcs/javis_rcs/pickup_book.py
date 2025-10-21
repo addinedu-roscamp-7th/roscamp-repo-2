@@ -5,22 +5,26 @@ from javis_interfaces.action import PickupBook
 from rclpy.task import Future
 from geometry_msgs.msg import Pose2D
 from geometry_msgs.msg import Pose
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, current_app
+import threading
 
-
-flask_app = Flask(__name__)
-
-@flask_app.route("/pickup_book", methods=['POST'])
-def receive_json():
-
-    if request.is_json:
-        data = request.get_json()
+app = Flask(__name__) # Flask 앱 인스턴스 생성
+namespace = 'dobby1/main'
 
 class PickupClient(Node):
-    def __init__(self, namespace=''):
+    def __init__(self, namespace='', flask_port=8001):
         super().__init__('pickup_client', namespace=namespace)
         self.dobby_client = ActionClient(self, PickupBook, 'pickup_book')
-
+        self.flask_thread = threading.Thread(target=self._run_flask_server, args=(flask_port,))
+        self.flask_thread.daemon = True
+        self.flask_thread.start()
+        self.get_logger().info(f'Flask Server running on port {flask_port}')
+    
+    def _run_flask_server(self, port):
+        # Flask 앱 컨텍스트에 ROS 노드 인스턴스를 저장합니다.
+        app.config['ros_node'] = self
+        app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+    
     def pickup_send_goal(self,
                         book_id: str,
                         shelf_approach_location: Pose2D,
@@ -48,32 +52,55 @@ class PickupClient(Node):
         fb = feedback.feedback
         self.get_logger().info(f'dobby pickup feedback: {fb.progress_percent}%')
 
-def main(self):
+    def listener_callback(self, msg):
+        self.get_logger().info(f'I heard: {msg.data}')
+        namespace = msg.data
+# Flask 라우트를 클래스 외부에서 정의합니다.
+@app.route('/robot/pickup', methods=['POST'])
+def pickup_handler():
+    # app.config에서 ROS 노드 인스턴스를 가져옵니다.
+    node = current_app.config['ros_node']
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'status': 'error', 'message': 'Invalid JSON'}), 400
+
+        node.get_logger().info(f'Received JSON data: {data}')
+
+        # JSON 데이터로부터 필요한 정보를 추출합니다.
+        book_id = data.get('task_name', "default_task_name")
+        book_info = data.get('book_info', {})
+        location = data.get('location', {})
+        storage_info = data.get('storage_info', {})
+        storage_id = storage_info.get('storage_id', 0)
+        shelf_info = data.get('shelf_info', {})
+        shelf_location = shelf_info.get('shelf_location', {})
+        shelf_approach_location = Pose2D(x=shelf_location.get('x', 0.0), y=shelf_location.get('y', 0.0), theta=shelf_location.get('facing', 0.0))
+        book_pick_pose = Pose(x=book_info.get('x', 0.0), y=book_info.get('y', 0.0), z=book_info.get('z', 0.0))
+        storage_approach_location = Pose2D(x=storage_info.get('location_x', 0.0), y=storage_info.get('location_y', 0.0), theta=storage_info.get('location_facing', 0.0))
+        storage_slot_pose = Pose(x=storage_info.get('pose_x', 0.0), y=storage_info.get('pose_y', 0.0), z=storage_info.get('pose_z', 0.0))
+        
+        # ROS 액션 목표 전송
+        pickup_goal_future = node.pickup_send_goal(
+            book_id=book_id,
+            storage_id=storage_id,
+            book_pick_pose=book_pick_pose,
+            storage_approach_location=storage_approach_location,
+            storage_slot_pose=storage_slot_pose,
+            shelf_approach_location=shelf_approach_location
+        )
+        
+        # 여기서 액션 결과를 기다리지 않고 바로 응답합니다.
+        # 결과는 ROS 로그를 통해 비동기적으로 확인됩니다.
+        return jsonify({'status': 'success', 'message': 'Pickup goal sent.'})
+
+    except Exception as e:
+        node.get_logger().error(f'Error processing /robot/pickup request: {e}')
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+def main():
     rclpy.init()
-    pickup_node = PickupClient(namespace='dobby1/main')
-    
-    pickup_goal_future = pickup_node.pickup_send_goal(
-        book_id = "Ga01",
-        storage_id = 3,
-        shelf_approach_location = Pose2D(x=1.0, y=2.0, theta=3.0),
-        book_pick_pose = Pose(x=4.0, y=5.0, z=6.0),   
-        storage_approach_location = Pose2D(x=7.0, y=8.0, theta=9.0),
-        storage_slot_pose = Pose(x=10.0, y=11.0, z=12.0)
 
-
-    )
-    def pickup_goal_response_cb(future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            pickup_node.get_logger().info('Goal rejected')
-            return
-        result_future = goal_handle.get_result_async()
-
-        def result_cb(r_future):
-            result = r_future.result().result
-            pickup_node.get_logger().info(f'Result  book_id:{result.book_id}, storage_id:{result.storage_id}, success: {"성공" if result.success else "실패"}, message: {result.message}, total_distance_m: {result.total_distance_m}m, total_time_sec: {result.total_time_sec}초')
-            rclpy.shutdown()
-        result_future.add_done_callback(result_cb)
-    pickup_goal_future.add_done_callback(pickup_goal_response_cb)
-
+    pickup_node = PickupClient(namespace=namespace)
     rclpy.spin(pickup_node)
+    rclpy.shutdown()

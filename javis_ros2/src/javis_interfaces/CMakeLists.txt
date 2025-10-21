@@ -44,7 +44,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/main/PickupBook.action"
   "action/main/ReshelvingBook.action"
   "srv/test/MyJson.srv"
-
+  "msg/main/BookInfo.msg"
+  "msg/main/Location.msg"
+  "msg/main/StorageInfo.msg"
+  "msg/main/BookPicupJson.msg"
+  
   DEPENDENCIES 
   std_msgs
   builtin_interfaces

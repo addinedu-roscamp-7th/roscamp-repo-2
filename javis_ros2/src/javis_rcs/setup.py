@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'flask'],
     zip_safe=True,
     maintainer='addinedu',
     maintainer_email='danny981027@gmail.com',
@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'pickup_book = javis_rcs.pickup_book:main'
         ],
     },
 )
