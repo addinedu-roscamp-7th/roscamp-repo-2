@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>javis_kc</name>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
+  <maintainer email="jetcobot@todo.todo">jetcobot</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <!-- ★★★★★ 여기에 아래 두 줄을 추가하세요 ★★★★★ -->
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <!-- ★★★★★ 여기까지 ★★★★★ -->
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
