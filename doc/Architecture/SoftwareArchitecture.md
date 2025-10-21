@@ -27,11 +27,6 @@ Kreacher 로봇: 도서관 카페 음료 제조
 
 ## 2. 소프트웨어 컴포넌트 역할
 
-<<<<<<< Updated upstream
-2. 소프트웨어 컴포넌트 역할
-2.1 Client GUIs
-구성 요소위치역할 및 책임dobby_guiDobby Robot도비 로봇 터치스크린 인터페이스<br/>• 길안내 목적지 선택 및 경로 표시<br/>• 도서 픽업 진행상황 실시간 표시<br/>• 사용자 인터랙션 화면 제공 (음성 인식 시작 버튼 등)<br/>• 피안내자 인식 안내 화면<br/>• 로봇 상태 및 배터리 표시<br/>통신: ROS2 ↔ DMCinformation_desk_guiInformation Desk PC도서관 안내데스크 키오스크<br/>• 도서 검색 및 조회 (제목, 저자, ISBN)<br/>• 도서 예약 및 픽업 요청<br/>• 좌석 예약 및 현황 조회<br/>• 회원 인증 (RFID 스캔)<br/>• 픽업 보관함 상태 표시 및 개폐 제어<br/>통신: TCP ↔ App Service, Serial ↔ Authentication Controlleradmin_guiAdmin PC관리자 모니터링 및 제어 인터페이스<br/><br/>• 로봇 모드 관리 (standby/roaming)<br/>• 로봇 상태/위치 실시간 모니터링 (지도 기반)<br/>• 작업 큐 및 진행 상황 모니터링<br/>• 로봇 모드 전환 (대기/자율이동)<br/>• 긴급 제어 (정지, 작업 취소, IDLE 복귀)<br/>• 시스템 통계 및 작업 이력 조회<br/>• 알림 수신 (에러, 배터리 경고 등)<br/>통신: TCP ↔ App Service & RCS, ROS2 ↔ DMC (긴급)cafe_order_guiCafe Order PC카페 주문 키오스크<br/>• 메뉴 조회 및 주문<br/>• 주문 상태 표시 (대기, 제조중, 완료)<br/>• 픽업 알림<br/>• 결제 처리 (RFID 간편결제)<br/>통신: TCP ↔ App Service, Serial ↔ Payment Controller
-=======
 ### 2.1 Client GUIs
 | 구성 요소                    | 위치                  | 역할 및 책임    |
 | ------------------------ | ------------------- | ------------- |
@@ -39,15 +34,9 @@ Kreacher 로봇: 도서관 카페 음료 제조
 | **information_desk_gui** | Information Desk PC | - 도서관 안내데스크 키오스크<br>  - 도서 검색 및 조회 (제목, 저자, ISBN)<br>  - 도서 예약 및 픽업 요청<br>  - 좌석 예약 및 현황 조회<br>  - 회원 인증 (RFID 스캔)<br>  - 픽업 보관함 상태 표시 및 개폐 제어<br>**통신:** TCP ↔ App Service, Serial ↔ Authentication Controller                                                                            |
 | **admin_gui**            | Admin PC            | - 관리자 모니터링 및 제어 인터페이스<br>  - 로봇 모드 관리 (standby/autonomy)<br>  - 로봇 상태/위치 실시간 모니터링 (지도 기반)<br>  - 작업 큐 및 진행 상황 모니터링<br>  - 로봇 모드 전환 (대기/자율이동)<br>  - 긴급 제어 (정지, 작업 취소, IDLE 복귀)<br>  - 시스템 통계 및 작업 이력 조회<br>  - 알림 수신 (에러, 배터리 경고 등)<br>**통신:** TCP ↔ App Service & RCS, ROS2 ↔ DMC (긴급 제어) |
 | **cafe_order_gui**       | Cafe Order PC       | - 카페 주문 키오스크<br>  - 메뉴 조회 및 주문<br>  - 주문 상태 표시 (대기, 제조 중, 완료)<br>  - 픽업 알림<br>  - 결제 처리 (RFID 간편결제)<br>**통신:** TCP ↔ App Service, Serial ↔ Payment Controller  |
->>>>>>> Stashed changes
 
 
-<<<<<<< Updated upstream
-2.3 Dobby Robot
-구성 요소타입역할 및 책임dobby_main_controller (DMC)ROS2 Python Node도비 로봇 통합 제어 및 오케스트레이션<br/>• Main/Sub State 관리 (SMACH 기반 State Machine)<br/>• 작업 실행 (Executor 패턴)<br/>• 하위 컨트롤러 조율 (DDC, DAC, DVS)<br/>• 음성 세션 상태 관리 (listening_mode)<br/>• 배터리 자동 관리 및 충전 제어<br/>• RCS 작업 할당 수락 (Action Server)<br/>• LLM Service 작업 요청 수락 (Service Server)<br/>• STT/TTS 상태 전환 요청 수락<br/>• 긴급 제어 처리 (정지, 취소, 복귀)<br/>• 로봇 상태 실시간 발행 (10Hz)<br/>지원 작업: Pickup Book, Reshelving Book, Guide Person, Clean Seat, Sorting Shelves<br/>통신: ROS2 ↔ 모든 하위 컨트롤러 & RCS & STT/TTS & GUIstt_tts_managerROS2 Python Node음성 인식 및 합성 관리<br/>• 마이크 입력 → 텍스트 변환 (STT)<br/>• Wake Word 감지 ("도비야", 로컬 처리)<br/>• DMC 상태 모니터링 (음성 인식 활성화 조건 판단)<br/>  - IDLE or ROAMING → 음성 인식 활성화<br/>  - 작업 수행 중 → 음성 인식 비활성화<br/>• LLM Service HTTP 통신 (의도 파싱 요청)<br/>• 텍스트 → 음성 변환 (TTS) 및 스피커 출력<br/>• DMC listening 모드 제어 (Service Call)<br/>• 타임아웃 관리 (20초)<br/>• 세션 종료 처리<br/>통신: Serial ↔ d_mic & d_speaker, HTTP ↔ LLM Service, ROS2 ↔ DMCdobby_vision_service (DVS)ROS2 Python Node도비 비전 AI 처리<br/>• 객체 감지 및 인식 (도서, 쓰레기, 사람)<br/>• 6D Pose Estimation (도서 위치 추정)<br/>• 피안내자 등록 및 추적<br/>• 장애물 감지 (동적/정적)<br/>• 책장/보관함 위치 식별<br/>• 도서 정위치 판별<br/>• DAC에 객체 좌표 제공<br/>• DDC에 장애물 정보 제공<br/>통신: Serial ↔ Camera & Depth Camera, ROS2 ↔ DAC & DDCdobby_arm_controller (DAC)ROS2 Python Node도비 로봇팔 제어<br/>• 매니퓰레이터 동작 계획 및 실행<br/>• 그리퍼 제어 (개폐, 파지력 조절)<br/>• 픽앤플레이스 작업 수행<br/>  - 도서 픽업/배치<br/>  - 쓰레기 수거/배출<br/>• DVS 좌표 기반 정밀 제어<br/>• 충돌 회피 및 안전 제어<br/>• 관측 자세 제어<br/>통신: Serial ↔ Robot Arm, ROS2 ↔ DMC & DVSdobby_drive_controller (DDC)ROS2 Python Node도비 주행 제어<br/>• 자율 내비게이션 (Nav2 기반)<br/>• 경로 계획 및 실행<br/>• 장애물 회피 (동적/정적)<br/>• 사람 추종 주행 (Guide Navigation)<br/>• 웨이포인트 순찰 (ROAMING 모드)<br/>• 수동 제어 명령 처리 (정지, 재개)<br/>• SLAM 및 Localization<br/>• Docking (충전소)<br/>통신: Serial ↔ Wheels & LiDAR & Depth Camera, ROS2 ↔ DMC & DVS
-=======
 ### 2.2 Servers
->>>>>>> Stashed changes
 
 | 구성 요소                           | 위치                 | 역할 및 책임             |
 | ------------------------------- | ------------------ | -------------------------------- |
