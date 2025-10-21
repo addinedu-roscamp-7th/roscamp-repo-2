@@ -43,6 +43,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/main/PerformTask.action"
   "action/main/PickupBook.action"
   "action/main/ReshelvingBook.action"
+  "srv/test/MyJson.srv"
 
   DEPENDENCIES 
   std_msgs
