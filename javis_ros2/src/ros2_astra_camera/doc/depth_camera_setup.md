@@ -22,6 +22,8 @@ export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
 
 ### 3.2 libuvc 빌드 및 설치
 ```bash
+
+# 로컬에서 dev_libs폴더를 생성하여 디펜던시 패키지를 보관 후 빌드하는게 좋음..
 mkdir -p ~/dev_libs
 cd ~/dev_libs
 git clone https://github.com/libuvc/libuvc.git
