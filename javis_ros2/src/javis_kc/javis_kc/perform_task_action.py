@@ -9,6 +9,7 @@ import time
 import math
 import threading
 import numpy as np
+import subprocess
 from enum import Enum  # 상태 관리를 위해 Enum 추가
 
 # TF2 라이브러리 임포트
@@ -20,7 +21,6 @@ import rclpy.duration
 
 class RobotState(Enum):
     WAITING_FOR_OBJECT = 1
-    MOVING_TO_APPROACH_POSITION = 2
     LOWERING_TO_PICK = 3
     GRIPPING = 4
     RAISING_AFTER_PICK = 5
@@ -31,16 +31,32 @@ class RobotState(Enum):
 class PerformTaskActionServer(Node):
     def __init__(self):
         super().__init__('perform_task_action_server')
+        tf_cmd = [
+            "ros2", "run", "tf2_ros", "static_transform_publisher",
+            "0.4", "-0.245", "0.07", "-1.5707", "3.1415", "1.5707",
+            "base_link", "camera_link"
+        ]
+        subprocess.Popen(tf_cmd)
+        self.get_logger().info('정적 TF 발행')
+
+        cmd = [
+            "ros2", "run", "tfmaker", "mycobot_tf_broadcaster"
+        ]
+        subprocess.Popen(cmd)
+        self.get_logger().info('myCobot 동적 TF 발행')
+
         self._action_server = ActionServer(
             self,
             PerformTask,
             '/kreacher/action/perform_task',
             self.execute_callback
         )
+
         self.feedback_msg = PerformTask.Feedback()
 
         self.mc = MyCobot280("/dev/ttyJETCOBOT", 1000000)
         self.mc.thread_lock = False
+        self.mc.send_coords([0, 0, 0, -90, 0, 45], 50)
         self.get_logger().info('MyCobot 연결 완료')
         # TF 리스너 및 버퍼 초기화
         self.tf_buffer = Buffer()
@@ -52,7 +68,7 @@ class PerformTaskActionServer(Node):
 
         # --- 상태 관리 변수 추가 ---
         self.state = RobotState.WAITING_FOR_OBJECT
-        self.target_coords = None  # 목표 좌표 저장 변수
+        self.target_coords = [0.0, 0.0, 0.0]  # 목표 좌표 저장 변수
         self.approach_height = 225  # 접근 높이 (mm)
         self.pick_height_offset = 10  # 물체 높이 + 추가 오프셋 (mm)
 
@@ -60,23 +76,21 @@ class PerformTaskActionServer(Node):
         self.lock = threading.Lock()
 
         # 상태 머신을 실행할 메인 제어 루프 타이머
-        self.control_timer = self.create_timer(0.5, self.control_loop)
         self.get_logger().info('액션서버 시작')
 
     def execute_callback(self, goal_handle):
-        print(goal_handle.request.member_id)
-        robot_status = 'MOVING'
         move_robot_arm_client = MoveRobotArmClient()
-        while robot_status != 'DONE':
+        res = move_robot_arm_client.send_request()
+        x, y, z = res.x, res.y, res.z
+        self.get_logger().info(f'x: {x}, y: {y}, z: {z}')
+        if x != 0.0 and y != 0.0 and z != 0.0:
+            self.target_coords = [x, y, z]
+            self.state = RobotState.LOWERING_TO_PICK
+        self.feedback_msg.progress_percentage = 0.0
+        while RobotState.RETURNING_HOME != 6:
             self.get_logger().info('로봇이 이동중입니다. 잠시만 기다려주세요')
-            res = move_robot_arm_client.send_request()
-            x, y, z = res.x, res.y, res.z
-            if x != 0.0 and y != 0.0 and z != 0.0:
-                self.target_coords = [x, y, z]
-                self.state = RobotState.MOVING_TO_APPROACH_POSITION
-            self.feedback_msg.progress_percentage = 0.0
             goal_handle.publish_feedback(self.feedback_msg)
-            # self.mc.sync_send_coords()
+            self.control_loop()
             time.sleep(2)
 
         # 작업 완료
@@ -93,11 +107,11 @@ class PerformTaskActionServer(Node):
         roll_rad = math.radians(roll)
         pitch_rad = math.radians(pitch)
         yaw_rad = math.radians(yaw)
-        cy = math.cos(yaw_rad * 0.5);
+        cy = math.cos(yaw_rad * 0.5)
         sy = math.sin(yaw_rad * 0.5)
-        cp = math.cos(pitch_rad * 0.5);
+        cp = math.cos(pitch_rad * 0.5)
         sp = math.sin(pitch_rad * 0.5)
-        cr = math.cos(roll_rad * 0.5);
+        cr = math.cos(roll_rad * 0.5)
         sr = math.sin(roll_rad * 0.5)
         q = [0.0] * 4
         q[3] = cr * cp * cy + sr * sp * sy  # w
@@ -137,18 +151,9 @@ class PerformTaskActionServer(Node):
 
     def control_loop(self):
         """상태에 따라 로봇을 제어하는 메인 루프"""
-        if self.state == RobotState.WAITING_FOR_OBJECT:
-            # UDP 스레드가 좌표를 받으면 상태가 변경될 때까지 대기
-            return
-
-        if self.state == RobotState.MOVING_TO_APPROACH_POSITION:
-            self.get_logger().info("상태: [MOVING_TO_APPROACH_POSITION]")
-
-            time.sleep(3)  # 이동 대기
-            self.state = RobotState.LOWERING_TO_PICK  # 다음 상태로 전환
-
-        elif self.state == RobotState.LOWERING_TO_PICK:
+        if self.state == RobotState.LOWERING_TO_PICK:
             self.get_logger().info("상태: [LOWERING_TO_PICK]")
+            self.feedback_msg.progress_percentage = 30.0
             current_coords = self.mc.get_coords()
             if not current_coords: return
 
@@ -161,11 +166,10 @@ class PerformTaskActionServer(Node):
                 current_coords[4],
                 current_coords[5]
             ]
-            approach_test1 = self.mc.send_coords(pick_coords, 30, 0)
-            if not approach_test1:
-                self.get_logger().info("이동안했음.")
+            result = self.mc.sync_send_coords(pick_coords, 30, 0)
             time.sleep(2)
-            self.state = RobotState.GRIPPING
+            if result == 1:
+                self.state = RobotState.GRIPPING
 
         elif self.state == RobotState.GRIPPING:
             self.get_logger().info("상태: [GRIPPING]")
