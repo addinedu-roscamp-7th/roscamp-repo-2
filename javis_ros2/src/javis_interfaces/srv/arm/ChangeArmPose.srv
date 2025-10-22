@@ -1,7 +1,7 @@
-# 로봇팔 자세 변경
+# ChangeArmPose.srv
 
 # Request (요청)
-uint8 pose_type # 0 : 관측자세, 1 : 초기자세, 2 : 사용자 지정 자세
+uint8 pose_type # 0 : 초기자세,1 : 사용자 지정 자세
 geometry_msgs/Pose target_pose  # 관측 또는 사용자 지정 자세의 목표 위치
 ---
 # Response (응답)
