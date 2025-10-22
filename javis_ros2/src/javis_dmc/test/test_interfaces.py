@@ -5,7 +5,6 @@ Tests both abstract interfaces and mock implementations.
 
 import unittest
 import time
-from unittest.mock import Mock, patch
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, Point, Quaternion
@@ -13,15 +12,13 @@ from geometry_msgs.msg import Pose, Point, Quaternion
 # Import interfaces
 from javis_dmc.interfaces import (
     BaseInterface, DriveInterface, ArmInterface, AIInterface,
-    GUIInterface, LLMInterface, TTSInterface, STTInterface,
-    BookPose, BoxStatus, ShelfInfo, TrashInfo, Intent, STTResult
+    GUIInterface, BookPose, BoxStatus, ShelfInfo, TrashInfo
 )
 
 # Import mock implementations
 from javis_dmc.mock import (
     MockDriveInterface, MockArmInterface, MockAIInterface,
-    MockGUIInterface, MockLLMInterface, MockTTSInterface, MockSTTInterface,
-    MockResponse
+    MockGUIInterface, MockResponse
 )
 
 
@@ -135,6 +132,17 @@ class TestMockDriveInterface(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertEqual(result.error_code, "PATH_NOT_FOUND")
 
+    def test_mock_drive_resume(self):
+        """Test mock resume functionality."""
+        self.drive.initialize()
+
+        # Successful resume
+        self.assertTrue(self.drive.resume())
+
+        # Configure resume to fail
+        self.drive.set_mock_response('resume', MockResponse(success=False))
+        self.assertFalse(self.drive.resume(reason="test_reason"))
+
 
 class TestMockArmInterface(unittest.TestCase):
     """Test cases for MockArmInterface."""
@@ -225,12 +233,11 @@ class TestMockAIInterface(unittest.TestCase):
         """Test mock person tracking."""
         self.ai.initialize()
         
-        # Register person
-        tracking_id = self.ai.register_person()
-        self.assertIsNotNone(tracking_id)
-        self.assertTrue(tracking_id.startswith("person_"))
+        # Change tracking mode to registration to simulate detection
+        result = self.ai.change_tracking_mode("registration")
+        self.assertTrue(result)
         
-        # Change tracking mode
+        # Switch to follow mode
         result = self.ai.change_tracking_mode("follow")
         self.assertTrue(result)
         
@@ -249,164 +256,6 @@ class TestMockAIInterface(unittest.TestCase):
         # Note: This might be flaky in CI, consider making it more deterministic
 
 
-class TestMockLLMInterface(unittest.TestCase):
-    """Test cases for MockLLMInterface."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        if not rclpy.ok():
-            rclpy.init()
-        self.node = Node('test_llm_node')
-        self.llm = MockLLMInterface(self.node, "dobby1")
-    
-    def tearDown(self):
-        """Clean up test fixtures."""
-        self.llm.shutdown()
-        self.node.destroy_node()
-    
-    def test_mock_llm_book_query(self):
-        """Test mock book query parsing."""
-        self.llm.initialize()
-        
-        # Test book-related query
-        intent = self.llm.parse_book_query("어린왕자 책 찾아줘")
-        self.assertIsNotNone(intent)
-        self.assertEqual(intent.action, "book_voice")
-        self.assertIn("book_id", intent.parameters)
-        
-        # Test non-book query
-        intent = self.llm.parse_book_query("안녕하세요")
-        self.assertIsNone(intent)
-    
-    def test_mock_llm_guide_query(self):
-        """Test mock guide query parsing."""
-        self.llm.initialize()
-        
-        # Test guide-related query
-        intent = self.llm.parse_guide_query("화장실 어디야")
-        self.assertIsNotNone(intent)
-        self.assertEqual(intent.action, "road_voice")
-        self.assertEqual(intent.parameters["destination"], "화장실")
-    
-    def test_mock_llm_session(self):
-        """Test mock session management."""
-        self.llm.initialize()
-        
-        # Set session ID
-        result = self.llm.set_session_id("test_session_123")
-        self.assertTrue(result)
-        
-        # Check session ID
-        session_id = self.llm.get_session_id()
-        self.assertEqual(session_id, "test_session_123")
-
-
-class TestMockTTSInterface(unittest.TestCase):
-    """Test cases for MockTTSInterface."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        if not rclpy.ok():
-            rclpy.init()
-        self.node = Node('test_tts_node')
-        self.tts = MockTTSInterface(self.node, "dobby1")
-    
-    def tearDown(self):
-        """Clean up test fixtures."""
-        self.tts.shutdown()
-        self.node.destroy_node()
-    
-    def test_mock_tts_speak(self):
-        """Test mock speak functionality."""
-        self.tts.initialize()
-        
-        # Test speak with wait
-        result = self.tts.speak("안녕하세요", wait=True)
-        self.assertTrue(result)
-        self.assertFalse(self.tts.is_speaking())
-        
-        # Test speak without wait
-        result = self.tts.speak("테스트 메시지", wait=False)
-        self.assertTrue(result)
-        # Note: is_speaking() might be True or False depending on timing
-    
-    def test_mock_tts_duration(self):
-        """Test mock duration estimation."""
-        self.tts.initialize()
-        
-        duration = self.tts.get_estimated_duration("테스트", speed=1.0)
-        self.assertIsNotNone(duration)
-        self.assertGreater(duration, 0)
-        
-        # Test with different speed
-        duration_fast = self.tts.get_estimated_duration("테스트", speed=2.0)
-        self.assertLess(duration_fast, duration)
-
-
-class TestMockSTTInterface(unittest.TestCase):
-    """Test cases for MockSTTInterface."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        if not rclpy.ok():
-            rclpy.init()
-        self.node = Node('test_stt_node')
-        self.stt = MockSTTInterface(self.node, "dobby1")
-    
-    def tearDown(self):
-        """Clean up test fixtures."""
-        self.stt.shutdown()
-        self.node.destroy_node()
-    
-    def test_mock_stt_listening(self):
-        """Test mock listening functionality."""
-        self.stt.initialize()
-        
-        # Test start listening
-        result = self.stt.start_listening()
-        self.assertTrue(result)
-        self.assertTrue(self.stt.is_listening())
-        
-        # Test stop listening
-        result = self.stt.stop_listening()
-        self.assertTrue(result)
-        self.assertFalse(self.stt.is_listening())
-    
-    def test_mock_stt_wake_word(self):
-        """Test mock wake word functionality."""
-        self.stt.initialize()
-        
-        # Test set wake word
-        result = self.stt.set_wake_word("헤이 도비")
-        self.assertTrue(result)
-        self.assertEqual(self.stt.get_wake_word(), "헤이 도비")
-    
-    def test_mock_stt_simulation(self):
-        """Test mock speech input simulation."""
-        self.stt.initialize()
-        
-        # Subscribe to results
-        results = []
-        def stt_callback(result):
-            results.append(result)
-        
-        self.stt.subscribe_stt_result(stt_callback)
-        self.stt.start_listening()
-        
-        # Simulate speech input
-        self.stt.simulate_speech_input("테스트 음성", confidence=0.95)
-        
-        # Check result
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].text, "테스트 음성")
-        self.assertEqual(results[0].confidence, 0.95)
-        
-        # Check latest result
-        latest = self.stt.get_latest_result()
-        self.assertIsNotNone(latest)
-        self.assertEqual(latest.text, "테스트 음성")
-
-
 def main():
     """Run all interface tests."""
     # Initialize ROS2
@@ -422,9 +271,6 @@ def main():
         suite.addTests(loader.loadTestsFromTestCase(TestMockDriveInterface))
         suite.addTests(loader.loadTestsFromTestCase(TestMockArmInterface))
         suite.addTests(loader.loadTestsFromTestCase(TestMockAIInterface))
-        suite.addTests(loader.loadTestsFromTestCase(TestMockLLMInterface))
-        suite.addTests(loader.loadTestsFromTestCase(TestMockTTSInterface))
-        suite.addTests(loader.loadTestsFromTestCase(TestMockSTTInterface))
         
         # Run tests
         runner = unittest.TextTestRunner(verbosity=2)

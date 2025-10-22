@@ -1,8 +1,15 @@
 from enum import IntEnum
 
 
+class RobotMode(IntEnum):
+    '''DMC 운영 모드 정의.'''
+
+    STANDBY = 0
+    AUTONOMY = 1
+
+
 class MainState(IntEnum):
-    '''DMC 메인 상태 정의.'''
+    '''DMC 메인 상태 정의 (문서 v6.0 기준).'''
 
     INITIALIZING = 0
     CHARGING = 1
@@ -14,6 +21,9 @@ class MainState(IntEnum):
     CLEANING_DESK = 7
     SORTING_SHELVES = 8
     FORCE_MOVE_TO_CHARGER = 9
+    LISTENING = 10
+    ROAMING = 11
+    EMERGENCYC_STOP = 98
     MAIN_ERROR = 99
 
 

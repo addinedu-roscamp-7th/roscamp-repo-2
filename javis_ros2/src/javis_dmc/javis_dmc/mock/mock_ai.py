@@ -139,22 +139,6 @@ class MockAIInterface(AIInterface, MockBase):
         self.logger.info(f"Mock detected {len(trash_list)} trash items")
         return trash_list
     
-    def register_person(self) -> Optional[str]:
-        """Mock register person implementation."""
-        self.logger.info("Mock register_person")
-        response = self.get_mock_response('register_person')
-        
-        if response.delay > 0:
-            time.sleep(response.delay)
-        
-        if response.success:
-            self._tracking_id = f"person_{int(time.time())}"
-            self._person_detected = True
-            self.logger.info(f"Mock registered person with ID: {self._tracking_id}")
-            return self._tracking_id
-        
-        return None
-    
     def change_tracking_mode(self, mode: str) -> bool:
         """Mock change tracking mode implementation."""
         self.logger.info(f"Mock change_tracking_mode: {mode}")
@@ -165,9 +149,13 @@ class MockAIInterface(AIInterface, MockBase):
         
         if response.success:
             self._tracking_mode = mode
-            if mode == "disabled":
+            if mode in ("disabled", "idle"):
                 self._person_detected = False
                 self._tracking_id = None
+            elif mode in ("registration", "follow", "tracking"):
+                if self._tracking_id is None:
+                    self._tracking_id = f"person_{int(time.time())}"
+                self._person_detected = True
         
         return response.success
     

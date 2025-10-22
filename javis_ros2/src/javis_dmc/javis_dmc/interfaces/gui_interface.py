@@ -14,10 +14,6 @@ class GUIInterface(BaseInterface):
     '''도비 GUI와 통신하는 추상 인터페이스.'''
 
     @abstractmethod
-    def update_screen(self, screen_type: str, data: Dict[str, Any]) -> bool:
-        '''화면 종류와 데이터를 받아 GUI를 갱신한다.'''
-
-    @abstractmethod
     def subscribe_screen_event(self, callback: Callable[[Dict[str, Any]], None]) -> bool:
         '''GUI 이벤트를 구독한다.'''
 
@@ -28,17 +24,11 @@ class RosGUIInterface(GUIInterface):
     def __init__(self, node, namespace: str = ''):
         super().__init__(node, namespace)
         self._cb_group = ReentrantCallbackGroup()
-        self._update_pub = None
         self._event_sub = None
         self._event_callback: Optional[Callable[[Dict[str, Any]], None]] = None
 
     def initialize(self) -> bool:
         '''GUI 토픽을 초기화한다.'''
-        self._update_pub = self.node.create_publisher(
-            String,
-            self._create_topic_name('gui/update_screen'),
-            10,
-        )
         self._event_sub = self.node.create_subscription(
             String,
             self._create_topic_name('gui/screen_event'),
@@ -49,16 +39,6 @@ class RosGUIInterface(GUIInterface):
         self._set_initialized(True)
         return True
 
-    def update_screen(self, screen_type: str, data: Dict[str, Any]) -> bool:
-        '''GUI에 화면 갱신 요청을 발행한다.'''
-        if self._update_pub is None:
-            return False
-        payload = {'screen': screen_type, 'data': data}
-        msg = String()
-        msg.data = json.dumps(payload, ensure_ascii=False)
-        self._update_pub.publish(msg)
-        return True
-
     def subscribe_screen_event(self, callback: Callable[[Dict[str, Any]], None]) -> bool:
         '''GUI 이벤트 콜백을 설정한다.'''
         self._event_callback = callback
@@ -66,9 +46,6 @@ class RosGUIInterface(GUIInterface):
 
     def shutdown(self) -> None:
         '''생성된 자원을 정리한다.'''
-        if self._update_pub is not None:
-            self.node.destroy_publisher(self._update_pub)
-            self._update_pub = None
         if self._event_sub is not None:
             self.node.destroy_subscription(self._event_sub)
             self._event_sub = None

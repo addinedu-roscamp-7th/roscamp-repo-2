@@ -27,21 +27,6 @@ class MockGUIInterface(GUIInterface, MockBase):
         self._set_initialized(True)
         return True
     
-    def update_screen(self, screen_type: str, data: Dict[str, Any]) -> bool:
-        """Mock update screen implementation."""
-        self.logger.info(f"Mock update_screen: {screen_type}")
-        response = self.get_mock_response('update_screen')
-        
-        if response.delay > 0:
-            time.sleep(response.delay)
-        
-        if response.success:
-            self._current_screen = screen_type
-            self._screen_data = data.copy()
-            self.logger.debug(f"Mock screen updated to {screen_type} with data: {data}")
-        
-        return response.success
-    
     def subscribe_screen_event(self, callback: Callable[[Dict[str, Any]], None]) -> bool:
         """Mock subscribe screen event implementation."""
         self.logger.info("Mock subscribe_screen_event")

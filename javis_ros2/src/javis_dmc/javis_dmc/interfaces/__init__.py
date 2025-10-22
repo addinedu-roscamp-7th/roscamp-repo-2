@@ -5,9 +5,7 @@ from .drive_interface import DriveInterface, RosDriveInterface
 from .arm_interface import ArmInterface, RosArmInterface
 from .ai_interface import AIInterface, BookPose, BoxStatus, ShelfInfo, TrashInfo, RosAIInterface
 from .gui_interface import GUIInterface, RosGUIInterface
-from .llm_interface import LLMInterface, Intent, RosLLMInterface
-from .tts_interface import TTSInterface, RosTTSInterface
-from .stt_interface import STTInterface, STTResult, RosSTTInterface
+from .voice_recognition_interface import DialogEvent, VoiceRecognitionInterface, RosVoiceRecognitionInterface
 
 __all__ = [
     'BaseInterface',
@@ -15,7 +13,5 @@ __all__ = [
     'ArmInterface', 'RosArmInterface',
     'AIInterface', 'RosAIInterface', 'BookPose', 'BoxStatus', 'ShelfInfo', 'TrashInfo',
     'GUIInterface', 'RosGUIInterface',
-    'LLMInterface', 'RosLLMInterface', 'Intent',
-    'TTSInterface', 'RosTTSInterface',
-    'STTInterface', 'RosSTTInterface', 'STTResult'
+    'VoiceRecognitionInterface', 'RosVoiceRecognitionInterface', 'DialogEvent',
 ]

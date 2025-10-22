@@ -1,0 +1,5 @@
+timeouts:
+  listening:
+    seconds: 20.0
+  destination_selection:
+    seconds: 60.0

@@ -20,7 +20,40 @@ file(GLOB_RECURSE INTERFACE_FILES
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  ${INTERFACE_FILES}
+  "msg/main/BatteryStatus.msg"
+  "msg/main/CurrentPose.msg"
+  "msg/main/DobbyState.msg"
+  "msg/ai/DetectedObjects.msg"
+  "msg/ai/Obstacles.msg"
+  "msg/ai/TrackingStatus.msg"
+  "srv/ai/DetectTrash.srv"
+  "srv/ai/ChangeTrackingMode.srv"
+  "srv/arm/ChangeArmPose.srv"
+  "srv/drive/CheckStorageBox.srv"
+  "srv/drive/DetectBook.srv"
+  "srv/drive/DriveControlCommand.srv"
+  "srv/drive/IdentifyBookShelf.srv"
+  "srv/drive/RegisterPerson.srv"
+  "srv/drive/VerifyBookPosition.srv"
+  "srv/admin/ForceTaskResult.srv"
+  "srv/admin/SetRobotMode.srv"
+  "srv/admin/SetManualState.srv"
+  "action/arm/CleanDesk.action"
+  "action/arm/CollectReturnedBooks.action"
+  "action/arm/CollectTrash.action"
+  "action/arm/DisposeTrash.action"
+  "action/arm/PickBook.action"
+  "action/arm/PlaceBook.action"
+  "action/arm/RearrangeBook.action"
+  "action/drive/GuideNavigation.action"
+  "action/drive/MoveToTarget.action"
+  "action/main/CleanSeat.action"
+  "action/main/GuidePerson.action"
+  "action/main/PerformTask.action"
+  "action/main/PickupBook.action"
+  "action/main/ReshelvingBook.action"
+  "srv/test/MyJson.srv"
+
   DEPENDENCIES
   std_msgs
   builtin_interfaces
