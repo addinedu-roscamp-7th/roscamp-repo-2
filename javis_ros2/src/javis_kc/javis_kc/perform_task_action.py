@@ -163,6 +163,7 @@ class PerformTaskActionServer(Node):
                 current_coords[4],
                 current_coords[5]
             ]
+            self.get_logger().info(pick_coords)
             result = self.mc.sync_send_coords(pick_coords, 30, 0)
             time.sleep(2)
             if result == 1:
@@ -170,12 +171,14 @@ class PerformTaskActionServer(Node):
 
         elif self.state == RobotState.GRIPPING:
             self.get_logger().info("상태: [GRIPPING]")
+            self.feedback_msg.progress_percentage = 60.0
             self.mc.set_gripper_value(0, 50)
             time.sleep(1)
             self.state = RobotState.RAISING_AFTER_PICK
 
         elif self.state == RobotState.RAISING_AFTER_PICK:
             self.get_logger().info("상태: [RAISING_AFTER_PICK]")
+            self.feedback_msg.progress_percentage = 80.0
             current_coords = self.mc.get_coords()
             if not current_coords: return
 
@@ -194,11 +197,10 @@ class PerformTaskActionServer(Node):
 
         elif self.state == RobotState.RETURNING_HOME:
             self.get_logger().info("상태: [RETURNING_HOME]")
+            self.feedback_msg.progress_percentage = 100.0
             self.mc.send_angles([0, 0, 0, 0, 0, 0], 50)
             self.mc.set_gripper_value(100, 50)
             time.sleep(2)
-            self.get_logger().info("작업 완료. 노드를 종료합니다.")
-            rclpy.shutdown()
 
     def broadcast_timer_callback(self):
         coords = self.mc.get_coords()
