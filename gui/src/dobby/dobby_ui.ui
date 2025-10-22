@@ -27,7 +27,10 @@
      </rect>
     </property>
     <property name="text">
-     <string>testByn01</string>
+     <string>Charging</string>
+    </property>
+    <property name="checkable">
+     <bool>true</bool>
     </property>
    </widget>
    <widget class="QPushButton" name="testByn02">
@@ -43,35 +46,10 @@
      </rect>
     </property>
     <property name="text">
-     <string>testByn02</string>
+     <string>Walking</string>
     </property>
-   </widget>
-   <widget class="QLabel" name="label_img">
-    <property name="geometry">
-     <rect>
-      <x>5</x>
-      <y>5</y>
-      <width>1590</width>
-      <height>760</height>
-     </rect>
-    </property>
-    <property name="cursor">
-     <cursorShape>PointingHandCursor</cursorShape>
-    </property>
-    <property name="autoFillBackground">
-     <bool>false</bool>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="scaledContents">
-     <bool>false</bool>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-    <property name="wordWrap">
-     <bool>false</bool>
+    <property name="checkable">
+     <bool>true</bool>
     </property>
    </widget>
    <widget class="QPushButton" name="testByn03">
@@ -87,8 +65,78 @@
      </rect>
     </property>
     <property name="text">
-     <string>testByn03</string>
+     <string>Loading</string>
     </property>
+    <property name="checkable">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QStackedWidget" name="stackedWidget_gif">
+    <property name="geometry">
+     <rect>
+      <x>5</x>
+      <y>5</y>
+      <width>1590</width>
+      <height>760</height>
+     </rect>
+    </property>
+    <property name="currentIndex">
+     <number>0</number>
+    </property>
+    <widget class="QWidget" name="page_charging">
+     <widget class="QLabel" name="label_charging">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>1590</width>
+        <height>760</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="page_walking">
+     <widget class="QLabel" name="label_walking">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>1590</width>
+        <height>760</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="page_loading">
+     <widget class="QLabel" name="label_loading">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>1590</width>
+        <height>760</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </widget>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
