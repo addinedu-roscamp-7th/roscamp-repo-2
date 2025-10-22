@@ -40,7 +40,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/drive/MoveToTarget.action"
   "action/main/CleanSeat.action"
   "action/main/GuidePerson.action"
-  "action/main/PerformTask.action"
+  "action/kreacher/PerformTask.action"
   "action/main/PickupBook.action"
   "action/main/ReshelvingBook.action"
   "srv/test/MyJson.srv"
