@@ -6,7 +6,7 @@ import time
 
 class DobbyPickupServer(Node):
     def __init__(self, namespace=''):
-        super().__init__('dobby_pickup_server')
+        super().__init__('dobby_pickup_server', namespace=namespace)
         self.pickup_server = ActionServer(
             self,
             PickupBook,
@@ -17,7 +17,7 @@ class DobbyPickupServer(Node):
         )
 
     def goal_callback(self, goal_request: PickupBook.Goal):
-        self.get_logger().info(f'도서 픽업 요청, task_id:{goal_request.task_id}, book_id:{goal_request.book_id}, storage_id:{goal_request.storage_id}')
+        self.get_logger().info(f'도서 픽업 요청, book_id:{goal_request.book_id}, storage_id:{goal_request.storage_id}')
 
         return GoalResponse.ACCEPT
     
@@ -37,7 +37,6 @@ class DobbyPickupServer(Node):
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 result = PickupBook.Result()
-                result.task_id = goal.task_id
                 result.book_id = goal.book_id
                 result.storage_id = goal.storage_id
                 result.success = False
@@ -53,7 +52,6 @@ class DobbyPickupServer(Node):
 
         goal_handle.succeed()
         result = PickupBook.Result()
-        result.task_id = goal.task_id
         result.book_id = goal.book_id
         result.storage_id = goal.storage_id
         result.success = True
@@ -68,7 +66,7 @@ class DobbyPickupServer(Node):
 def main():
     rclpy.init()
 
-    node = DobbyPickupServer()
+    node = DobbyPickupServer(namespace='dobby1/main')
 
     try:
         rclpy.spin(node)

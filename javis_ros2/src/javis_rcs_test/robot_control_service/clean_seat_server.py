@@ -5,8 +5,8 @@ from rclpy.action import ActionServer, GoalResponse, CancelResponse
 import time
 
 class CleanSeatServer(Node):
-    def __init__(self):
-        super().__init__('clean_seat_server')
+    def __init__(self, namespace = ''):
+        super().__init__('clean_seat_server', namespace=namespace)
         self._server = ActionServer(
             self,
             CleanSeat,
@@ -65,7 +65,7 @@ class CleanSeatServer(Node):
 def main():
     rclpy.init()
 
-    node = CleanSeatServer()
+    node = CleanSeatServer(namespace='dobby1/main')
 
     try:
         rclpy.spin(node)

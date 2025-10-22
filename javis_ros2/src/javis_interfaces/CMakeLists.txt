@@ -39,12 +39,16 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/drive/MoveToTarget.action"
   "action/main/CleanSeat.action"
   "action/main/GuidePerson.action"
-  "action/main/PerformTask.action"
+  "action/kreacher/PerformTask.action"
   "action/main/PickupBook.action"
   "action/main/ReshelvingBook.action"
   "srv/test/MyJson.srv"
   "srv/ai/GetCoordinates.srv"
-
+  "msg/main/BookInfo.msg"
+  "msg/main/Location.msg"
+  "msg/main/StorageInfo.msg"
+  "msg/main/BookPicupJson.msg"
+  
   DEPENDENCIES 
   std_msgs
   builtin_interfaces
