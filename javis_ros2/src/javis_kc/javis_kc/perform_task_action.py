@@ -37,12 +37,7 @@ class PerformTaskActionServer(Node):
             "base_link", "camera_link"
         ]
         subprocess.Popen(tf_cmd)
-        self.get_logger().info('정적 TF 발행')
 
-        cmd = [
-            "ros2", "run", "tfmaker", "mycobot_tf_broadcaster"
-        ]
-        subprocess.Popen(cmd)
         self.get_logger().info('myCobot 동적 TF 발행')
 
         self._action_server = ActionServer(
@@ -56,7 +51,7 @@ class PerformTaskActionServer(Node):
 
         self.mc = MyCobot280("/dev/ttyJETCOBOT", 1000000)
         self.mc.thread_lock = False
-        self.mc.send_coords([0, 0, 0, -90, 0, 45], 50)
+        self.mc.send_angles([0, 0, 0, -90, 0, 45], 50)
         self.get_logger().info('MyCobot 연결 완료')
         # TF 리스너 및 버퍼 초기화
         self.tf_buffer = Buffer()
@@ -80,15 +75,17 @@ class PerformTaskActionServer(Node):
 
     def execute_callback(self, goal_handle):
         move_robot_arm_client = MoveRobotArmClient()
-        res = move_robot_arm_client.send_request()
-        x, y, z = res.x, res.y, res.z
-        self.get_logger().info(f'x: {x}, y: {y}, z: {z}')
-        if x != 0.0 and y != 0.0 and z != 0.0:
-            self.target_coords = [x, y, z]
-            self.state = RobotState.LOWERING_TO_PICK
+
         self.feedback_msg.progress_percentage = 0.0
         while RobotState.RETURNING_HOME != 6:
             self.get_logger().info('로봇이 이동중입니다. 잠시만 기다려주세요')
+            res = move_robot_arm_client.send_request()
+            x, y, z = res.x, res.y, res.z
+            self.get_logger().info(f'x: {x}, y: {y}, z: {z}')
+            if x != 0.0 and y != 0.0 and z != 0.0:
+                self.target_coords = [x, y, z]
+                if self.state == RobotState.WAITING_FOR_OBJECT:
+                    self.state = RobotState.LOWERING_TO_PICK
             goal_handle.publish_feedback(self.feedback_msg)
             self.control_loop()
             time.sleep(2)
