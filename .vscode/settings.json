@@ -1,0 +1,4 @@
+{
+  "idf.pythonInstallPath": "/usr/bin/python3",
+  "cmake.sourceDirectory": "/home/mac/dev_ws/roscamp-repo-2/javis_ros2/src/javis_dmc_test_msgs"
+}

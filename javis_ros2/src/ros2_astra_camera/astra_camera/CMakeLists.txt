@@ -99,7 +99,9 @@ add_library(${PROJECT_NAME} SHARED
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/openni2>
   $<INSTALL_INTERFACE:include>
+  $<INSTALL_INTERFACE:include/openni2>
   ${OpenCV_INCLUDED_DIRS}
   )
 
@@ -122,7 +124,9 @@ add_executable(list_devices_node
 target_include_directories(list_devices_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/openni2>
   $<INSTALL_INTERFACE:include>
+  $<INSTALL_INTERFACE:include/openni2>
   ${OpenCV_INCLUDED_DIRS}
   )
 

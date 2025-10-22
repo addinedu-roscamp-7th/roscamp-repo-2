@@ -40,5 +40,5 @@ depth_roi.height: -1
 # 深度放大倍数 | depth scale times 
 depth_scale : 1
 publish_tf: true
-tf_publish_rate: 10.0
+tf_publish_rate: 30.0
 reconnect_timeout: 6.0
