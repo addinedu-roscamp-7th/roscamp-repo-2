@@ -62,7 +62,7 @@ class KreacherPerformTask(Node):
     def get_result_callback(self, future: Future):
         """액션의 최종 결과를 처리합니다."""
         result = future.result().result
-        self.get_logger().info(f'작업 완료 결과 =  success: {result.success}, message: {result.message}, pickup_num: {result.pickup_num}')
+        self.get_logger().info(f'작업 완료 결과 =  success: {result.success}, message: {result.message}, pick_up_num: {result.pick_up_num}')
         
         # 모든 작업이 완료되었으므로 노드를 종료합니다.
         rclpy.shutdown()
