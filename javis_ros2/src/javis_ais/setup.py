@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'javis_ai_service = javis_ais.javis_ai_service:main'
+            'javis_ai_service = javis_ais.javis_ai_service:main',
+            'tracking_publish = javis_ais.tracking_publish:main'
         ],
     },
 )
