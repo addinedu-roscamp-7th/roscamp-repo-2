@@ -14,7 +14,6 @@ from javis_interfaces.srv import (
     DetectBook,
     DetectTrash,
     IdentifyBookShelf,
-    RegisterPerson,
     VerifyBookPosition,
 )
 
@@ -82,10 +81,6 @@ class AIInterface(BaseInterface):
         '''좌석 주변의 쓰레기를 탐지한다.'''
 
     @abstractmethod
-    def register_person(self) -> Optional[str]:
-        '''추적 대상자를 등록한다.'''
-
-    @abstractmethod
     def change_tracking_mode(self, mode: str) -> bool:
         '''추적 모드를 변경한다.'''
 
@@ -105,7 +100,6 @@ class RosAIInterface(AIInterface):
         self._verify_book_client = None
         self._identify_shelf_client = None
         self._detect_trash_client = None
-        self._register_person_client = None
         self._change_mode_client = None
         self._tracking_sub = None
         self._tracking_callback: Optional[Callable[[Dict[str, Any]], None]] = None
@@ -118,7 +112,6 @@ class RosAIInterface(AIInterface):
         self._verify_book_client = self._create_client(VerifyBookPosition, 'ai/verify_book_position')
         self._identify_shelf_client = self._create_client(IdentifyBookShelf, 'ai/identify_bookshelf')
         self._detect_trash_client = self._create_client(DetectTrash, 'ai/detect_trash')
-        self._register_person_client = self._create_client(RegisterPerson, 'ai/register_person')
         self._change_mode_client = self._create_client(ChangeTrackingMode, 'ai/change_tracking_mode')
 
         self._tracking_sub = self.node.create_subscription(
@@ -135,7 +128,6 @@ class RosAIInterface(AIInterface):
             ('ai/verify_book_position', self._verify_book_client),
             ('ai/identify_bookshelf', self._identify_shelf_client),
             ('ai/detect_trash', self._detect_trash_client),
-            ('ai/register_person', self._register_person_client),
             ('ai/change_tracking_mode', self._change_mode_client),
         ]:
             self._wait_for_service(client, name)
@@ -211,17 +203,6 @@ class RosAIInterface(AIInterface):
             infos.append(TrashInfo(trash_type=trash_type, pose=trash_pose, confidence=confidence))
         return infos
 
-    def register_person(self) -> Optional[str]:
-        '''피안내자를 등록한다.'''
-        if self._register_person_client is None:
-            return None
-        request = RegisterPerson.Request()
-        request.registration_timeout = 5.0
-        response = self._call_service(self._register_person_client, request)
-        if response is None or not response.success:
-            return None
-        return response.tracking_id
-
     def change_tracking_mode(self, mode: str) -> bool:
         '''추적 모드를 변경한다.'''
         if self._change_mode_client is None:
@@ -252,7 +233,6 @@ class RosAIInterface(AIInterface):
             self._verify_book_client,
             self._identify_shelf_client,
             self._detect_trash_client,
-            self._register_person_client,
             self._change_mode_client,
         ):
             if client is not None:

@@ -38,8 +38,12 @@ class DriveInterface(BaseInterface):
         '''사람 추종 모드를 비활성화한다.'''
 
     @abstractmethod
-    def stop(self) -> bool:
+    def stop(self, reason: str = 'emergency_stop') -> bool:
         '''비상 정지를 수행한다.'''
+
+    @abstractmethod
+    def resume(self, reason: str = 'resume_navigation') -> bool:
+        '''정지 상태에서 주행을 재개한다.'''
 
     @abstractmethod
     def rotate_in_place(self, angle: float) -> bool:
@@ -132,13 +136,23 @@ class RosDriveInterface(DriveInterface):
         self._guide_goal_handle = None
         return True
 
-    def stop(self) -> bool:
+    def stop(self, reason: str = 'emergency_stop') -> bool:
         '''비상 정지 명령을 발행한다.'''
         if self._drive_command_client is None:
             return False
         request = DriveControlCommand.Request()
         request.command = DriveControlCommand.Request.STOP
-        request.reason = 'emergency_stop'
+        request.reason = reason or 'emergency_stop'
+        self._drive_command_client.call_async(request)
+        return True
+
+    def resume(self, reason: str = 'resume_navigation') -> bool:
+        '''정지 상태에서 주행을 재개한다.'''
+        if self._drive_command_client is None:
+            return False
+        request = DriveControlCommand.Request()
+        request.command = DriveControlCommand.Request.RESUME
+        request.reason = reason or 'resume_navigation'
         self._drive_command_client.call_async(request)
         return True
 

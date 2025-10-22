@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import time
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from javis_dmc.states.state_enums import SubState
 
@@ -15,6 +15,7 @@ class BaseExecutor(ABC):
         self._sub_state_callback: Optional[Callable[[SubState], None]] = None
         self._feedback_callback: Optional[Callable[[float], None]] = None
         self._step_delay = 0.0
+        self._outcome: Optional[Any] = None
 
     def configure(
         self,
@@ -33,9 +34,9 @@ class BaseExecutor(ABC):
     def cancel(self) -> None:
         '''진행 중인 작업을 취소한다.'''
 
-    def wait_for_result(self) -> bool:
-        '''실행이 완료될 때까지 대기한다 (스켈레톤).'''
-        return not self._active
+    def wait_for_result(self) -> Optional[Any]:
+        '''마지막 실행 결과를 반환한다.'''
+        return self._outcome
 
     def is_active(self) -> bool:
         '''실행 중인지 여부를 반환한다.'''
@@ -44,6 +45,7 @@ class BaseExecutor(ABC):
     def _begin(self) -> None:
         '''내부 상태를 실행 중으로 설정한다.'''
         self._active = True
+        self._outcome = None
 
     def _finish(self) -> None:
         '''내부 상태를 완료로 설정한다.'''
@@ -68,3 +70,7 @@ class BaseExecutor(ABC):
         '''설정된 시간만큼 지연한다.'''
         if self._step_delay > 0.0:
             time.sleep(self._step_delay)
+
+    def _set_outcome(self, outcome: Any) -> None:
+        '''실행 결과를 기록한다.'''
+        self._outcome = outcome

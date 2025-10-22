@@ -21,14 +21,17 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ai/Obstacles.msg"
   "msg/ai/TrackingStatus.msg"
   "srv/ai/DetectTrash.srv"
+  "srv/ai/ChangeTrackingMode.srv"
   "srv/arm/ChangeArmPose.srv"
-  "srv/drive/ChangeTrackingMode.srv"
   "srv/drive/CheckStorageBox.srv"
   "srv/drive/DetectBook.srv"
   "srv/drive/DriveControlCommand.srv"
   "srv/drive/IdentifyBookShelf.srv"
   "srv/drive/RegisterPerson.srv"
   "srv/drive/VerifyBookPosition.srv"
+  "srv/admin/ForceTaskResult.srv"
+  "srv/admin/SetRobotMode.srv"
+  "srv/admin/SetManualState.srv"
   "action/arm/CleanDesk.action"
   "action/arm/CollectReturnedBooks.action"
   "action/arm/CollectTrash.action"
@@ -45,7 +48,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/main/ReshelvingBook.action"
   "srv/test/MyJson.srv"
 
-  DEPENDENCIES 
+  DEPENDENCIES
   std_msgs
   builtin_interfaces
   geometry_msgs

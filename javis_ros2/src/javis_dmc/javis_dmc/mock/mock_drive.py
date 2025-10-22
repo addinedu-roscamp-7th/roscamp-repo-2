@@ -87,18 +87,32 @@ class MockDriveInterface(DriveInterface, MockBase):
         
         return response.success
     
-    def stop(self) -> bool:
+    def stop(self, reason: str = "emergency_stop") -> bool:
         """Mock emergency stop implementation."""
         response = self.get_mock_response('stop')
-        
+
         if response.delay > 0:
             time.sleep(response.delay)
-        
+
         if response.success:
-            self.logger.info("Mock emergency stop executed")
+            self.logger.info(f"Mock stop executed: reason={reason}")
         else:
             self.logger.warn("Mock emergency stop failed")
-        
+
+        return response.success
+
+    def resume(self, reason: str = "resume_navigation") -> bool:
+        """Mock resume navigation implementation."""
+        response = self.get_mock_response('resume')
+
+        if response.delay > 0:
+            time.sleep(response.delay)
+
+        if response.success:
+            self.logger.info(f"Mock resume executed: reason={reason}")
+        else:
+            self.logger.warn("Mock resume failed")
+
         return response.success
     
     def rotate_in_place(self, angle: float) -> bool:

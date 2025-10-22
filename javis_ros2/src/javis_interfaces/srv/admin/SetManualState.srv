@@ -1,0 +1,6 @@
+int32 mode            # -1 유지, 0=STANDBY, 1=AUTONOMY
+int32 main_state      # -1 유지 (MainState enum 값 사용)
+int32 sub_state       # -1 유지 (SubState enum 값 사용)
+---
+bool success
+string message
