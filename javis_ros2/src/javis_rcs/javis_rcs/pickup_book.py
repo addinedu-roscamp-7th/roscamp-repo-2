@@ -133,7 +133,7 @@ def pickup_handler():
         node.get_logger().info(f'Received JSON data: {data}')
 
         # --- JSON 데이터 파싱 ---
-        book_id = data.get('task_name', "default_task_name")
+        book_id = data.get('book_id', "default_task_name")
         book_info = data.get('book_info', {})
         location = data.get('location', {})
         storage_info = data.get('storage_info', {})

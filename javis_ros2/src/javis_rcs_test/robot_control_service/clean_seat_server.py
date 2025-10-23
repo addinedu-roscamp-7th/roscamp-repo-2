@@ -18,7 +18,7 @@ class CleanSeatServer(Node):
         )
 
     def goal_callback(self, goal_request: CleanSeat.Goal):
-        self.get_logger().info(f"좌석 정리 요청, task_id: {goal_request.task_id}, seat_id: {goal_request.seat_id}, 좌석위치:[location : {goal_request.return_desk_location}, pose: {goal_request.return_desk_pose}], 쓰레기 위치: [location: {goal_request.bin_location}, pose: {goal_request.bin_pose}]")
+        self.get_logger().info(f"좌석 정리 요청, seat_id: {goal_request.seat_id}, 좌석위치:[location : {goal_request.return_desk_location}, pose: {goal_request.return_desk_pose}], 쓰레기 위치: [location: {goal_request.bin_location}, pose: {goal_request.bin_pose}]")
         return GoalResponse.ACCEPT
     
     def cancel_callback(self, goal_handle):
@@ -34,7 +34,6 @@ class CleanSeatServer(Node):
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 result = CleanSeat.Result()
-                result.task_id = goal.task_id
                 result.seat_id = goal.seat_id
                 result.success = False
                 result.message = '작업 취소'
@@ -51,7 +50,6 @@ class CleanSeatServer(Node):
 
         goal_handle.succeed()
         result = CleanSeat.Result()
-        result.task_id = goal.task_id
         result.seat_id = goal.seat_id
         result.success = True
         result.message = "좌석 정리 완료"

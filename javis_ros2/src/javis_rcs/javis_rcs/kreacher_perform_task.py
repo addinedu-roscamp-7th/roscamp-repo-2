@@ -8,7 +8,7 @@ import sys
 
 class KreacherPerformTask(Node):
     """Kreacher의 PerformTask 액션을 요청하고 결과를 처리하는 클라이언트 노드입니다."""
-    def __init__(self, namespace: str):
+    def __init__(self, namespace: str, member_id: int):
         super().__init__('kreacher_perform_task_client', namespace=namespace)
 
         # --- 파라미터 선언 ---
@@ -22,6 +22,9 @@ class KreacherPerformTask(Node):
         self.goal_handle = None
         self.get_logger().info(f"Kreacher client node started, targeting namespace: '{namespace}'")
 
+        # 노드가 완전히 초기화된 후 목표 전송을 시작합니다.
+        self.send_goal(member_id)
+
     def send_goal(self, member_id: int):
     
         goal_msg = PerformTask.Goal()
@@ -30,7 +33,7 @@ class KreacherPerformTask(Node):
         self.get_logger().info("Kreacher 액션 서버를 기다리는 중...")
         if not self._client.wait_for_server(timeout_sec=self.action_server_timeout):
             self.get_logger().error('Kreacher 액션 서버가 응답하지 않습니다. 노드를 종료합니다.')
-            # 서버가 없으면 더 이상 진행할 수 없으므로 종료
+            # 서버가 없으면 더 이상 진행할 수 없으므로 노드를 파괴하고 rclpy.spin()을 종료합니다.
             rclpy.shutdown()
             return
 
@@ -51,7 +54,6 @@ class KreacherPerformTask(Node):
         self.goal_handle = future.result()
         if not self.goal_handle.accepted:
             self.get_logger().info('Kreacher 작업이 거절되었습니다.')
-            # 작업이 거절되었으므로 노드를 종료합니다.
             rclpy.shutdown()
             return
 
@@ -63,9 +65,10 @@ class KreacherPerformTask(Node):
         """액션의 최종 결과를 처리합니다."""
         result = future.result().result
         self.get_logger().info(f'작업 완료 결과 =  success: {result.success}, message: {result.message}, pick_up_num: {result.pick_up_num}')
-        
-        # 모든 작업이 완료되었으므로 노드를 종료합니다.
+
+        # 모든 작업이 완료되었으므로 노드를 파괴하고 rclpy.spin()을 종료합니다.
         rclpy.shutdown()
+        # rclpy.shutdown()은 main 함수에서 처리됩니다.
 
 def main(args=None):
     rclpy.init(args=args)
@@ -78,21 +81,13 @@ def main(args=None):
 
     # Kreacher 서버의 네임스페이스를 명시적으로 전달합니다.
     namespace = 'kreacher/action'
-    perform_task_node = KreacherPerformTask(namespace=namespace)
-    
-    # 파싱된 member_id로 목표 전송
-    perform_task_node.send_goal(member_id=parsed_args.member_id)
+    perform_task_node = KreacherPerformTask(namespace=namespace, member_id=parsed_args.member_id)
 
     try:
-        # rclpy.shutdown()이 호출될 때까지 노드를 실행합니다.
+        # 노드가 스스로 파괴(destroy_node)될 때까지 spin이 돌면서 콜백을 처리합니다.
         rclpy.spin(perform_task_node)
+        
     except KeyboardInterrupt:
         perform_task_node.get_logger().info('Keyboard interrupt, shutting down.')
-    finally:
-        # 노드가 종료되기 전에 goal_handle을 취소하려고 시도할 수 있습니다.
-        if perform_task_node.goal_handle:
-            perform_task_node.get_logger().info('Canceling the goal...')
-            perform_task_node.goal_handle.cancel_goal_async()
+
         
-        perform_task_node.destroy_node()
-        rclpy.shutdown()

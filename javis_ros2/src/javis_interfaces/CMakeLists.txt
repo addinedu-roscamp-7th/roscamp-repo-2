@@ -12,51 +12,22 @@ find_package(sensor_msgs REQUIRED)
 find_package(unique_identifier_msgs REQUIRED)
 find_package(action_msgs REQUIRED)
 
+file(GLOB_RECURSE INTERFACE_FILES
+  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+  "msg/*.msg"
+  "srv/*.srv"
+  "action/*.action"
+)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/main/BatteryStatus.msg"
-  "msg/main/CurrentPose.msg"
-  "msg/main/DobbyState.msg"
-  "msg/ai/DetectedObjects.msg"
-  "msg/ai/Obstacles.msg"
-  "msg/ai/TrackingStatus.msg"
-  "srv/ai/DetectTrash.srv"
-  "srv/drive/ChangeTrackingMode.srv"
-  "srv/drive/CheckStorageBox.srv"
-  "srv/drive/DetectBook.srv"
-  "srv/drive/DriveControlCommand.srv"
-  "srv/drive/IdentifyBookShelf.srv"
-  "srv/drive/RegisterPerson.srv"
-  "srv/drive/VerifyBookPosition.srv"
-  "action/arm/CleanDesk.action"
-  "action/arm/CollectReturnedBooks.action"
-  "action/arm/CollectTrash.action"
-  "action/arm/DisposeTrash.action"
-  "action/arm/PickBook.action"
-  "action/arm/PlaceBook.action"
-  "action/arm/RearrangeBook.action"
-  "action/drive/GuideNavigation.action"
-  "action/drive/MoveToTarget.action"
-  "action/main/CleanSeat.action"
-  "action/main/GuidePerson.action"
-  "action/kreacher/PerformTask.action"
-  "action/main/PickupBook.action"
-  "action/main/ReshelvingBook.action"
-  "srv/test/MyJson.srv"
-  "srv/ai/GetCoordinates.srv"
-  "msg/main/BookInfo.msg"
-  "msg/main/Location.msg"
-  "msg/main/StorageInfo.msg"
-  "msg/main/BookPicupJson.msg"
-  
-  DEPENDENCIES 
+  ${INTERFACE_FILES}
+  DEPENDENCIES
   std_msgs
   builtin_interfaces
   geometry_msgs
   sensor_msgs
   unique_identifier_msgs
   action_msgs
-
 )
 
 # find dependencies
