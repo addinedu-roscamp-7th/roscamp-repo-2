@@ -13,10 +13,8 @@ uint8 LISTENING = 10
 uint8 ROAMING = 11
 uint8 EMERGENCY_STOP = 98
 uint8 MAIN_ERROR = 99
-
 # ----------------------------
 uint8 main_state
-
 
 # === Sub State Constants ===
 # General States
