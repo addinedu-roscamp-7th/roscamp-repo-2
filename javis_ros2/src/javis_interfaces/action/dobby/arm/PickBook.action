@@ -4,6 +4,7 @@
 string book_id
 int32 carrier_slot_id # 도비 운반함
 geometry_msgs/Pose book_pose
+int32 storage_box_id
 ---
 # Result         
 string book_id
@@ -11,4 +12,5 @@ bool success
 string message # "1번 도서 픽업에 성공했습니다."
 ---
 # Feedback         
+string status
 string current_action         
