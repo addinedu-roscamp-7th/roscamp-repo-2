@@ -5,6 +5,7 @@ from flask_cors import CORS
 import rclpy
 from rclpy.node import Node
 from javis_interfaces.srv import MyJson
+from geometry_msgs.msg import Pose, Pose2D
 
 app = Flask(__name__)
 CORS(app)
@@ -50,17 +51,23 @@ def handle_pickup_request():
         req_data = request.get_json(force=True, silent=False)
         if not req_data:
             return jsonify({'ok': False, 'message': 'Request body must be JSON.'}), 400
+        
+        task_name = req_data.get('task_name', 'pickup_book')
+        book_id = req_data.get('book_id', "default_task_name")
+        book_info = req_data.get('book_info', {})
+        location = req_data.get('location', {})
+        storage_info = req_data.get('storage_info', {})
+        shelf_info = req_data.get('shelf_info', {})
 
-        book_name = req_data.get('book_name')
-        location = req_data.get('location')
-
-        if not book_name or not location:
+        if not book_id or not location:
             return jsonify({'ok': False, 'message': 'Missing required fields: book_name, location'}), 400
 
         task_data = {
-            "task_name": "pickup_book",
-            "book_id": book_name,
-            "location": location
+            "task_name": task_name,
+            "book_info": book_info,
+            "storage_info": storage_info,
+            "shelf_info": shelf_info
+
         }
         
         response_from_ros = _send_task_to_orchestrator(task_data)
@@ -110,8 +117,7 @@ def process_generic_test():
         return jsonify({'ok': False, 'message': f'Bad JSON: {e}'}), 400
 
     response_from_ros = _send_task_to_orchestrator(task_data)
-    json_data = json.dumps(response_from_ros, ensure_ascii=False)
-    response_data = {'ok': bool(res.ok), 'message': res.message}
+    response_data = {'ok': response_from_ros.get('ok', False), 'message': response_from_ros.get('message', '')}
     json_data = json.dumps(response_data, ensure_ascii=False)
     return app.response_class(response=json_data, status=200, mimetype='application/json; charset=utf-8')
 
