@@ -3,10 +3,10 @@ from rclpy.node import Node
 from javis_interfaces.msg import BatteryStatus
 
 class BatteryStatusMonitor(Node):
-    def __init__(self):
-        super().__init__('battery_status_monitor')
+    def __init__(self, namespace):
+        super().__init__('battery_status_monitor', namespace=namespace)
         self.battery_level = 100.0
-        self.publisher = self.create_publisher(BatteryStatus, 'battery_status', 10)
+        self.publisher = self.create_publisher(BatteryStatus, 'status/battery_status', 10)
         self.timer = self.create_timer(1.0, self.publish_battery_status)
         self.get_logger().info('Battery Status Monitor node has been started.')
 
@@ -28,7 +28,7 @@ class BatteryStatusMonitor(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    battery_monitor = BatteryStatusMonitor()
+    battery_monitor = BatteryStatusMonitor(namespace='dobby1')
     rclpy.spin(battery_monitor)
     battery_monitor.destroy_node()
     rclpy.shutdown()

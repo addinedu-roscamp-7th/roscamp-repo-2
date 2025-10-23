@@ -8,8 +8,8 @@ import time # 이 모듈은 현재 코드에서 직접 사용되지 않지만, �
 
 
 class DobbyStatePublisher(Node):
-    def __init__(self):
-        super().__init__('dobby_state_publisher', namespace='') # 노드 이름과 네임스페이스 설정
+    def __init__(self, namespace):
+        super().__init__('dobby_state_publisher', namespace=namespace) # 노드 이름과 네임스페이스 설정
 
         # QoS 설정 (Quality of Service)
         # - ReliabilityPolicy.RELIABLE: 메시지 전송의 신뢰성을 높여 메시지 손실을 방지합니다.
@@ -22,7 +22,7 @@ class DobbyStatePublisher(Node):
         )
 
         # DobbyState 메시지를 'dobby/state' 토픽으로 발행하는 퍼블리셔 생성
-        self.pub = self.create_publisher(DobbyState, 'dobby/state', qos)
+        self.pub = self.create_publisher(DobbyState, 'status/robot_state', qos)
 
         # 예시용 상태 시나리오 (메인/서브 상태를 시간에 따라 순환)
         # `itertools.cycle`을 사용하여 정의된 상태들을 무한히 반복합니다.
@@ -131,7 +131,7 @@ class DobbyStatePublisher(Node):
 
 def main():
     rclpy.init()
-    node = DobbyStatePublisher()
+    node = DobbyStatePublisher(namespace='dobby1')
     try:
         rclpy.spin(node) # 노드가 메시지 콜백, 타이머 콜백 등을 처리하도록 합니다.
     except KeyboardInterrupt:

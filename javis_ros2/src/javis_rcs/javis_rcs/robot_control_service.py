@@ -9,8 +9,10 @@ import threading
 
 from javis_interfaces.srv import MyJson
 from javis_interfaces.msg import DobbyState, BatteryStatus
+from geometry_msgs.msg import Pose, Pose2D, Point, Quaternion # Pose, Pose2D, Point, Quaternion 추가
 from javis_interfaces.action import PickupBook, CleanSeat
 from .clean_seat import CleanSeat as CleanSeatNode # CleanSeat 노드 클래스를 직접 임포트
+from .pickup_book import PickupBook as PickupBookNode # PickupBook 노드 클래스를 직접 임포트
 
 class OrchestratorNode(Node):
     """
@@ -119,27 +121,11 @@ class OrchestratorNode(Node):
         self.get_logger().info(f"Executing '{task_name}' on '{robot_namespace}'...")
 
         if task_name == 'pickup_book':
-            client = self.action_clients[robot_namespace]['pickup_book']
-            if not client.wait_for_server(timeout_sec=5.0):
-                self.get_logger().error(f"Action server for 'pickup_book' on '{robot_namespace}' not available.")
-                # TODO: 작업 실패 처리 및 큐에 다시 넣는 로직 추가
-                return
+            book_id = task_data.get('book_id')
+            self.get_logger().info(f"Sending 'pickup_book' goal for book_id {book_id} to robot '{robot_namespace}'")
 
-            goal_msg = PickupBook.Goal()
-            # task_data에서 book_name과 location 정보를 가져와 goal에 설정
-            goal_msg.book_id = task_data.get('book_id', 'Unknown Book') # 'book_name' -> 'book_id'
-            goal_msg.location = json.dumps(task_data.get('location', {})) # location은 객체이므로 JSON 문자열로 변환
-
-            self.get_logger().info(f"Sending goal for 'pickup_book': {goal_msg.book_id} at {goal_msg.location}")
-            
-            send_goal_future = client.send_goal_async(
-                goal_msg,
-                feedback_callback=lambda feedback_msg: self.feedback_callback(robot_namespace, feedback_msg)
-            )
-            send_goal_future.add_done_callback(
-                lambda future: self.goal_response_callback(robot_namespace, future)
-            )
-        
+            thread = threading.Thread(target=self._run_pickup_book_task, args=(robot_namespace, book_id, task_data))
+            thread.start()
         elif task_name == 'clean_seat':
             # [수정됨] Executor를 사용하여 'clean_seat' 노드의 로직을 현재 프로세스에서 실행
             seat_id = task_data.get('seat_id', 0)
@@ -174,6 +160,28 @@ class OrchestratorNode(Node):
                 clean_seat_node.destroy_node()
             temp_executor.shutdown()
 
+    def _run_pickup_book_task(self, robot_namespace, book_id, task_data):
+        temp_executor = SingleThreadedExecutor()
+        pickup_book_node = None
+        try:
+            pickup_book_node = PickupBookNode(namespace=f'{robot_namespace}/main')
+            temp_executor.add_node(pickup_book_node)
+
+            kwargs = {k: v for k, v in task_data.items() if k != 'book_id'}
+
+            task_future = pickup_book_node.run_task(book_id, **kwargs)
+            temp_executor.spin_until_future_complete(task_future)
+
+            result = task_future.result()
+            self.get_logger().info(f"Pickup book task for '{robot_namespace}' completed. Success : {result['success']}, Msg: '{result['message']}'")
+
+        except Exception as e:
+            self.get_logger().error(f"An error occurred during pickup_book task for '{robot_namespace}': {e}")
+        finally:
+            if pickup_book_node:
+                pickup_book_node.destroy_node()
+            temp_executor.shutdown()
+
     def goal_response_callback(self, robot_namespace, future):
         """골 전송 요청에 대한 서버의 수락/거부 응답을 처리합니다."""
         goal_handle = future.result()
@@ -199,7 +207,7 @@ class OrchestratorNode(Node):
         """액션 실행 중 서버로부터 오는 피드백을 처리합니다."""
         feedback = feedback_msg.feedback
         self.get_logger().info(
-            f"Feedback from '{robot_namespace}': {feedback.status}"
+            f"Feedback2 from '{robot_namespace}': {feedback}"
         )
 
 def main(args=None):

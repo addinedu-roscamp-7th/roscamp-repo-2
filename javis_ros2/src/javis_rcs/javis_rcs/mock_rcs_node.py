@@ -60,8 +60,8 @@ class MockRcsNode(Node):
 
     async def pickup_execute_callback(self, goal_handle):
         """'pickup_book' 액션 요청을 처리합니다."""
-        book_name = goal_handle.request.book_name
-        self.get_logger().info(f"'{self.namespace}' starting pickup_book for '{book_name}'...")
+        book_id = goal_handle.request.book_id
+        self.get_logger().info(f"'{self.namespace}' starting pickup_book for '{book_id}'...")
 
         # 상태를 작업 중으로 변경
         self.current_state = DobbyState.PICKING_UP_BOOK
@@ -69,15 +69,17 @@ class MockRcsNode(Node):
 
         # 5초간 작업하는 척 시뮬레이션
         for i in range(5):
+            progress = (i + 1) * 20
             feedback_msg = PickupBook.Feedback()
-            feedback_msg.status = f"Picking up... {i+1}/5"
+            feedback_msg.progress_percent = int(progress)
             goal_handle.publish_feedback(feedback_msg)
             time.sleep(1)
 
         goal_handle.succeed()
         result = PickupBook.Result()
         result.success = True
-        result.message = f"Successfully picked up {book_name}"
+        result.message = f"Successfully picked up {book_id}"
+        result.book_id = book_id # 결과에 book_id를 포함시켜주는 것이 좋습니다.
         
         # 상태를 다시 IDLE로 변경
         self.current_state = DobbyState.IDLE
@@ -102,7 +104,7 @@ class MockRcsNode(Node):
         for i in range(5):
             progress = (i + 1) * 20
             feedback_msg = CleanSeat.Feedback()
-            feedback_msg.progress_percent = float(progress)
+            feedback_msg.progress_percent = int(progress)
             goal_handle.publish_feedback(feedback_msg)
             self.get_logger().info(f"Cleaning seat {seat_id}... {progress}%")
             time.sleep(1)

@@ -137,19 +137,12 @@ def main(args=None):
     robot_namespace = sys.argv[1]
     seat_id = int(sys.argv[2])
 
-    # ✅ __init__ 시그니처 수정에 맞게 사용
     node = CleanSeat(namespace=f'{robot_namespace}/main')
-
-    # 여기서는 테스트용으로 빈 kwargs 전달 (필요 시 실제 좌표/포즈 dict 넣기)
-    task_future = node.run_task(seat_id)
-
-    # 별도 스레드에서 spin
-    spin_thread = threading.Thread(target=rclpy.spin, args=(node,))
-    spin_thread.start()
-
-    # 작업 완료 대기
-    rclpy.spin_until_future_complete(node, task_future)
-
-    node.get_logger().info("작업 완료. 노드를 종료합니다.")
-    rclpy.shutdown()
-    spin_thread.join()
+    try:
+        node.get_logger().info(f"Starting clean_seat task for seat_id: {seat_id}")
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        node.get_logger().info("CleanSeat 노드가 종료됩니다.")
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()

@@ -43,31 +43,22 @@ def _send_task_to_orchestrator(task_data):
 
 @app.route('/robot/pickup', methods=['POST'])
 def handle_pickup_request():
-    """
-    '/robot/pickup' HTTP POST 요청을 처리하여 'pickup_book' 작업을 OrchestratorNode에 전달합니다.
-    요청 JSON 예시: {"book_name": "ROS2 Programming Guide", "location": "Shelf A, Section 3"}
-    """
+  
     try:
         req_data = request.get_json(force=True, silent=False)
         if not req_data:
             return jsonify({'ok': False, 'message': 'Request body must be JSON.'}), 400
-        
-        task_name = req_data.get('task_name', 'pickup_book')
-        book_id = req_data.get('book_id', "default_task_name")
-        book_info = req_data.get('book_info', {})
-        location = req_data.get('location', {})
-        storage_info = req_data.get('storage_info', {})
-        shelf_info = req_data.get('shelf_info', {})
 
-        if not book_id or not location:
-            return jsonify({'ok': False, 'message': 'Missing required fields: book_name, location'}), 400
+        book_id = req_data.get('book_id')
+        if book_id is None: 
+            return jsonify({'ok': False, 'message': 'Missing required field: book'}), 400
 
+        # clean_seat에 필요한 다른 파라미터들은 req_data에서 직접 가져와 task_data에 포함
+        # OrchestratorNode의 execute_task에서 기본값 처리가 되므로, 없으면 안 보내도 됨
         task_data = {
-            "task_name": task_name,
-            "book_info": book_info,
-            "storage_info": storage_info,
-            "shelf_info": shelf_info
-
+            "task_name": "pickup_book",
+            "book_id": book_id,
+            **{k: v for k, v in req_data.items() if k not in ['task_name', 'book_id']} # seat_id 외 다른 필드 포함
         }
         
         response_from_ros = _send_task_to_orchestrator(task_data)
