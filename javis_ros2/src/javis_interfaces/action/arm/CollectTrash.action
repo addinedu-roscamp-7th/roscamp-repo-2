@@ -1,9 +1,0 @@
-# Goal (목표)
-string trash_type
-geometry_msgs/Pose trash_pose
----
-# Result (결과)
-bool success
-string message
----
-# Feedback (피드백)

@@ -1,0 +1,9 @@
+# ChangeArmPose.srv
+
+# Request (요청)
+uint8 pose_type # 0 : 초기자세,1 : 사용자 지정 자세
+geometry_msgs/Pose target_pose  # 관측 또는 사용자 지정 자세의 목표 위치
+---
+# Response (응답)
+bool success
+string message

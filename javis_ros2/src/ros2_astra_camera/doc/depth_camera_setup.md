@@ -23,7 +23,7 @@ export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
 ### 3.2 libuvc 빌드 및 설치
 ```bash
 
-# 로컬에서 dev_libs폴더를 생성하여 디펜던시 패키지를 보관 후 빌드하는게 좋음..
+# 로컬에서 dev_libs폴더를 생성하여 디펜던시 패키지를 보관 후 빌드하는게
 mkdir -p ~/dev_libs
 cd ~/dev_libs
 git clone https://github.com/libuvc/libuvc.git
@@ -54,6 +54,7 @@ sudo ./scripts/install.sh          # 벤더 제공 udev 규칙 설치
 sudo usermod -aG plugdev "$USER"   # 재로그인 필요
 sudo udevadm control --reload-rules
 sudo udevadm trigger
+
 ```
 - 규칙 예시:
   ```
@@ -64,12 +65,12 @@ sudo udevadm trigger
 ```bash
 cd ~/dev_ws/roscamp-repo-2/javis_ros2
 rm -rf build log install
+__NV_PRIME_RENDER_OFFLOAD=1
 export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
-colcon build --packages-select astra_camera astra_camera_msgs
 colcon build
 ```
 - 반복 빌드 시 `export CMAKE_PREFIX_PATH=...` 를 생략하지 않는다.
-- 빌드 경고 중 `roomie_vs` 관련 오류가 발생하면 `src/javis_dvs/setup.py` 의 잔존 코드 조각을 정리한다.
+
 
 ## 6. 런치 및 시각화
 ```bash
@@ -99,4 +100,5 @@ rviz2 -d $(ros2 pkg prefix astra_camera)/share/astra_camera/rviz/pointcloud.rviz
 - `ros2 topic list`에서 `/camera/color/image_raw`, `/camera/depth/image_raw`, `/camera/depth/color/points` 확인.
 - RViz에서 컬러/IR/Depth 이미지와 포인트 클라우드가 수신되는지 점검.
 - `~/.ros/log/.../astra_camera_container` 로그에 에러가 없는지 확인.
+
 

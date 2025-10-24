@@ -1,0 +1,20 @@
+# 도서픽업 작업
+
+# Goal 
+string book_id
+int32 storage_id # 도비 운반함 id  
+geometry_msgs/Pose2D shelf_approach_location # 책장 앞 접근 위치
+geometry_msgs/Pose book_pick_pose    
+geometry_msgs/Pose2D storage_approach_location # 보관함 정보 (좌표) 
+geometry_msgs/Pose storage_slot_pose # 어느 칸인지
+---
+# Result 
+string book_id
+int32 storage_id
+bool success 
+string message # "도서 픽업에 성공했습니다." or "도서 픽업에 실패했습니다"
+float64 total_distance_m # 총 이동 거리
+float64 total_time_sec # 총 작업 시간
+---
+# Feedback 넣지말지 고민중 상태는 토픽으로 보냄
+int32 progress_percent         # 0~100
