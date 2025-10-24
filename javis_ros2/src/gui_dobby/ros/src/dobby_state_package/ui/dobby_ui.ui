@@ -10,219 +10,337 @@
     <height>900</height>
    </rect>
   </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>1280</width>
+    <height>720</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>1920</width>
+    <height>1080</height>
+   </size>
+  </property>
   <property name="windowTitle">
    <string>Dobby_UI</string>
   </property>
+  <property name="layoutDirection">
+   <enum>Qt::LeftToRight</enum>
+  </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QStackedWidget" name="stackedWidget_gif">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>10</y>
-      <width>1590</width>
-      <height>860</height>
-     </rect>
-    </property>
-    <property name="currentIndex">
-     <number>5</number>
-    </property>
-    <widget class="QWidget" name="page_charging">
-     <widget class="QLabel" name="label_charging">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>1590</width>
-        <height>760</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-     <widget class="QLabel" name="text_charging">
-      <property name="geometry">
-       <rect>
-        <x>860</x>
-        <y>0</y>
-        <width>66</width>
-        <height>19</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>charging</string>
-      </property>
-     </widget>
-    </widget>
-    <widget class="QWidget" name="page_walking">
-     <widget class="QLabel" name="label_walking">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>1590</width>
-        <height>760</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-     <widget class="QLabel" name="text_walking">
-      <property name="geometry">
-       <rect>
-        <x>850</x>
-        <y>10</y>
-        <width>66</width>
-        <height>19</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>walking</string>
-      </property>
-     </widget>
-    </widget>
-    <widget class="QWidget" name="page_loading">
-     <widget class="QLabel" name="label_loading">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>1590</width>
-        <height>760</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-     <widget class="QLabel" name="text_loading">
-      <property name="geometry">
-       <rect>
-        <x>810</x>
-        <y>20</y>
-        <width>66</width>
-        <height>19</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>loading</string>
-      </property>
-     </widget>
-    </widget>
-    <widget class="QWidget" name="page_working">
-     <widget class="QLabel" name="label_working">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>1590</width>
-        <height>760</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-     <widget class="QLabel" name="text_working">
-      <property name="geometry">
-       <rect>
-        <x>870</x>
-        <y>10</y>
-        <width>66</width>
-        <height>19</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>working</string>
-      </property>
-     </widget>
-    </widget>
-    <widget class="QWidget" name="page_resting">
-     <widget class="QLabel" name="label_resting">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>1590</width>
-        <height>760</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-     <widget class="QLabel" name="text_resting">
-      <property name="geometry">
-       <rect>
-        <x>880</x>
-        <y>0</y>
-        <width>66</width>
-        <height>19</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>resting</string>
-      </property>
-     </widget>
-    </widget>
-    <widget class="QWidget" name="page_error">
-     <widget class="QLabel" name="label_error">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>1590</width>
-        <height>760</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-     <widget class="QLabel" name="text_error">
-      <property name="geometry">
-       <rect>
-        <x>800</x>
-        <y>10</y>
-        <width>66</width>
-        <height>19</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>error</string>
-      </property>
-     </widget>
-    </widget>
-   </widget>
-  </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>1600</width>
-     <height>24</height>
-    </rect>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
    </property>
+   <property name="cursor">
+    <cursorShape>BlankCursor</cursorShape>
+   </property>
+   <property name="layoutDirection">
+    <enum>Qt::LeftToRight</enum>
+   </property>
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="0">
+     <widget class="QStackedWidget" name="stackedWidget_gif">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="page_charging">
+       <widget class="QLabel" name="label_charging">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>1590</width>
+          <height>760</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+       <widget class="QLabel" name="text_charging">
+        <property name="geometry">
+         <rect>
+          <x>445</x>
+          <y>730</y>
+          <width>700</width>
+          <height>120</height>
+         </rect>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>56</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>charging</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="page_walking">
+       <widget class="QLabel" name="label_walking">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>1590</width>
+          <height>760</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+       <widget class="QLabel" name="text_walking">
+        <property name="geometry">
+         <rect>
+          <x>445</x>
+          <y>730</y>
+          <width>700</width>
+          <height>120</height>
+         </rect>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>56</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>walking</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="page_loading">
+       <widget class="QLabel" name="label_loading">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>1590</width>
+          <height>760</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+       <widget class="QLabel" name="text_loading">
+        <property name="geometry">
+         <rect>
+          <x>445</x>
+          <y>730</y>
+          <width>700</width>
+          <height>120</height>
+         </rect>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>56</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>loading</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="page_working">
+       <widget class="QLabel" name="label_working">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>1590</width>
+          <height>760</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+       <widget class="QLabel" name="text_working">
+        <property name="geometry">
+         <rect>
+          <x>445</x>
+          <y>730</y>
+          <width>700</width>
+          <height>120</height>
+         </rect>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>56</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>working</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="page_resting">
+       <widget class="QLabel" name="label_resting">
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>1590</width>
+          <height>760</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+       <widget class="QLabel" name="text_resting">
+        <property name="geometry">
+         <rect>
+          <x>445</x>
+          <y>730</y>
+          <width>700</width>
+          <height>120</height>
+         </rect>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>56</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>resting</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="page_error">
+       <widget class="QLabel" name="label_error">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="geometry">
+         <rect>
+          <x>0</x>
+          <y>0</y>
+          <width>1590</width>
+          <height>760</height>
+         </rect>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+       <widget class="QLabel" name="text_error">
+        <property name="geometry">
+         <rect>
+          <x>445</x>
+          <y>730</y>
+          <width>700</width>
+          <height>120</height>
+         </rect>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>56</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>error</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </widget>
+     </widget>
+    </item>
+   </layout>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>

@@ -201,7 +201,7 @@ def main(args=None):
     # 👈 Ctrl+C (SIGINT) 신호에 대한 핸들러 설정
     signal.signal(signal.SIGINT, lambda sig, frame: QApplication.quit())
     
-    adminWindow = WindowClass(robot_name='dobby') 
+    adminWindow = WindowClass(robot_name='dobby1') 
     
     # ROS 2 이벤트를 PyQt 이벤트 루프에 통합
     timer = QTimer()
