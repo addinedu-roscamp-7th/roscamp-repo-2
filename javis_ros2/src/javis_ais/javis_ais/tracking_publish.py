@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
 import rclpy as rp
 from rclpy.node import Node
-from javis_ais_msgs.msg import TrackingStatus # import는 파일명으로 (무조건)
+# from javis_ais_msgs.msg import TrackingStatus # import는 파일명으로 (무조건)
+from javis_interfaces.msg import TrackingStatus # import는 파일명으로 (무조건)
 # 코드에 숨어있지만 import는 하지 않아도 되는 항목들
 # from geometry_msgs
 # from std_msgs
@@ -10,7 +12,7 @@ class tracking_publisher(Node):
 
     def __init__(self):
         super().__init__('tracking_person_publisher')
-        self.publisher = self.create_publisher(TrackingStatus, '/ai/tracking/status', 10)
+        self.publisher = self.create_publisher(TrackingStatus, '/dobby1/ai/tracking/status', 10)
         self.timer = self.create_timer(0.5, self.timer_callback)
 
     def timer_callback(self):
