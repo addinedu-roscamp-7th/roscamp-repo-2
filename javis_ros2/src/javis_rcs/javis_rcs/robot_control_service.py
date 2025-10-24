@@ -10,9 +10,11 @@ import threading
 from javis_interfaces.srv import MyJson
 from javis_interfaces.msg import DobbyState, BatteryStatus
 from geometry_msgs.msg import Pose, Pose2D, Point, Quaternion # Pose, Pose2D, Point, Quaternion 추가
-from javis_interfaces.action import PickupBook, CleanSeat
+from javis_interfaces.action import PickupBook, CleanSeat, GuidePerson, ReshelvingBook
 from .clean_seat import CleanSeat as CleanSeatNode # CleanSeat 노드 클래스를 직접 임포트
 from .pickup_book import PickupBook as PickupBookNode # PickupBook 노드 클래스를 직접 임포트
+from .guide_person import GuidePerson as GuidePersonNode
+from .reshelving_book import ReshelvingBook as ReshelvingBookNode
 
 class OrchestratorNode(Node):
     """
@@ -54,7 +56,9 @@ class OrchestratorNode(Node):
             # 로봇별 액션 클라이언트 생성 및 저장
             self.action_clients[ns] = {
                 'pickup_book': ActionClient(self, PickupBook, f'/{ns}/main/pickup_book'),
-                'clean_seat': ActionClient(self, CleanSeat, f'/{ns}/main/clean_seat')
+                'clean_seat': ActionClient(self, CleanSeat, f'/{ns}/main/clean_seat'),
+                'guide_person': ActionClient(self, GuidePerson, f'/{ns}/main/guide_person'),
+                'reshelving_book': ActionClient(self, ReshelvingBook, f'/{ns}/main/reshelving_book'),
             }
 
         # 주기적으로 작업 큐를 확인하고 할당을 시도하는 타이머
@@ -134,6 +138,18 @@ class OrchestratorNode(Node):
             # 별도의 스레드에서 작업을 실행하여 메인 스레드(Orchestrator)의 스핀을 막지 않도록 합니다.
             thread = threading.Thread(target=self._run_clean_seat_task, args=(robot_namespace, seat_id, task_data))
             thread.start()
+        elif task_name == 'guide_person':
+            dest_location = task_data.get('dest_location')
+            self.get_logger().info(f"Sending 'guide_person' goal for dest_location {dest_location} to robot '{robot_namespace}'")
+
+            thread = threading.Thread(target=self._run_guide_person_task, args=(robot_namespace, dest_location, task_data))
+            thread.start()
+        elif task_name == 'reshelving_book':
+            return_desk_id = task_data.get('return_desk_id')
+            self.get_logger().info(f"Sending 'reshelving_book' goal for return_desk_id {return_desk_id} to robot '{robot_namespace}'")
+
+            thread = threading.Thread(target=self._run_reshelving_book_task, args=(robot_namespace, return_desk_id, task_data))
+            thread.start()
 
     def _run_clean_seat_task(self, robot_namespace, seat_id, task_data):
         """별도 스레드에서 CleanSeat 노드를 생성하고 실행합니다."""
@@ -180,6 +196,50 @@ class OrchestratorNode(Node):
         finally:
             if pickup_book_node:
                 pickup_book_node.destroy_node()
+            temp_executor.shutdown()
+
+    def _run_guide_person_task(self, robot_namespace, dest_location, task_data):
+        temp_executor = SingleThreadedExecutor()
+        guide_person_node = None
+        try:
+            guide_person_node = GuidePersonNode(namespace=f'{robot_namespace}/main')
+            temp_executor.add_node(guide_person_node)
+
+            kwargs = {k: v for k, v in task_data.items() if k != 'dest_location'}
+
+            task_future = guide_person_node.run_task(dest_location, **kwargs)
+            temp_executor.spin_until_future_complete(task_future)
+
+            result = task_future.result()
+            self.get_logger().info(f"Guide_person task for '{robot_namespace}' completed. Success : {result['success']}, Msg: '{result['message']}'")
+
+        except Exception as e:
+            self.get_logger().error(f"An error occurred during guide_person task for '{robot_namespace}': {e}")
+        finally:
+            if guide_person_node:
+                guide_person_node.destroy_node()
+            temp_executor.shutdown()
+
+    def _run_reshelving_book_task(self, robot_namespace, return_desk_id, task_data):
+        temp_executor = SingleThreadedExecutor()
+        reshelving_book_node = None
+        try:
+            reshelving_book_node = ReshelvingBookNode(namespace=f'{robot_namespace}/main')
+            temp_executor.add_node(reshelving_book_node)
+
+            kwargs = {k: v for k, v in task_data.items() if k != 'dest_location'}
+
+            task_future = reshelving_book_node.run_task(return_desk_id, **kwargs)
+            temp_executor.spin_until_future_complete(task_future)
+
+            result = task_future.result()
+            self.get_logger().info(f"Reshelving book task for '{robot_namespace}' completed. Success : {result['success']}, Msg: '{result['message']}'")
+
+        except Exception as e:
+            self.get_logger().error(f"An error occurred during reshelving_book task for '{robot_namespace}': {e}")
+        finally:
+            if reshelving_book_node:
+                reshelving_book_node.destroy_node()
             temp_executor.shutdown()
 
     def goal_response_callback(self, robot_namespace, future):

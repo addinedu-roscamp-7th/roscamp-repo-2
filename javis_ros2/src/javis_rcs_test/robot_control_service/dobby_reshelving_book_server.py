@@ -5,8 +5,8 @@ from javis_interfaces.action import ReshelvingBook
 import time
 
 class DobbyReshelvingBookServer(Node):
-    def __init__(self):
-        super().__init__('dobby_reshelving_book_server')
+    def __init__(self, namespace: str = ''):
+        super().__init__('dobby_reshelving_book_server', namespace=namespace)
         self._server = ActionServer(
             self,
             ReshelvingBook,
@@ -64,7 +64,7 @@ class DobbyReshelvingBookServer(Node):
 def main():
     rclpy.init()
 
-    node = DobbyReshelvingBookServer()
+    node = DobbyReshelvingBookServer(namespace="dobby2/main")
 
     try:
         rclpy.spin(node)

@@ -47,7 +47,7 @@ class KreacherPerformTask(Node):
     def feedback_callback(self, feedback):
         """액션 실행 중 서버로부터 피드백을 수신했을 때 호출됩니다."""
         fb = feedback.feedback
-        self.get_logger().info(f'feedback = 상태:{fb.status} 진행률: {fb.progress_percentage}%')
+        self.get_logger().info(f'feedback = 회원id:{fb.member_id} 진행률: {fb.progress_percentage}%')
 
     def goal_response_callback(self, future: Future):
         """서버가 목표를 수락했는지 여부를 처리합니다."""
