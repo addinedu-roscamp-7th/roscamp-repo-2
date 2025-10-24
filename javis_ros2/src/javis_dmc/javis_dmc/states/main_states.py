@@ -81,7 +81,7 @@ class DmcStateMachine:
             return False
         if battery_critical or battery_warning:
             return False
-        if self.main_state == MainState.EMERGENCYC_STOP:
+        if self.main_state == MainState.EMERGENCY_STOP:
             return False
         if self.mode == RobotMode.STANDBY:
             return self.main_state == MainState.IDLE
@@ -126,14 +126,14 @@ class DmcStateMachine:
 
     def enter_emergency_stop(self) -> None:
         '''긴급 정지 상태로 진입한다.'''
-        if self.main_state != MainState.EMERGENCYC_STOP:
+        if self.main_state != MainState.EMERGENCY_STOP:
             self._previous_main_state = self.main_state
-        self.main_state = MainState.EMERGENCYC_STOP
+        self.main_state = MainState.EMERGENCY_STOP
         self.sub_state = SubState.NONE
 
     def resume_from_emergency(self) -> None:
         '''긴급 정지 해제 후 적절한 상태로 복귀한다.'''
-        if self.main_state != MainState.EMERGENCYC_STOP:
+        if self.main_state != MainState.EMERGENCY_STOP:
             return
 
         if self.mode == RobotMode.AUTONOMY:
@@ -153,7 +153,7 @@ class DmcStateMachine:
 
     def is_emergency(self) -> bool:
         '''긴급 정지 상태인지 여부를 반환한다.'''
-        return self.main_state == MainState.EMERGENCYC_STOP
+        return self.main_state == MainState.EMERGENCY_STOP
 
     def determine_post_task_state(
         self,

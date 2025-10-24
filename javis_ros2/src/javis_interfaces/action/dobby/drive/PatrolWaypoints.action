@@ -1,0 +1,15 @@
+# Goal
+geometry_msgs/Pose[] waypoints
+float32 loop_pause_sec
+bool loop_forever
+string route_id
+---
+# Result
+bool success
+uint8 error_code
+string message
+int32 completed_loops
+---
+# Feedback
+uint32 current_index
+float32 progress

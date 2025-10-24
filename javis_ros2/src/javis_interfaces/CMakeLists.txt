@@ -46,6 +46,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/arm/PlaceBook.action"
   "action/arm/RearrangeBook.action"
   "action/drive/GuideNavigation.action"
+  "action/drive/PatrolWaypoints.action"
   "action/drive/MoveToTarget.action"
   "action/main/CleanSeat.action"
   "action/main/GuidePerson.action"

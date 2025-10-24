@@ -1,11 +1,86 @@
 '''DMC 상태 모니터링 및 제어용 Tkinter GUI.'''
 
 from datetime import datetime
+import time
 import tkinter as tk
-from tkinter import ttk
-from typing import Dict, List, Optional
+from tkinter import messagebox, ttk
+from typing import Dict, List, Optional, Tuple
 
 from javis_dmc.states.state_enums import MainState, SubState
+
+
+class StateGraphCanvas(tk.Canvas):
+    '''상태 다이어그램을 그리는 Canvas 위젯.'''
+
+    def __init__(self, parent, state_graph: Dict[str, object], width: int = 320, height: int = 520) -> None:
+        super().__init__(parent, width=width, height=height, bg='#1c1f26', highlightthickness=0)
+        self._default_fill = '#2f3644'
+        self._highlight_fill = '#8ab4f8'
+        self._text_color = '#f5f7fa'
+        self._line_color = '#455a64'
+        self._rectangles: Dict[str, int] = {}
+        self._labels: Dict[str, int] = {}
+        self._positions: Dict[str, Tuple[float, float]] = {}
+        self._transition_lines: List[int] = []
+        self._draw_graph(state_graph or {})
+
+    def _draw_graph(self, state_graph: Dict[str, object]) -> None:
+        main_states = state_graph.get('main_states', []) if isinstance(state_graph, dict) else []
+        if not isinstance(main_states, list):
+            main_states = []
+
+        margin = 40
+        box_width = 200
+        box_height = 34
+        spacing = 18
+        total_height = len(main_states) * (box_height + spacing) + margin
+        canvas_height = max(total_height, int(self['height']))
+        self.config(scrollregion=(0, 0, int(self['width']), canvas_height))
+
+        for index, entry in enumerate(main_states):
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get('name', '')
+            if not name:
+                continue
+            y = margin + index * (box_height + spacing)
+            x0 = 30
+            x1 = x0 + box_width
+            y1 = y + box_height
+            rect = self.create_rectangle(x0, y, x1, y1, fill=self._default_fill, outline='#37474f', width=2)
+            label = self.create_text((x0 + x1) / 2, (y + y1) / 2, text=name, fill=self._text_color, font=('맑은 고딕', 11, 'bold'))
+            self._rectangles[name.upper()] = rect
+            self._labels[name.upper()] = label
+            self._positions[name.upper()] = ((x0 + x1) / 2, (y + y1) / 2)
+
+        transitions = state_graph.get('transitions', []) if isinstance(state_graph, dict) else []
+        if not isinstance(transitions, list):
+            transitions = []
+        for entry in transitions:
+            if not isinstance(entry, dict):
+                continue
+            from_state = str(entry.get('from', '')).upper()
+            to_state = str(entry.get('to', '')).upper()
+            if from_state in {'ANY', 'ANY_TASK'}:
+                continue
+            if from_state not in self._positions or to_state not in self._positions:
+                continue
+            start = self._positions[from_state]
+            end = self._positions[to_state]
+            line = self.create_line(start[0] + 100, start[1], end[0] + 100, end[1], arrow=tk.LAST, fill=self._line_color, width=2)
+            self._transition_lines.append(line)
+
+    def highlight(self, main_state: str, sub_state: Optional[str] = None) -> None:
+        name = (main_state or '').upper()
+        for state, rect_id in self._rectangles.items():
+            fill = self._highlight_fill if state == name else self._default_fill
+            self.itemconfig(rect_id, fill=fill)
+            label_id = self._labels.get(state)
+            if label_id:
+                self.itemconfig(label_id, fill=self._text_color)
+
+    def show_transition(self, from_state: str, to_state: str) -> None:
+        self.highlight(to_state, None)
 
 
 class TestGuiApp:
@@ -14,9 +89,9 @@ class TestGuiApp:
     _TASK_STATUS_LABELS = {
         'pending': '대기',
         'in_progress': '진행중',
-        'parallel': '병렬',
         'completed': '완료',
-        'blocked': '보류',
+        'failed': '실패',
+        'skipped': '미수행',
     }
 
     _BASE_BG = '#1c1f26'
@@ -36,7 +111,7 @@ class TestGuiApp:
     _MODE_COLORS = {
         'STANDBY': ('#ffffff', '#2e7d32'),
         'AUTONOMY': ('#ffffff', '#1565c0'),
-        'EMERGENCYC_STOP': ('#ffffff', '#c62828'),
+        'EMERGENCY_STOP': ('#ffffff', '#c62828'),
     }
     _MODE_HINTS = {
         'STANDBY': '충전소 대기 모드 – 작업 대기 및 충전 상태',
@@ -55,7 +130,7 @@ class TestGuiApp:
         'CHARGING': ('#1b1f24', '#ffd54f'),
         'LISTENING': ('#1b1f24', '#ffca28'),
         'INITIALIZING': ('#ffffff', '#546e7a'),
-        'EMERGENCYC_STOP': ('#ffffff', '#c62828'),
+        'EMERGENCY_STOP': ('#ffffff', '#c62828'),
         'MAIN_ERROR': ('#ffffff', '#b71c1c'),
     }
     _STATE_HINTS = {
@@ -71,7 +146,7 @@ class TestGuiApp:
         'CHARGING': '충전 중입니다.',
         'LISTENING': '음성 명령을 듣고 있습니다.',
         'INITIALIZING': '시스템 초기화 중입니다.',
-        'EMERGENCYC_STOP': '긴급 정지! 관리자 조치가 필요합니다.',
+        'EMERGENCY_STOP': '긴급 정지! 관리자 조치가 필요합니다.',
         'MAIN_ERROR': '알 수 없는 오류 상태입니다.',
     }
     _LISTENING_COLORS = {
@@ -86,6 +161,23 @@ class TestGuiApp:
         'rejected': ('#ffffff', '#c62828'),
         'error': ('#ffffff', '#c62828'),
         'emergency_stop': ('#ffffff', '#c62828'),
+    }
+
+    _MOCK_MODE_LABELS = {
+        -1: '자동',
+        0: '실장비',
+        1: 'Mock',
+    }
+    _MOCK_MODE_CHOICES = ['자동', '실장비', 'Mock']
+    _MOCK_MODE_PARAM = {
+        '자동': 'auto',
+        '실장비': 'real',
+        'Mock': 'mock',
+    }
+    _MOCK_MODE_PARAM_TO_VALUE = {
+        'auto': -1,
+        'real': 0,
+        'mock': 1,
     }
 
     _BATTERY_THRESHOLDS = [
@@ -111,9 +203,39 @@ class TestGuiApp:
         self._state_description = ''
 
         self.tasks: Dict[str, Dict[str, str]] = {}
-        self._task_seq = 1
+        self._scenario_status_var = tk.StringVar(value='시나리오 미선택')
+        self._scenario_summary_var = tk.StringVar(value='진행 단계: 0 완료 · 0 실패 · 0 대기')
 
         self._log_tags = {'INFO', 'WARN', 'ERROR', 'STATUS', 'SUCCESS'}
+        self.test_mode_var = tk.BooleanVar(value=True)
+        self.interface_mode_var = tk.StringVar(value='Real')
+        self.scenario_var = tk.StringVar(value='')
+        self.scenarios = self.node.get_scenarios()
+        self.mock_methods = self.node.get_mock_methods()
+        self.state_graph_data = self.node.describe_state_machine() or {}
+        runtime = self.state_graph_data.get('runtime', {}) if isinstance(self.state_graph_data, dict) else {}
+        self._patrol_active = False
+        if isinstance(runtime, dict):
+            if runtime.get('use_mock_interfaces'):
+                self.interface_mode_var.set('Mock')
+            if 'patrol_active' in runtime:
+                self._patrol_active = bool(runtime.get('patrol_active'))
+        self.mock_modes = self.node.get_mock_modes()
+        if isinstance(runtime, dict) and isinstance(runtime.get('mock_modes'), dict):
+            for key, value in runtime['mock_modes'].items():
+                if isinstance(value, int):
+                    self.mock_modes[key] = value
+        self.mock_interface_var = tk.StringVar(value='drive')
+        self.mock_method_var = tk.StringVar(value='')
+        self.mock_error_var = tk.StringVar(value='')
+        self.mock_mode_vars: Dict[str, tk.StringVar] = {}
+        self.mock_mode_combos: Dict[str, ttk.Combobox] = {}
+        self._state_graph_canvas: Optional[StateGraphCanvas] = None
+
+        self._left_panel = tk.Frame(self.root, bg=self._BASE_BG)
+        self._left_panel.pack(side='left', fill='both', expand=True)
+        self._right_panel = tk.Frame(self.root, bg=self._BASE_BG)
+        self._right_panel.pack(side='right', fill='y', padx=12, pady=12)
 
         style = ttk.Style(self.root)
         style.theme_use('clam')
@@ -134,9 +256,24 @@ class TestGuiApp:
         self._build_control_panel()
         self._build_task_panel()
         self._build_log_panel()
+        self._build_state_graph_panel()
+        self._sync_mock_mode_widgets()
+
+    def _build_state_graph_panel(self) -> None:
+        title = tk.Label(
+            self._right_panel,
+            text='상태 다이어그램',
+            bg=self._BASE_BG,
+            fg=self._ACCENT_FG,
+            font=self._HEADER_FONT,
+        )
+        title.pack(anchor='nw', pady=(0, 8))
+
+        self._state_graph_canvas = StateGraphCanvas(self._right_panel, self.state_graph_data)
+        self._state_graph_canvas.pack(fill='both', expand=True)
 
     def _build_status_panel(self) -> None:
-        frame = tk.Frame(self.root, bg=self._PANEL_BG, padx=18, pady=16)
+        frame = tk.Frame(self._left_panel, bg=self._PANEL_BG, padx=18, pady=16)
         frame.pack(fill='x', padx=12, pady=(12, 10))
 
         title = tk.Label(frame, text='로봇 상태', bg=self._PANEL_BG, fg=self._ACCENT_FG, font=self._HEADER_FONT)
@@ -148,6 +285,7 @@ class TestGuiApp:
             ('서브 상태', 'sub'),
             ('배터리', 'battery'),
             ('LISTENING', 'listening'),
+            ('순찰', 'patrol'),
             ('피드백', 'feedback'),
         ]
 
@@ -199,10 +337,11 @@ class TestGuiApp:
         for key in self._status_vars:
             default = '비활성' if key == 'listening' else '-'
             self._set_status(key, default, tone='status')
+        self._set_status('patrol', '진행중' if self._patrol_active else '중지', tone='status')
         self._update_status_hint()
 
     def _build_control_panel(self) -> None:
-        frame = ttk.LabelFrame(self.root, text='제어', style='Dark.TLabelframe')
+        frame = ttk.LabelFrame(self._left_panel, text='제어', style='Dark.TLabelframe')
         frame.pack(fill='x', padx=12, pady=(0, 10))
 
         button_specs = [
@@ -238,53 +377,176 @@ class TestGuiApp:
         )
         manual_frame.columnconfigure(5, weight=1)
 
+        mode_frame = ttk.Frame(frame, style='Dark.TFrame')
+        mode_frame.grid(row=3, column=0, columnspan=4, sticky='ew', padx=6, pady=(10, 4))
+        ttk.Checkbutton(
+            mode_frame,
+            text='Test 모드 (실패시 선택창 표시)',
+            variable=self.test_mode_var,
+            style='TCheckbutton',
+        ).grid(row=0, column=0, padx=4, pady=4, sticky='w')
+
+        ttk.Label(mode_frame, text='인터페이스', background=self._PANEL_BG, foreground=self._HEADER_FG).grid(
+            row=0, column=1, padx=(12, 4), pady=4, sticky='w'
+        )
+        ttk.Radiobutton(
+            mode_frame,
+            text='Real',
+            value='Real',
+            variable=self.interface_mode_var,
+            command=lambda: self._apply_interface_mode('Real'),
+        ).grid(row=0, column=2, padx=4, pady=4, sticky='w')
+        ttk.Radiobutton(
+            mode_frame,
+            text='Mock',
+            value='Mock',
+            variable=self.interface_mode_var,
+            command=lambda: self._apply_interface_mode('Mock'),
+        ).grid(row=0, column=3, padx=4, pady=4, sticky='w')
+
+        mock_mode_frame = ttk.LabelFrame(frame, text='인터페이스 Mock 모드', style='Dark.TLabelframe')
+        mock_mode_frame.grid(row=4, column=0, columnspan=4, padx=6, pady=(10, 4), sticky='ew')
+        interfaces = [('drive', 'Drive'), ('arm', 'Arm'), ('ai', 'AI'), ('gui', 'GUI')]
+        for idx, (key, label_text) in enumerate(interfaces):
+            tk.Label(
+                mock_mode_frame,
+                text=label_text,
+                bg=self._PANEL_BG,
+                fg=self._HEADER_FG,
+                font=('맑은 고딕', 10),
+            ).grid(row=0, column=idx * 2, padx=(4, 2), pady=4, sticky='w')
+            var = tk.StringVar(value=self._mock_mode_label(key))
+            combo = ttk.Combobox(
+                mock_mode_frame,
+                textvariable=var,
+                values=self._MOCK_MODE_CHOICES,
+                state='readonly',
+                width=10,
+            )
+            combo.grid(row=0, column=idx * 2 + 1, padx=(0, 8), pady=4, sticky='w')
+            combo.bind('<<ComboboxSelected>>', lambda _evt, iface=key: self._on_mock_mode_change(iface))
+            self.mock_mode_vars[key] = var
+            self.mock_mode_combos[key] = combo
+        mock_mode_frame.columnconfigure(len(interfaces) * 2 - 1, weight=1)
+
+        scenario_frame = ttk.LabelFrame(frame, text='시나리오 실행', style='Dark.TLabelframe')
+        scenario_frame.grid(row=5, column=0, columnspan=4, padx=6, pady=(10, 4), sticky='ew')
+
+        ttk.Label(scenario_frame, text='시나리오', background=self._PANEL_BG, foreground=self._HEADER_FG).grid(
+            row=0, column=0, padx=4, pady=4, sticky='w'
+        )
+        scenario_names = sorted(self.scenarios.keys())
+        self.scenario_combo = ttk.Combobox(
+            scenario_frame,
+            textvariable=self.scenario_var,
+            values=scenario_names,
+            state='readonly',
+            width=32,
+        )
+        if scenario_names:
+            self.scenario_combo.current(0)
+        self.scenario_combo.grid(row=0, column=1, padx=4, pady=4, sticky='ew')
+        scenario_frame.columnconfigure(1, weight=1)
+
+        ttk.Button(scenario_frame, text='시작', style='Dark.TButton', command=self._run_selected_scenario).grid(
+            row=0, column=2, padx=4, pady=4
+        )
+
+        mock_frame = ttk.LabelFrame(frame, text='Mock 응답 제어', style='Dark.TLabelframe')
+        mock_frame.grid(row=6, column=0, columnspan=4, padx=6, pady=(10, 4), sticky='ew')
+
+        ttk.Label(mock_frame, text='인터페이스', background=self._PANEL_BG, foreground=self._HEADER_FG).grid(
+            row=0, column=0, padx=4, pady=4, sticky='w'
+        )
+        interface_options = sorted(self.mock_methods.keys()) if self.mock_methods else ['drive', 'arm', 'ai', 'gui']
+        if interface_options and self.mock_interface_var.get() not in interface_options:
+            self.mock_interface_var.set(interface_options[0])
+        self.mock_interface_combo = ttk.Combobox(
+            mock_frame,
+            textvariable=self.mock_interface_var,
+            values=interface_options,
+            state='readonly',
+            width=12,
+        )
+        self.mock_interface_combo.grid(row=0, column=1, padx=4, pady=4, sticky='w')
+        self.mock_interface_combo.bind('<<ComboboxSelected>>', self._refresh_mock_method_options)
+
+        ttk.Label(mock_frame, text='메서드', background=self._PANEL_BG, foreground=self._HEADER_FG).grid(
+            row=0, column=2, padx=4, pady=4, sticky='w'
+        )
+        self.mock_method_combo = ttk.Combobox(
+            mock_frame,
+            textvariable=self.mock_method_var,
+            values=[],
+            width=18,
+        )
+        self.mock_method_combo.grid(row=0, column=3, padx=4, pady=4, sticky='w')
+
+        ttk.Label(mock_frame, text='에러 코드', background=self._PANEL_BG, foreground=self._HEADER_FG).grid(
+            row=0, column=4, padx=4, pady=4, sticky='w'
+        )
+        ttk.Entry(mock_frame, textvariable=self.mock_error_var, width=12).grid(
+            row=0, column=5, padx=4, pady=4, sticky='w'
+        )
+
+        ttk.Button(mock_frame, text='성공으로 설정', style='Dark.TButton', command=lambda: self._apply_mock_response(True)).grid(
+            row=0, column=6, padx=4, pady=4
+        )
+        ttk.Button(mock_frame, text='실패로 설정', style='Dark.TButton', command=lambda: self._apply_mock_response(False)).grid(
+            row=0, column=7, padx=4, pady=4
+        )
+        mock_frame.columnconfigure(3, weight=1)
+        self._refresh_mock_method_options()
+
     def _build_task_panel(self) -> None:
-        frame = ttk.LabelFrame(self.root, text='작업 진행 현황 (병목 대응 메모)', style='Dark.TLabelframe')
+        frame = ttk.LabelFrame(self._left_panel, text='시나리오 진행 현황', style='Dark.TLabelframe')
         frame.pack(fill='both', expand=True, padx=12, pady=10)
 
-        entry_frame = ttk.Frame(frame, style='Dark.TFrame')
-        entry_frame.pack(fill='x', pady=6, padx=4)
+        header_frame = ttk.Frame(frame, style='Dark.TFrame')
+        header_frame.pack(fill='x', padx=6, pady=(6, 2))
 
-        tk.Label(entry_frame, text='작업명', bg=self._PANEL_BG, fg=self._HEADER_FG, font=('맑은 고딕', 10)).grid(
-            row=0, column=0, padx=4, pady=2, sticky='w'
-        )
-        self.task_entry = ttk.Entry(entry_frame)
-        self.task_entry.grid(row=0, column=1, padx=4, pady=2, sticky='ew')
-        entry_frame.columnconfigure(1, weight=1)
+        tk.Label(
+            header_frame,
+            textvariable=self._scenario_status_var,
+            bg=self._PANEL_BG,
+            fg=self._HEADER_FG,
+            font=('맑은 고딕', 10, 'bold'),
+        ).grid(row=0, column=0, sticky='w', padx=4, pady=2)
 
-        ttk.Button(entry_frame, text='추가', style='Dark.TButton', command=self._on_add_task).grid(
-            row=0, column=2, padx=4, pady=2
-        )
+        tk.Label(
+            header_frame,
+            textvariable=self._scenario_summary_var,
+            bg=self._PANEL_BG,
+            fg='#9aa5b4',
+            font=self._DESCRIPTION_FONT,
+        ).grid(row=1, column=0, sticky='w', padx=4, pady=2)
+        header_frame.columnconfigure(0, weight=1)
 
-        columns = ('name', 'status')
+        columns = ('order', 'description', 'status')
         self.task_tree = ttk.Treeview(frame, columns=columns, show='headings', height=8)
-        self.task_tree.heading('name', text='작업')
+        self.task_tree.heading('order', text='단계')
+        self.task_tree.heading('description', text='설명')
         self.task_tree.heading('status', text='상태')
-        self.task_tree.pack(fill='both', expand=True, padx=4, pady=6)
-        self.task_tree.tag_configure('parallel', background='#53461f')
-        self.task_tree.tag_configure('blocked', background='#4a2525')
+        self.task_tree.column('order', width=60, anchor='center')
+        self.task_tree.column('description', anchor='w')
+        self.task_tree.column('status', width=120, anchor='center')
+        self.task_tree.pack(fill='both', expand=True, padx=6, pady=6)
+        self.task_tree.tag_configure('in_progress', background='#2d3d4f')
+        self.task_tree.tag_configure('failed', background='#4a2525')
+        self.task_tree.tag_configure('skipped', foreground='#9aa5b4')
 
-        btn_frame = ttk.Frame(frame, style='Dark.TFrame')
-        btn_frame.pack(fill='x', pady=4, padx=4)
-        status_buttons = [
-            ('진행중', 'in_progress'),
-            ('병렬', 'parallel'),
-            ('보류', 'blocked'),
-            ('완료', 'completed'),
-            ('삭제', 'delete'),
-        ]
-        for idx, (text, status) in enumerate(status_buttons):
-            if status == 'delete':
-                command = self._remove_selected_task
-            else:
-                command = lambda s=status: self._update_selected_task(s)
-            ttk.Button(btn_frame, text=text, style='Dark.TButton', command=command).grid(
-                row=0, column=idx, padx=4, pady=4, sticky='ew'
-            )
-            btn_frame.columnconfigure(idx, weight=1)
+        control_frame = ttk.Frame(frame, style='Dark.TFrame')
+        control_frame.pack(fill='x', padx=6, pady=(0, 6))
+        ttk.Button(
+            control_frame,
+            text='진척 초기화',
+            style='Dark.TButton',
+            command=self._clear_task_panel,
+        ).grid(row=0, column=0, sticky='w', padx=4, pady=4)
+        control_frame.columnconfigure(0, weight=1)
 
     def _build_log_panel(self) -> None:
-        frame = ttk.LabelFrame(self.root, text='이벤트 로그', style='Dark.TLabelframe')
+        frame = ttk.LabelFrame(self._left_panel, text='이벤트 로그', style='Dark.TLabelframe')
         frame.pack(fill='both', expand=True, padx=12, pady=(0, 12))
 
         self.log_text = tk.Text(
@@ -338,13 +600,34 @@ class TestGuiApp:
                 self._set_status('listening', event.get('text', '비활성'), tone='status')
             elif event_type == 'notify':
                 self._append_log(event.get('message', ''), level)
-
+            elif event_type == 'interface_mode':
+                self.interface_mode_var.set(event.get('mode', 'Real'))
+                self._append_log(f"인터페이스 모드 전환: {event.get('mode', 'Unknown')}", level)
+            elif event_type == 'scenario':
+                self._append_log(event.get('message', ''), level)
+            elif event_type == 'patrol_status':
+                active = bool(event.get('active'))
+                self._patrol_active = active
+                label = '진행중' if active else '중지'
+                self._set_status('patrol', label, tone='status')
+                self._append_log(f'[순찰] {label}', 'STATUS')
+            elif event_type == 'state_transition':
+                payload = event.get('payload', {})
+                if isinstance(payload, dict):
+                    frm = payload.get('from', {}).get('main', '') if isinstance(payload.get('from'), dict) else ''
+                    to = payload.get('to', {}).get('main', '') if isinstance(payload.get('to'), dict) else ''
+                    if self._state_graph_canvas:
+                        self._state_graph_canvas.show_transition(frm.upper(), to.upper())
+                    self._append_log(f"상태 전이: {frm} → {to}", 'STATUS')
+        
     # ------------------------------------------------------------------ Helpers
     def _handle_state_event(self, event: Dict[str, str], level: str) -> None:
         main_state = event.get('main', '-')
         sub_state = event.get('sub', '-')
         self._set_status('main', main_state)
         self._set_status('sub', sub_state)
+        if self._state_graph_canvas:
+            self._state_graph_canvas.highlight(main_state)
         if 'mode' in event:
             self._set_status('mode', event['mode'])
         if event.get('log'):
@@ -389,6 +672,8 @@ class TestGuiApp:
             return self._DEFAULT_LABEL
         if key == 'listening':
             return self._LISTENING_COLORS.get(text, self._DEFAULT_LABEL)
+        if key == 'patrol':
+            return ('#ffffff', '#1976d2') if text == '진행중' else self._DEFAULT_LABEL
         if key == 'battery':
             percent = self._parse_percentage(text)
             if percent is not None:
@@ -414,10 +699,260 @@ class TestGuiApp:
             parts.append(f'모드: {self._mode_description}')
         if self._state_description:
             parts.append(f'상태: {self._state_description}')
+        parts.append('순찰: 진행중' if self._patrol_active else '순찰: 중지')
         if parts:
             self._state_hint_var.set(' | '.join(parts))
         else:
             self._state_hint_var.set('상태 정보가 여기에 표시됩니다.')
+
+    def _apply_interface_mode(self, mode_label: str) -> None:
+        target_label = 'Mock' if mode_label.lower() == 'mock' else 'Real'
+        if self.interface_mode_var.get() == target_label:
+            changed = self.node.set_interface_mode(target_label.lower() == 'mock')
+        else:
+            self.interface_mode_var.set(target_label)
+            changed = self.node.set_interface_mode(target_label.lower() == 'mock')
+        if not changed:
+            # revert state
+            current = 'Mock' if self.node._use_mock_interfaces else 'Real'
+            self.interface_mode_var.set(current)
+
+    def _run_selected_scenario(self) -> None:
+        scenario_id = self.scenario_var.get()
+        if not scenario_id:
+            messagebox.showinfo('Scenario', '실행할 시나리오를 선택하세요.')
+            return
+        scenario = self.scenarios.get(scenario_id)
+        if not scenario or not isinstance(scenario, dict):
+            messagebox.showwarning('Scenario', f'시나리오를 찾을 수 없습니다: {scenario_id}')
+            return
+
+        steps = scenario.get('steps', [])
+        if not isinstance(steps, list) or not steps:
+            messagebox.showwarning('Scenario', '시나리오에 실행 가능한 단계가 없습니다.')
+            return
+
+        self._prepare_scenario_tracking(scenario_id, steps)
+        self._append_log(f'[시나리오] {scenario_id} 시작', 'INFO')
+        interactive = bool(self.test_mode_var.get())
+        all_success = True
+        for idx, step in enumerate(steps, start=1):
+            self._set_task_status(idx, 'in_progress')
+            success, detail = self._execute_scenario_step(step, interactive)
+            summary = detail or f'Step {idx}: {step.get("action")}'
+            if success:
+                self._set_task_status(idx, 'completed')
+                self._append_log(f'[시나리오] ✅ {summary}', 'SUCCESS')
+                continue
+            self._set_task_status(idx, 'failed')
+            self._append_log(f'[시나리오] ❌ {summary}', 'ERROR')
+            self._mark_remaining_steps(idx + 1)
+            all_success = False
+            break
+        if all_success:
+            self._append_log(f'[시나리오] {scenario_id} 완료', 'SUCCESS')
+            counts_text = self._scenario_summary_var.get()
+            self._scenario_summary_var.set(f'{scenario_id} 완료 | {counts_text}')
+        else:
+            counts_text = self._scenario_summary_var.get()
+            self._scenario_summary_var.set(f'{scenario_id} 중단: {summary} | {counts_text}')
+
+    def _execute_scenario_step(self, step: Dict[str, object], interactive: bool) -> Tuple[bool, str]:
+        action = str(step.get('action', '')).lower()
+        if not action:
+            return False, '액션이 지정되지 않았습니다.'
+
+        if action == 'call_service':
+            target = str(step.get('target', ''))
+            args = step.get('args', {})
+            args = args if isinstance(args, dict) else {}
+            success = self.node.call_service_step(target, **args)
+            if success:
+                return True, f'서비스 호출: {target}'
+            if interactive:
+                result = messagebox.askyesnocancel('시나리오 실패', f'[{target}] 호출 실패\n성공으로 간주하시겠습니까?')
+                if result is True:
+                    return True, f'서비스 호출: {target} (성공 간주)'
+                if result is False:
+                    return False, f'서비스 호출 실패: {target}'
+                return False, '사용자가 시나리오를 취소했습니다.'
+            return False, f'서비스 호출 실패: {target}'
+
+        if action == 'wait_for_state':
+            args = step.get('args', {})
+            args = args if isinstance(args, dict) else {}
+            main = args.get('main')
+            sub = args.get('sub')
+            timeout = float(args.get('timeout', 10.0))
+            success = self.node.wait_for_state(main, sub, timeout)
+            if success:
+                return True, f'상태 대기 완료: {main or "*"}/{sub or "*"}'
+            if interactive:
+                result = messagebox.askyesnocancel('시나리오 실패', f'상태 대기 실패: {main}/{sub}\n성공으로 간주하시겠습니까?')
+                if result is True:
+                    return True, f'상태 대기: {main or "*"}/{sub or "*"} (성공 간주)'
+                if result is False:
+                    return False, f'상태 대기 실패: {main}/{sub}'
+                return False, '사용자가 시나리오를 취소했습니다.'
+            return False, f'상태 대기 실패: {main}/{sub}'
+
+        if action == 'sleep':
+            duration = float(step.get('seconds', step.get('duration', 1.0)))
+            time.sleep(max(0.0, duration))
+            return True, f'{duration:.1f}초 대기'
+
+        if action == 'publish_mock':
+            target = str(step.get('target', ''))
+            self._append_log(f'[시나리오] Mock 호출 준비: {target} (미구현)', 'WARN')
+            return True, f'Mock 호출(미구현): {target}'
+
+        if action == 'log':
+            message = str(step.get('message', ''))
+            self._append_log(message, 'INFO')
+            return True, message
+
+        return False, f'지원하지 않는 액션: {action}'
+
+    def _refresh_mock_method_options(self, *_args) -> None:
+        interface = self.mock_interface_var.get().strip()
+        methods = self.mock_methods.get(interface, [])
+        self.mock_method_combo['values'] = methods
+        if methods:
+            if self.mock_method_var.get() not in methods:
+                self.mock_method_var.set(methods[0])
+        else:
+            self.mock_method_var.set('')
+
+    def _mock_mode_label(self, interface: str) -> str:
+        value = self.mock_modes.get(interface, -1)
+        return self._MOCK_MODE_LABELS.get(value, '자동')
+
+    def _on_mock_mode_change(self, interface: str) -> None:
+        var = self.mock_mode_vars.get(interface)
+        if var is None:
+            return
+        label = var.get()
+        mode_key = self._MOCK_MODE_PARAM.get(label, 'auto')
+        success = self.node.set_mock_mode(interface, mode_key)
+        if success:
+            self.mock_modes[interface] = self._MOCK_MODE_PARAM_TO_VALUE.get(mode_key, -1)
+            self._append_log(f'[Mock 모드] {interface} → {label}', 'INFO')
+        else:
+            # 롤백
+            var.set(self._mock_mode_label(interface))
+
+    def _sync_mock_mode_widgets(self) -> None:
+        for key, var in self.mock_mode_vars.items():
+            var.set(self._mock_mode_label(key))
+
+    def _apply_mock_response(self, success_flag: bool) -> None:
+        interface = self.mock_interface_var.get().strip()
+        method = self.mock_method_var.get().strip()
+        error_code = self.mock_error_var.get().strip()
+        if not interface or not method:
+            messagebox.showwarning('Mock 응답', '인터페이스와 메서드를 모두 입력하세요.')
+            return
+        scenario = method if not error_code else f'{method}:{error_code}'
+        result = self.node.set_mock_response(interface, scenario, success_flag)
+        if result:
+            status = '성공' if success_flag else '실패'
+            self._append_log(f'[Mock] {interface}.{method} → {status}', 'INFO')
+        else:
+            self._append_log(f'[Mock] 설정 실패: {interface}.{method}', 'ERROR')
+
+    def _clear_task_panel(self) -> None:
+        self.tasks.clear()
+        for item in self.task_tree.get_children():
+            self.task_tree.delete(item)
+        self._scenario_status_var.set('시나리오 미선택')
+        self._scenario_summary_var.set('진행 단계: 0 완료 · 0 실패 · 0 대기')
+
+    def _prepare_scenario_tracking(self, scenario_id: str, steps: List[Dict[str, object]]) -> None:
+        self.tasks.clear()
+        for item in self.task_tree.get_children():
+            self.task_tree.delete(item)
+
+        for idx, step in enumerate(steps, start=1):
+            step_id = f'S{idx}'
+            description = self._describe_scenario_step(step)
+            self.tasks[step_id] = {'name': description, 'status': 'pending'}
+            self.task_tree.insert(
+                '',
+                'end',
+                iid=step_id,
+                values=(idx, description, self._TASK_STATUS_LABELS['pending']),
+            )
+
+        self._scenario_status_var.set(f'{scenario_id} (총 {len(steps)}단계)')
+        self._update_scenario_summary()
+
+    def _set_task_status(self, step_index: int, status: str) -> None:
+        step_id = f'S{step_index}'
+        task = self.tasks.get(step_id)
+        if task is None:
+            return
+
+        task['status'] = status
+        label = self._TASK_STATUS_LABELS.get(status, status)
+        tags = (status,) if status in {'in_progress', 'failed', 'skipped'} else ()
+        self.task_tree.item(step_id, values=(step_index, task['name'], label), tags=tags)
+        if status == 'in_progress':
+            self.task_tree.selection_set(step_id)
+            self.task_tree.see(step_id)
+        self._update_scenario_summary()
+
+    def _mark_remaining_steps(self, start_index: int) -> None:
+        for idx in range(start_index, len(self.tasks) + 1):
+            step_id = f'S{idx}'
+            task = self.tasks.get(step_id)
+            if task is None:
+                continue
+            if task['status'] == 'pending':
+                self._set_task_status(idx, 'skipped')
+
+    def _update_scenario_summary(self) -> None:
+        counts = {'completed': 0, 'failed': 0, 'in_progress': 0, 'pending': 0, 'skipped': 0}
+        for task in self.tasks.values():
+            status = task.get('status', 'pending')
+            counts[status] = counts.get(status, 0) + 1
+        waiting = counts['pending'] + counts['skipped']
+        summary = f"완료 {counts['completed']} · 실패 {counts['failed']} · 진행중 {counts['in_progress']} · 대기 {waiting}"
+        self._scenario_summary_var.set(f'진행 단계: {summary}')
+
+    def _describe_scenario_step(self, step: Dict[str, object]) -> str:
+        action = str(step.get('action', '')).lower()
+        if not action:
+            return '미정의 단계'
+
+        if action == 'call_service':
+            args = step.get('args', {})
+            args = args if isinstance(args, dict) else {}
+            target = step.get('target') or args.get('target')
+            return f'service:{target}'
+
+        if action == 'wait_for_state':
+            args = step.get('args', {})
+            args = args if isinstance(args, dict) else {}
+            main = args.get('main', '*')
+            sub = args.get('sub', '*')
+            return f'wait:{main}/{sub}'
+
+        if action == 'sleep':
+            duration = step.get('seconds', step.get('duration', 0))
+            try:
+                duration = float(duration)
+            except (TypeError, ValueError):
+                duration = 0.0
+            return f'sleep:{duration:.1f}s'
+
+        if action == 'publish_mock':
+            return f'mock:{step.get("target", "")}'
+
+        if action == 'log':
+            message = str(step.get('message', ''))
+            return f'log:{message[:24]}'
+
+        return action
 
     def _append_log(self, message: str, level: str = 'INFO') -> None:
         if not message:
@@ -430,46 +965,6 @@ class TestGuiApp:
         self.log_text.insert('end', line + '\n', tag)
         self.log_text.see('end')
         self.log_text.configure(state='disabled')
-
-    # ------------------------------------------------------------------ Task editor
-    def _on_add_task(self) -> None:
-        name = self.task_entry.get().strip()
-        if not name:
-            self._append_log('⚠️ 작업명을 입력하세요.', 'WARN')
-            return
-        task_id = f'T{self._task_seq}'
-        self._task_seq += 1
-        self.tasks[task_id] = {'name': name, 'status': 'pending'}
-        self.task_tree.insert('', 'end', iid=task_id, values=(name, self._TASK_STATUS_LABELS['pending']))
-        self.task_entry.delete(0, 'end')
-        self._append_log(f'작업 등록: {name}', 'INFO')
-
-    def _update_selected_task(self, status: str) -> None:
-        selection = self.task_tree.selection()
-        if not selection:
-            self._append_log('⚠️ 상태를 변경할 작업을 선택하세요.', 'WARN')
-            return
-        label = self._TASK_STATUS_LABELS.get(status, status)
-        for item in selection:
-            task = self.tasks.get(item)
-            if task is None:
-                continue
-            task['status'] = status
-            tags = ()
-            if status == 'parallel':
-                tags = ('parallel',)
-            elif status == 'blocked':
-                tags = ('blocked',)
-            self.task_tree.item(item, values=(task['name'], label), tags=tags)
-        self._append_log(f'작업 상태 변경: {label}', 'INFO')
-
-    def _remove_selected_task(self) -> None:
-        selection = self.task_tree.selection()
-        for item in selection:
-            self.task_tree.delete(item)
-            self.tasks.pop(item, None)
-        if selection:
-            self._append_log('작업을 삭제했습니다.', 'INFO')
 
     # ------------------------------------------------------------------ Manual state form
     def _apply_manual_state(self) -> None:

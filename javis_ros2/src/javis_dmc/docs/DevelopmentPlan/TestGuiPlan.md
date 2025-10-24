@@ -77,7 +77,7 @@
 1. **코드 구성**
    - `test_gui/test_gui_node.py`: ROS 노드 및 Tkinter 구동 엔트리 포인트.
    - `test_gui/test_gui_widget.py`: Tkinter 위젯 정의 및 이벤트 처리.
-   - `setup.py`: `console_scripts`에 `dmc_test_gui` 추가.
+   - `setup.py`: `console_scripts`에 `test_gui_node` 추가.
    - `docs/DevelopmentPlan/ImplementationChecklist.md`: CL-10 진행 메모 업데이트.
 
 2. **최초 기능 목록**
@@ -99,7 +99,7 @@
 ## 6. 테스트 전략
 
 1. `ros2 launch javis_dmc dmc_test.launch.py use_sim_time:=false`로 mock DMC 실행.  
-2. `ros2 run javis_dmc dmc_test_gui --ros-args -p robot_namespace:=dobby_test`로 GUI 실행.  
+2. `ros2 run javis_dmc test_gui_node --ros-args -p robot_namespace:=dobby_test`로 GUI 실행.  
 3. 서비스 호출 버튼이 정상 동작하는지 확인: `/dobby_test/admin/set_robot_mode`, `/dobby_test/admin/emergency_stop`, `/dobby_test/set_listening_mode`, `/dobby_test/admin/force_task_result`, `/dobby_test/admin/set_manual_state`.  
 4. 작업 상태 테이블에서 병렬/완료 상태 전환 시 로그 기록 확인.  
 5. 긴급 정지 → 해제, LISTENING on/off, 작업 강제 처리/수동 상태 적용 후 상태 라벨과 로그가 갱신되는지 검증.

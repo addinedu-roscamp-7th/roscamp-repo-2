@@ -54,7 +54,6 @@ sequenceDiagram
     activate VoiceAPI
     VoiceAPI->>VoiceAPI: STT + Intent 분석<br/>intent="navigation", target="화장실"
     VoiceAPI-->>VRC: {tts_audio: "화장실로 안내해드릴까요?", require_confirmation: true}
-    VoiceAPI-->>DMC: {intent: "navigation", destination: "화장실"}
     deactivate VoiceAPI
 
     activate VRC
@@ -71,7 +70,6 @@ sequenceDiagram
     activate VoiceAPI
     VoiceAPI->>VoiceAPI: 의도 파싱<br/>intent="confirmation", confirmed=true
     VoiceAPI-->>VRC: {tts_audio: "앞으로 나와 주시면 안내를 시작할게요", require_task: true, task_payload:{destination:"화장실"}}
-    VoiceAPI-->>DMC: {require_task: true, task_payload:{destination:"화장실"}}
     deactivate VoiceAPI
 
     activate VRC
@@ -79,8 +77,12 @@ sequenceDiagram
     deactivate VRC
     Speaker-->>User: 음성 출력
 
+    activate VRC
+    VRC->>DMC: submit_voice_task(destination="화장실") [ROS2 Service]
+    deactivate VRC
+
     activate DMC
-    DMC->>DMC: voice_api 응답 수신 → request_task 준비
+    DMC->>DMC: 서비스 요청 수신 → request_task 준비
     DMC->>RCS: create_task(guide_person, destination) [ROS2 Service]
     deactivate DMC
 
