@@ -16,7 +16,6 @@ class MockAIInterface(AIInterface, MockBase):
         AIInterface.__init__(self, node, namespace)
         MockBase.__init__(self, node, namespace)
 
-        self._tracking_id: Optional[str] = None
         self._tracking_mode = 'disabled'
         self._person_detected = False
         self._tracking_callbacks: List[Callable[[Dict[str, Any]], None]] = []
@@ -142,10 +141,7 @@ class MockAIInterface(AIInterface, MockBase):
             self._tracking_mode = mode
             if mode in ('disabled', 'idle'):
                 self._person_detected = False
-                self._tracking_id = None
             elif mode in ('registration', 'follow', 'tracking'):
-                if self._tracking_id is None:
-                    self._tracking_id = f'person_{int(time.time())}'
                 self._person_detected = True
 
         return response.success

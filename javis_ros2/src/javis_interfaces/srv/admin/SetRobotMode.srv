@@ -1,4 +1,8 @@
-string mode
+# SetRobotMode.srv
+
+# Request 
+string mode # 0:standby, 1:autonomy
 ---
+# Response
 bool success
 string message

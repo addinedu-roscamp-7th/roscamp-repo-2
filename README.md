@@ -99,7 +99,7 @@ ROS2와 AI를 활용한 자율주행 로봇개발자 부트캠프 2팀 저장소
     dis - Dobby Image Service
     kc - Kreacher Controller
     kis - Kreacher Image Service
-    interfaces - 메시지/액션 정의
+    interfaces - 커스텀 서비스/메시지/액션 정의
 
     Firmware
     fw/auth - 인증 컨트롤러
