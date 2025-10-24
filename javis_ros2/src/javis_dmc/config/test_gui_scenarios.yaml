@@ -1,0 +1,24 @@
+scenarios:
+  guiding_smoke:
+    description: 'Guiding happy-path'
+    steps:
+      - action: log
+        message: 'LISTENING 시작 요청'
+      - action: call_service
+        target: set_listening_mode
+        args:
+          enabled: true
+      - action: wait_for_state
+        args:
+          main: LISTENING
+          timeout: 5.0
+      - action: sleep
+        seconds: 1.0
+      - action: call_service
+        target: set_listening_mode
+        args:
+          enabled: false
+      - action: wait_for_state
+        args:
+          main: IDLE
+          timeout: 5.0

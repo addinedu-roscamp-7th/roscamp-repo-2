@@ -35,7 +35,9 @@ setup(
     entry_points={
         "console_scripts": [
             "dmc_node = javis_dmc.dmc_node:main",
-            "dmc_test_gui = test_gui.test_gui_node:main",
+            "test_gui_node = test_gui.test_gui_node:main",
+            "pick_book_action_client = javis_dmc.pick_book_action_client:main",
+
         ],
     },
 )

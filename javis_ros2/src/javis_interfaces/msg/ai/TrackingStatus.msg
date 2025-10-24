@@ -1,4 +1,5 @@
 # 피안내자 추적 상태
+
 std_msgs/Header header             # 메시지 헤더
 string tracking_id                 # 추적 중인 ID
 bool person_detected               # 사람 감지 여부

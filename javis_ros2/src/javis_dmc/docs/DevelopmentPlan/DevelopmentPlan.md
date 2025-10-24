@@ -48,7 +48,7 @@ JAVIS DMC (Dobby Main Controller) 상세 설계서 v6.0
     │   관리   │         │   관리   │
     │ - 작업   │         │ - 작업   │
     │   실행   │         │   실행   │
-    │ - 배터리 │         │ - 배터리 │
+    │ - 배터리  │         │ - 배터리 │
     │   감시   │         │   감시   │
     └────┬────┘         └────┬────┘
          │                   │
@@ -214,16 +214,62 @@ javis_dmc_test_msgs/
 ```
 
 > **참고:** 주요 디렉터리 용도 요약
-> - `states/`: 상태 전이 로직과 Enum을 묶어서 관리하며 `StateDefinition.md`와 동기화해야 합니다.
-> - `task_executors/`: RCS Action별 실행기를 보관합니다. 새 작업 타입 추가 시 여기와 문서의 작업 전략을 동시에 갱신합니다.
-> - `interfaces/`: 하위 장치 제어를 위한 추상화 계층입니다. 실제 하드웨어 또는 시뮬레이터 구현은 이 인터페이스를 상속해야 합니다.
-> - `mock/`: Test GUI와 단위 테스트용 모듈 저장소입니다. 실 장비 배포 시에는 이 디렉터리를 번들에서 제외하는 것이 안전합니다.
-> - `utils/`: 로깅, ROS2 헬퍼 등 공용 유틸리티입니다. 재사용 함수 추가 시 의존 모듈을 문서화하여 사이드이펙트를 방지합니다.
-> - `test_gui/`: QA용 GUI 노드로 LISTENING/Guiding 시나리오 재현을 빠르게 수행할 때 사용합니다.
-> - `config/`: ROS 파라미터 YAML 묶음입니다. 값 수정 시 launch 파일과 하드웨어 설정을 함께 검토해야 합니다.
-> - `launch/`: DMC 기동 스크립트 모음입니다. 로봇 수나 테스트 모드에 맞춰 적절한 파일을 선택합니다.
-> - `test/`: 핵심 로직 단위 테스트입니다. 기능 추가 시 관련 검증 케이스를 최소 1개 이상 보강합니다.
-> - `javis_dmc_test_msgs/`: 테스트 전용 커스텀 메시지 패키지로 운영 빌드에는 포함하지 않습니다.
+> - `battery_manager.py`: 배터리 시뮬레이션과 경계값 로직. `DmcStateMachine`과 결합되어 작업 수락 조건을 결정합니다.
+> - `states/`: `main_states.py`, `state_enums.py`로 구성된 메인/서브 상태 정의 및 전이 규칙. `StateDefinition.md`와 반드시 동기화합니다.
+> - `task_executors/`: 액션 종류별 실행기(픽업·반납·길안내·청소·정리). 공통 베이스 클래스로 서브 상태/피드백 처리를 표준화합니다.
+> - `interfaces/`: Drive/Arm/AI/GUI/Voice의 ROS 2 액션·서비스 어댑터. 실 하드웨어와 Mock 구현이 동일 API를 사용하도록 추상화합니다.
+> - `sessions/`: LISTENING과 목적지 선택 타임아웃을 관리하는 dataclass. `dmc_node`에서 세션 관리 코드를 분리하기 위한 핵심 보조 모듈입니다.
+> - `mock/`: Test GUI·단위 테스트용 가짜 하위 시스템. 실제 배포 시에는 Launch에서 import하지 않도록 주의합니다.
+> - `test_gui/`: QA용 rqt 기반 GUI와 헬퍼. 시나리오 실행, 상태 모니터링, Mock 주입을 지원합니다.
+> - `config/`: ROS 파라미터 YAML. 타임아웃·충전소 위치 등 실행 시점 설정을 보관합니다.
+>   - `action_timeouts.yaml`, `patrol_routes.yaml` 등
+> - `launch/`: 단일/다중 로봇 및 테스트용 ROS 2 Launch 스크립트.
+> - `test/`: 단위 테스트 모듈. 상태 머신·배터리·실행자 단위 검증을 유지합니다.
+> - `javis_dmc_test_msgs/`: 테스트 전용 서비스 정의. 운영 빌드에는 포함하지 않습니다.
+> - Test GUI 상세 설계는 `DevelopmentPlan/TestGuiDesign.md`를 참고합니다.
+> - Mock/실 장비 전환은 `use_mock_interfaces` 파라미터(Launch 또는 ros2 param)를 통해 제어하며, Test GUI에서 해당 값을 토글할 수 있도록 한다.
+
+### 3.2 소스 레이어 세부 역할
+
+| 계층 | 포함 모듈 | 책임 | 핵심 진입점 |
+| :--- | :--- | :--- | :--- |
+| 오케스트레이션 | `dmc_node.JavisDmcNode` | 상태 머신 + 액션 서버 + 서비스 핸들러 통합 | `main()` → `JavisDmcNode.__init__` |
+| 상태 관리 | `states/main_states.py`, `states/state_enums.py` | 모드/메인/서브 상태 정의, 전이, 작업 수락 판단 | `DmcStateMachine` |
+| 배터리 | `battery_manager.BatteryManager` | 충전/방전 시뮬레이션, 경고·위험 임계치 계산 | `_on_battery_timer`, `_sync_battery_state` |
+| 세션 | `sessions/listening_session.py`, `sessions/destination_session.py` | LISTENING 및 목적지 선택 타이머/메타데이터 관리 | `_activate_listening_mode`, `_run_guiding_sequence` |
+| 하위 장치 인터페이스 | `interfaces/*.py` | Drive/Arm/AI/GUI/Voice 액션·서비스 클라이언트 래핑 | `_initialize_interfaces`, 각 실행 흐름 |
+| 작업 실행기 | `task_executors/*.py` | 액션별 서브 상태 진행, 피드백/결과 생산 | `_configure_executors`, `_execute_task` |
+| Mock/QA | `mock/*.py`, `test_gui/` | 통합 테스트, 실패 주입, 상태 모니터링 UI | Test GUI 시나리오 |
+
+> **리딩 순서 가이드:** 새 담당자는 (1) `StateDefinition.md` → (2) `states/` → (3) `battery_manager.py` → (4) `sessions/` → (5) `interfaces/` → (6) `task_executors/` → (7) `dmc_node.py` 순으로 확인하면 빠르게 흐름을 파악할 수 있습니다.
+
+### 3.3 `dmc_node.py` 모듈 분해
+
+`JavisDmcNode`는 약 1,500줄로 구성되어 있으며 아래 5개 그룹으로 나눠 읽을 수 있습니다.
+
+| 구간 | 범위 (행 기준) | 내용 | 리팩토링 메모 |
+| :--- | :--- | :--- | :--- |
+| 초기화 | 54-206 | 파라미터 선언, 상태 머신/세션/인터페이스, 서비스·액션 서버 생성 | 추후 `BootstrapConfig` 클래스로 분리 추천 |
+| LISTENING/모드 서비스 | 211-389 | LISTENING 토글, 모드 전환, 비상 정지/재개, 수동 상태 설정 | `ListeningController`, `AdminServiceHandler`로 추출 가능 |
+| 액션 서비스 | 751-989 | Goal 수락/취소/실행, 피드백/결과 구성 | 실행자별 헬퍼 클래스로 분할 |
+| 작업 런타임 | 872-1289 | 길안내·도서 픽업 시퀀스, Future 타임아웃, Pose 변환 | `GuidingWorkflow`, `PickupWorkflow` 등 별도 모듈화 |
+| 공통 헬퍼 | 610-867, 1126-1289 | 배터리 동기화, 세션 대기, Pose/Quaternion 변환 | `navigation_helpers.py` 등 유틸 분리 고려 |
+
+> **리팩토링 원칙**
+> 1. 서비스 핸들러/액션 콜백을 `@dataclass` 또는 전용 클래스로 분리하여 테스트 가능한 단위로 만든다.  
+> 2. 세션/배터리 판단 로직은 Pure Function으로 유지하여 시뮬레이션 테스트를 쉽게 한다.  
+> 3. 인터페이스 실패 처리(`Future` 타임아웃 등)를 공통 함수로 묶어 로그 메시지를 일관되게 관리한다.  
+> 4. Mock와 실제 구현이 동일 메서드 시그니처를 갖도록 인터페이스 계층을 확장한다.
+
+### 3.4 빠른 코드 이해 체크리스트
+
+1. `config/action_timeouts.yaml`에서 LISTENING·GUIDING 시간 제약 확인  
+2. `DmcStateMachine`에서 모드/작업 전이 조건 정리  
+3. `BatteryManager` 임계값이 작업 수락/후속 전이 트리거라는 점 이해  
+4. `_activate_listening_mode` → `_run_guiding_sequence` 흐름 추적 (음성 → GUI → 주행)  
+5. `_wait_future_success`에서 타임아웃 시 로그만 남기고 성공으로 처리되는 현재 동작을 숙지 (개선 필요)  
+6. 액션별 실행자(`task_executors/*`)가 서브 상태와 피드백을 어떻게 업데이트하는지 확인  
+7. Mock 인터페이스 인젝션 방법(`mock/mock_*.py`) 파악 — Test GUI에서 실패 시나리오를 재현할 때 사용
 
 ### 3.1 ROS 인터페이스 매핑 표
 
@@ -404,7 +450,7 @@ GuidingExecutor 업데이트 포인트
 
 | Mode ID | 한글명 | 설명 | 기본 진입 경로 | 주요 해제 조건 | 관리자 제어 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `MODE_STANDBY` | 대기 모드 | 충전소에서 대기하며 음성 호출과 작업 할당을 준비한다. | 관리자 GUI에서 `Standby` 명령, 배터리 충전 완료(≥ 40%) | 배터리 ≤ 40% → `CHARGING`, 긴급 정지 → `EMERGENCYC_STOP`, 관리자 `Autonomy` 전환 | Admin GUI `set_robot_mode` |
+| `MODE_STANDBY` | 대기 모드 | 충전소에서 대기하며 음성 호출과 작업 할당을 준비한다. | 관리자 GUI에서 `Standby` 명령, 배터리 충전 완료(≥ 40%) | 배터리 ≤ 40% → `CHARGING`, 긴급 정지 → `EMERGENCY_STOP`, 관리자 `Autonomy` 전환 | Admin GUI `set_robot_mode` |
 | `MODE_AUTONOMY` | 자율이동 모드 | 웨이포인트 순찰(ROAMING) 상태에서 작업/음성 호출을 수락한다. | 관리자 GUI에서 `Autonomy` 명령, 충전 완료 후 자동 복귀 | 배터리 ≤ 40% → `MOVING_TO_CHARGER`, 긴급 정지 | Admin GUI `set_robot_mode` |
 
 > **설계 의도:** 모드 전환은 항상 관리자 GUI 트리거를 따라간다. 내부 로직은 배터리/긴급 상황에 따라 모드를 강제 종료할 수 있지만, 임의 전환은 허용하지 않는다.
@@ -413,7 +459,7 @@ GuidingExecutor 업데이트 포인트
 
 - **모드 변경:** Admin GUI는 `dobby_admin/set_robot_mode`(예정) 서비스를 호출해 `standby` 또는 `autonomy` 값을 전달한다. DMC는 현재 작업/세션이 없을 때만 즉시 전환하며, 진행 중이라면 `busy` 응답을 반환한다.
 - **웨이포인트 제어:** AUTONOMY 모드 진입 시 DMC는 `ROAMING` 상태로 전환하고 `DDC.start_patrol`을 호출한다. STANDBY 복귀 시 `DDC.control_command(STOP)` 후 `IDLE`로 정착한다.
-- **긴급 정지:** Admin GUI는 `dobby_admin/emergency_stop` 서비스를 통해 어느 모드에서나 즉시 `EMERGENCYC_STOP`으로 전환한다. 해제 시 `resume_navigation` 명령으로 이전 모드/상태를 복원한다.
+- **긴급 정지:** Admin GUI는 `dobby_admin/emergency_stop` 서비스를 통해 어느 모드에서나 즉시 `EMERGENCY_STOP`으로 전환한다. 해제 시 `resume_navigation` 명령으로 이전 모드/상태를 복원한다.
 - **모드별 작업 수락 정책:** STANDBY에서는 `IDLE`에서만 새 작업을 수락하며, AUTONOMY에서는 `ROAMING` 중 작업을 수락한다. 두 모드 모두 배터리 경고 이하(≤ 40%)에서는 신규 작업을 거부한다.
 - **상태 브로드캐스트:** 모드 변경 결과는 `status/robot_state` 토픽과 Admin GUI 피드백 채널(`dobby_admin/mode_feedback`)에 동시에 반영해 UI가 즉시 갱신되도록 한다.
 
@@ -433,7 +479,7 @@ GuidingExecutor 업데이트 포인트
 | 9 | FORCE_MOVE_TO_CHARGER | 강제 충전 복귀 | -1%/min | ❌ |
 | 10 | LISTENING | 음성 인식 대기 (Wake Word 후 20초) | 0 | ❌ |
 | 11 | ROAMING | 웨이포인트 순찰 (AUTONOMY 모드) | -1%/min | ✅ (≥ 40%) |
-| 98 | EMERGENCYC_STOP | 긴급 정지 (Admin) | 0 | ❌ |
+| 98 | EMERGENCY_STOP | 긴급 정지 (Admin) | 0 | ❌ |
 | 99 | MAIN_ERROR | 치명적 오류 | 없음 | ❌ |
 
 ### 5.4 Sub State 정의 (공통 + 작업)
@@ -513,10 +559,10 @@ stateDiagram-v2
     MOVING_TO_CHARGER --> CHARGING: charger_arrived
     MOVING_TO_CHARGER --> IDLE: battery >= 80 & admin=STANDBY
 
-    INITIALIZING --> EMERGENCYC_STOP: emergency
-    CHARGING --> EMERGENCYC_STOP: emergency
-    IDLE --> EMERGENCYC_STOP: emergency
-    TASK_IN_PROGRESS --> EMERGENCYC_STOP: emergency
+    INITIALIZING --> EMERGENCY_STOP: emergency
+    CHARGING --> EMERGENCY_STOP: emergency
+    IDLE --> EMERGENCY_STOP: emergency
+    TASK_IN_PROGRESS --> EMERGENCY_STOP: emergency
 ```
 
 > **참고:** Admin GUI가 `autonomy`로 전환하면 `IDLE` 또는 `CHARGING` 상태에서 AUTONOMY 모드로 이탈하고, 이후 상태 전이는 5.7을 따른다.
@@ -553,9 +599,9 @@ stateDiagram-v2
     MOVING_TO_CHARGER --> CHARGING: charger_arrived
     CHARGING --> ROAMING: battery >= 80 & admin=AUTONOMY
 
-    ROAMING --> EMERGENCYC_STOP: emergency
-    TASK_IN_PROGRESS --> EMERGENCYC_STOP: emergency
-    LISTENING --> EMERGENCYC_STOP: emergency
+    ROAMING --> EMERGENCY_STOP: emergency
+    TASK_IN_PROGRESS --> EMERGENCY_STOP: emergency
+    LISTENING --> EMERGENCY_STOP: emergency
 ```
 
 > **관리자 요청:** AUTONOMY 모드에서 `Standby` 명령이 들어오면 현재 작업 종료 후 `MOVING_TO_CHARGER` → `CHARGING` → `IDLE` 순으로 복귀한다.
@@ -648,10 +694,14 @@ BatteryManager
 | LISTENING 세션 매니저 | Wake Word 타이머, 음성 스트림 제어, Voice API 응답 큐 구현 |  | 대기 | §4.5.1, `SequenceDiagram/GuidingScenario.md` |
 | 목적지 선택 타이머 | GUI 이벤트 60초 제한, Vision 연동, RCS 취소 플로우 |  | 대기 | §4.5.2 |
 | 모드 전환/관리자 서비스 | `set_robot_mode`, `emergency_stop`, `resume_navigation` 서비스 처리 및 상태 브로드캐스트 |  | 대기 | §5.1~5.7 |
-| 상태 머신/Enum 동기화 | `ROAMING`, `EMERGENCYC_STOP` 등 MainState 확장 및 전이 로직 구현 |  | 대기 | §5.3~5.7, `StateDefinition/StateDefinition.md` |
+| 상태 머신/Enum 동기화 | `ROAMING`, `EMERGENCY_STOP` 등 MainState 확장 및 전이 로직 구현 |  | 대기 | §5.3~5.7, `StateDefinition/StateDefinition.md` |
 | 타이머/파라미터 설정 | `action_timeouts.yaml`에 20s/60s 및 Voice API 엔드포인트 정의, 파라미터 로딩 |  | 대기 | §4.5, §7 |
 | 로그/모니터링 보강 | LISTENING/모드 전환/긴급 정지 로그와 Admin GUI 피드백 토픽 업데이트 |  | 대기 | §5.2, §7 |
 | 테스트 플랜 업데이트 | 단위 테스트/시나리오 테스트 확장 (모드 전환, Voice API 페이크) |  | 대기 | §8.1, `test/` |
+| Task Executor 정비 | 서브 상태 전환/피드백 구조 유지 여부 검토, 겹치는 로직 정리 |  | 대기 | §3.2, §8.1 |
+| Nav2 Waypoint 연동 | 순찰(ROAMING)용 Waypoint/Path 메시지 정의 및 DDC 인터페이스 확장 |  | 대기 | §3.2, §5.6, `DevelopmentPlan/NavWaypointDesign.md` |
+| Mock & Test GUI 정합성 | Mock API와 Test GUI 제어 경로 일치 여부 검토, 시나리오 Runner 설계 반영 |  | 대기 | §3.2, `DevelopmentPlan/TestGuiDesign.md` |
+| 상태 그래프 서비스 | DMC가 상태/전이 메타데이터를 서비스/토픽으로 제공, GUI가 시각화 |  | 대기 | §4.5, §5.3, `DevelopmentPlan/StateIntrospection.md` |
 
 > **체크 방법:** 담당자는 `상태` 열에 `진행중`, `완료` 등을 기입하고 완료 시 관련 문서 섹션 번호를 검토한다. 항목 추가가 필요하면 테이블에 바로 반영한다.
 

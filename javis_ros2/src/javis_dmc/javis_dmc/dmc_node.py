@@ -4,7 +4,7 @@ import time
 from functools import partial
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from concurrent.futures import Future, TimeoutError
 
@@ -13,6 +13,7 @@ from geometry_msgs.msg import Pose
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.node import Node
+from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import String
 from std_srvs.srv import SetBool
 from std_srvs.srv import Trigger
@@ -26,6 +27,8 @@ from javis_dmc.interfaces import (
     RosGUIInterface,
     RosVoiceRecognitionInterface,
 )
+from javis_dmc.mock import MockAIInterface, MockArmInterface, MockDriveInterface, MockGUIInterface
+from javis_dmc.mock.mock_base import MockResponse
 from javis_dmc.sessions import DestinationSession, ListeningSession
 from javis_dmc.states.main_states import DmcStateMachine
 from javis_dmc.states.state_enums import MainState, RobotMode, SubState
@@ -46,6 +49,7 @@ from javis_interfaces.msg import DobbyState
 from javis_interfaces.srv import ForceTaskResult
 from javis_interfaces.srv import SetManualState
 from javis_interfaces.srv import SetRobotMode
+from javis_dmc_test_msgs.srv import SetMockResponse
 
 
 class JavisDmcNode(Node):
@@ -58,20 +62,65 @@ class JavisDmcNode(Node):
         self.declare_parameter('robot_namespace', '')
         self.namespace = self.get_parameter('robot_namespace').get_parameter_value().string_value
 
+        self.declare_parameter('use_mock_interfaces', False)
+        self.declare_parameter('mock_mode_drive', -1)
+        self.declare_parameter('mock_mode_arm', -1)
+        self.declare_parameter('mock_mode_ai', -1)
+        self.declare_parameter('mock_mode_gui', -1)
+        self.use_mock_interfaces = bool(self.get_parameter('use_mock_interfaces').value)
+        self._mock_modes = self._collect_mock_modes()
+        self.add_on_set_parameters_callback(self._on_parameters)
+
+        self.declare_parameter('patrol_route', 'default')
+        self._patrol_route_id = self.get_parameter('patrol_route').get_parameter_value().string_value or 'default'
+
         # 주요 구성요소 초기화
         self.state_machine = DmcStateMachine()
         self.state_machine.set_mode(RobotMode.STANDBY)
+        self._last_main_state = self.state_machine.main_state
+        self._last_sub_state = self.state_machine.sub_state
+
         self.battery_manager = BatteryManager()
         self.current_pose: Optional[Pose] = None
         self.current_executor: Optional[BaseExecutor] = None
-        self._battery_timer_period = 2.0
-        self._state_timer_period = 5.0
-        self._listening_timer_period = 0.5
+
+        # 타이머 주기 설정
+        self._battery_timer_period = 2.0    # 배터리 상태 갱신 주기
+        self._state_timer_period = 5.0      # 상태 퍼블리시 주기
+        self._listening_timer_period = 0.5   # 음성 인식 주기
+        self._battery_status: Optional[BatteryStatus] = None
         self._last_state_msg: Optional[DobbyState] = None
-        self.drive = RosDriveInterface(self, self.namespace)
-        self.arm = RosArmInterface(self, self.namespace)
-        self.ai = RosAIInterface(self, self.namespace)
-        self.gui = RosGUIInterface(self, self.namespace)
+
+        # 하위 인터페이스 초기화
+        mock_usage = {
+            'drive': self._should_use_mock('drive'),
+            'arm': self._should_use_mock('arm'),
+            'ai': self._should_use_mock('ai'),
+            'gui': self._should_use_mock('gui'),
+        }
+        if any(mock_usage.values()):
+            self.get_logger().info('Mock 인터페이스 모드로 초기화합니다.')
+
+        if mock_usage['drive']:
+            self.drive = MockDriveInterface(self, self.namespace)
+        else:
+            self.drive = RosDriveInterface(self, self.namespace)
+
+        if mock_usage['arm']:
+            self.arm = MockArmInterface(self, self.namespace)
+        else:
+            self.arm = RosArmInterface(self, self.namespace)
+
+        if mock_usage['ai']:
+            self.ai = MockAIInterface(self, self.namespace)
+        else:
+            self.ai = RosAIInterface(self, self.namespace)
+
+        if mock_usage['gui']:
+            self.gui = MockGUIInterface(self, self.namespace)
+        else:
+            self.gui = RosGUIInterface(self, self.namespace)
+
         self.voice = RosVoiceRecognitionInterface(self, self.namespace)
         self._interfaces = [
             self.drive,
@@ -80,6 +129,14 @@ class JavisDmcNode(Node):
             self.gui,
             self.voice,
         ]
+        self._mock_interfaces: Dict[str, Any] = {
+            key: getattr(self, key)
+            for key, enabled in mock_usage.items()
+            if enabled
+        }
+        self._patrol_routes = self._load_patrol_routes()
+        self._patrol_future: Optional[Future] = None
+        # 세션 및 상태 추적 초기화
         self._timeouts = self._load_action_timeouts()
         clock_now = self.get_clock().now
         self.listening_session = ListeningSession(clock_now, self._timeouts['listening'])
@@ -128,6 +185,16 @@ class JavisDmcNode(Node):
             self._ns_topic('admin/set_manual_state'),
             self._on_set_manual_state,
         )
+        self.describe_state_service = self.create_service(
+            Trigger,
+            self._ns_topic('debug/describe_state_machine'),
+            self._on_describe_state_machine,
+        )
+        self.mock_response_service = self.create_service(
+            SetMockResponse,
+            self._ns_topic('test/set_mock_response'),
+            self._on_set_mock_response,
+        )
 
         # 실행자 구성
         self.executors: Dict[MainState, BaseExecutor] = {
@@ -137,6 +204,7 @@ class JavisDmcNode(Node):
             MainState.CLEANING_DESK: CleaningExecutor(),
             MainState.SORTING_SHELVES: SortingExecutor(),
         }
+        # 실행자 콜백 및 인터페이스 초기화
         self._configure_executors()
         self._initialize_interfaces()
         if self.ai.is_initialized():
@@ -171,6 +239,11 @@ class JavisDmcNode(Node):
         self.battery_pub = self.create_publisher(
             BatteryStatus,
             self._ns_topic('status/battery_status'),
+            10,
+        )
+        self.state_transition_pub = self.create_publisher(
+            String,
+            self._ns_topic('debug/state_transitions'),
             10,
         )
         self.current_pose_sub = self.create_subscription(
@@ -324,7 +397,9 @@ class JavisDmcNode(Node):
             self.state_machine.set_main_state(MainState.ROAMING)
             if self.drive.is_initialized() and not self.drive.resume('autonomy_mode'):
                 self.get_logger().warn('주행 재개 명령이 실패했습니다.')
+            self._start_patrol('mode_switch')
         else:
+            self._stop_patrol('mode_switch')
             self.state_machine.set_main_state(MainState.IDLE)
             if self.drive.is_initialized() and not self.drive.stop('standby_mode'):
                 self.get_logger().warn('주행 정지 명령이 실패했습니다.')
@@ -347,6 +422,7 @@ class JavisDmcNode(Node):
         self._abort_active_goal('긴급 정지로 작업이 중단되었습니다.')
         self.destination_session.clear()
         self._deactivate_listening_mode(reason='긴급 정지')
+        self._stop_patrol('emergency_stop')
 
         if self.drive.is_initialized() and not self.drive.stop('emergency_stop'):
             self.get_logger().warn('주행 정지 명령이 실패했습니다.')
@@ -376,9 +452,11 @@ class JavisDmcNode(Node):
         if target_state == MainState.ROAMING:
             if self.drive.is_initialized() and not self.drive.resume('resume_navigation'):
                 self.get_logger().warn('주행 재개 명령이 실패했습니다.')
+            self._start_patrol('resume_navigation')
         else:
             if self.drive.is_initialized() and not self.drive.stop('resume_to_idle'):
                 self.get_logger().warn('주행 정지 명령이 실패했습니다.')
+            self._stop_patrol('resume_to_idle')
 
         self._publish_state_immediately()
         message = '긴급 정지를 해제했습니다.'
@@ -409,7 +487,10 @@ class JavisDmcNode(Node):
 
         goal_handle = self._active_goal_handle
         if success:
-            goal_handle.succeed(result_msg)
+            try:
+                goal_handle.succeed(result_msg)
+            except TypeError:
+                goal_handle.succeed()
         else:
             try:
                 goal_handle.abort(result_msg)
@@ -469,6 +550,63 @@ class JavisDmcNode(Node):
         self._publish_mode_feedback('manual_state', summary)
         response.success = True
         response.message = summary
+        return response
+
+    def _on_describe_state_machine(self, _request: Trigger.Request, response: Trigger.Response) -> Trigger.Response:
+        '''상태·전이 정보를 JSON으로 반환한다.'''
+        try:
+            payload = {
+                'modes': self._describe_modes(),
+                'main_states': self._describe_main_states(),
+                'sub_states': self._describe_sub_states(),
+                'transitions': self._describe_transitions(),
+                'runtime': {
+                    'use_mock_interfaces': self.use_mock_interfaces,
+                    'patrol_route': self._patrol_route_id,
+                    'patrol_active': bool(getattr(self.drive, 'is_patrol_active', lambda: False)()),
+                    'mock_modes': self._mock_modes,
+                    'mock_active': {
+                        key: self._should_use_mock(key)
+                        for key in ('drive', 'arm', 'ai', 'gui')
+                    },
+                },
+            }
+            response.success = True
+            response.message = json.dumps(payload, ensure_ascii=False)
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().error(f'상태 정보 생성 실패: {exc}')
+            response.success = False
+            response.message = f'상태 정보를 생성하지 못했습니다: {exc}'
+        return response
+
+    def _on_set_mock_response(self, request: SetMockResponse.Request, response: SetMockResponse.Response) -> SetMockResponse.Response:
+        '''Mock 인터페이스 응답을 설정한다.'''
+        interface_key = request.interface_name.strip().lower()
+        if interface_key not in self._mock_interfaces:
+            response.success = False
+            response.message = f'{request.interface_name} 인터페이스는 현재 Mock 모드가 아닙니다.'
+            return response
+
+        method_name, error_code = self._parse_mock_scenario(request.scenario)
+        if not method_name:
+            response.success = False
+            response.message = '시나리오 문자열에 메서드명이 포함되어야 합니다.'
+            return response
+
+        interface = self._mock_interfaces[interface_key]
+        try:
+            mock_response = MockResponse(success=bool(request.success_override), error_code=error_code)
+            interface.set_mock_response(method_name, mock_response)
+        except Exception as exc:  # noqa: BLE001
+            response.success = False
+            response.message = f'응답 설정 실패: {exc}'
+            return response
+
+        mode_text = '성공' if request.success_override else '실패'
+        message = f'{interface_key}.{method_name} 응답을 {mode_text}로 설정했습니다.'
+        response.success = True
+        response.message = message
+        self.get_logger().info(message)
         return response
 
     def _publish_mode_feedback(self, status: str, message: str) -> None:
@@ -561,6 +699,119 @@ class JavisDmcNode(Node):
             'listening': listening,
             'destination_selection': destination,
         }
+
+    def _load_patrol_routes(self) -> Dict[str, Dict[str, object]]:
+        '''순찰 경로 설정을 로드한다.'''
+        config_path = Path(__file__).resolve().parent.parent / 'config' / 'patrol_routes.yaml'
+        if not config_path.exists():
+            self.get_logger().info('patrol_routes.yaml 파일이 없어 순찰 기능을 비활성화합니다.')
+            return {}
+
+        try:
+            import yaml  # type: ignore
+        except ImportError:
+            self.get_logger().warn('PyYAML이 설치되어 있지 않아 순찰 기능을 비활성화합니다.')
+            return {}
+
+        try:
+            with config_path.open('r', encoding='utf-8') as handle:
+                data = yaml.safe_load(handle) or {}
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().error(f'patrol_routes.yaml 로드 실패: {exc}')
+            return {}
+
+        routes = data.get('routes', {})
+        if not isinstance(routes, dict):
+            return {}
+
+        result: Dict[str, Dict[str, object]] = {}
+        for name, meta in routes.items():
+            if isinstance(meta, dict):
+                result[str(name)] = dict(meta)
+        return result
+
+    def _collect_mock_modes(self) -> Dict[str, int]:
+        '''인터페이스별 Mock 모드 파라미터를 로드한다.'''
+        modes: Dict[str, int] = {}
+        for key in ('drive', 'arm', 'ai', 'gui'):
+            param_name = f'mock_mode_{key}'
+            try:
+                value = self.get_parameter(param_name).value
+            except Exception:
+                value = -1
+            if not isinstance(value, int):
+                value = -1
+            modes[key] = value
+        return modes
+
+    def _should_use_mock(self, interface: str) -> bool:
+        '''특정 인터페이스에서 Mock 구현을 사용할지 결정한다.'''
+        mode = self._mock_modes.get(interface, -1)
+        if mode == 1:
+            return True
+        if mode == 0:
+            return False
+        return self.use_mock_interfaces
+
+    def _start_patrol(self, reason: str = '') -> None:
+        '''ROAMING 상태에서 순찰을 시작한다.'''
+        if self.state_machine.main_state != MainState.ROAMING:
+            return
+        if not self._patrol_routes:
+            return
+        if not hasattr(self.drive, 'start_patrol'):
+            return
+        if hasattr(self.drive, 'is_initialized') and not self.drive.is_initialized():
+            return
+        if self.drive.is_patrol_active():
+            return
+
+        route = self._patrol_routes.get(self._patrol_route_id)
+        if route is None:
+            self.get_logger().warn(f'순찰 경로를 찾을 수 없습니다: {self._patrol_route_id}')
+            return
+
+        self.get_logger().info(f'순찰을 시작합니다 ({self._patrol_route_id}, reason={reason}).')
+        try:
+            future = self.drive.start_patrol(route)
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().warn(f'순찰 시작 실패: {exc}')
+            return
+
+        self._patrol_future = future
+        future.add_done_callback(self._on_patrol_result)
+        self._publish_patrol_status()
+
+    def _stop_patrol(self, reason: str = '') -> None:
+        '''순찰을 중단한다.'''
+        if not hasattr(self.drive, 'cancel_patrol'):
+            return
+        if hasattr(self.drive, 'is_initialized') and not self.drive.is_initialized():
+            return
+        try:
+            cancelled = self.drive.cancel_patrol(reason)
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().warn(f'순찰 취소 실패: {exc}')
+            cancelled = False
+        self._patrol_future = None
+        self._publish_patrol_status()
+
+    def _on_patrol_result(self, future: Future) -> None:
+        '''순찰 종료 콜백.'''
+        try:
+            result = future.result()
+            success = bool(getattr(result, 'success', True))
+            message = str(getattr(result, 'message', ''))
+        except Exception as exc:  # noqa: BLE001
+            success = False
+            message = str(exc)
+
+        log_fn = self.get_logger().info if success else self.get_logger().warn
+        log_fn(f'순찰 종료: {message or ("성공" if success else "실패")}')
+        self._patrol_future = None
+        if self.state_machine.main_state == MainState.ROAMING:
+            self._publish_state_immediately()
+        self._publish_patrol_status()
 
     def _create_action_servers(self) -> None:
         '''설계서에 정의된 작업 액션 서버를 초기화한다.'''
@@ -657,10 +908,64 @@ class JavisDmcNode(Node):
         ):
             self.state_pub.publish(state_msg)
             self._last_state_msg = state_msg
+            if force:
+                self._last_main_state = self.state_machine.main_state
+                self._last_sub_state = self.state_machine.sub_state
 
     def _publish_state_immediately(self) -> None:
         '''상태 변화를 즉시 반영한다.'''
         self._publish_state(force=True)
+
+    def _publish_state_transition(self, previous_main: MainState, previous_sub: SubState) -> None:
+        '''상태 전이 이벤트를 퍼블리시한다.'''
+        if self.state_transition_pub.get_subscription_count() == 0:
+            return
+
+        timestamp_msg = self.get_clock().now().to_msg()
+        payload = {
+            'from': {
+                'main': previous_main.name,
+                'sub': previous_sub.name,
+            },
+            'to': {
+                'main': self.state_machine.main_state.name,
+                'sub': self.state_machine.sub_state.name,
+            },
+            'timestamp': {
+                'sec': timestamp_msg.sec,
+                'nanosec': timestamp_msg.nanosec,
+            },
+            'patrol_active': bool(getattr(self.drive, 'is_patrol_active', lambda: False)()),
+        }
+
+        msg = String()
+        msg.data = json.dumps(payload, ensure_ascii=False)
+        self.state_transition_pub.publish(msg)
+
+    def _publish_patrol_status(self) -> None:
+        if self.state_transition_pub.get_subscription_count() == 0:
+            return
+
+        timestamp_msg = self.get_clock().now().to_msg()
+        payload = {
+            'from': {
+                'main': self.state_machine.main_state.name,
+                'sub': self.state_machine.sub_state.name,
+            },
+            'to': {
+                'main': self.state_machine.main_state.name,
+                'sub': self.state_machine.sub_state.name,
+            },
+            'timestamp': {
+                'sec': timestamp_msg.sec,
+                'nanosec': timestamp_msg.nanosec,
+            },
+            'patrol_active': bool(getattr(self.drive, 'is_patrol_active', lambda: False)()),
+        }
+
+        msg = String()
+        msg.data = json.dumps(payload, ensure_ascii=False)
+        self.state_transition_pub.publish(msg)
 
     def _is_at_charger(self) -> bool:
         '''충전소 도착 여부를 판단한다 (향후 위치 기반 로직으로 교체 필요).'''
@@ -669,7 +974,16 @@ class JavisDmcNode(Node):
 
     def _on_state_timer(self) -> None:
         '''현재 상태 정보를 퍼블리시한다.'''
+        previous_main = self._last_main_state
+        previous_sub = self._last_sub_state
         self._publish_state()
+        if (
+            self.state_machine.main_state != previous_main
+            or self.state_machine.sub_state != previous_sub
+        ):
+            self._publish_state_transition(previous_main, previous_sub)
+            self._last_main_state = self.state_machine.main_state
+            self._last_sub_state = self.state_machine.sub_state
 
     def _on_destination_timer(self) -> None:
         '''GUIDING 목적지 선택 세션의 타임아웃을 감시한다.'''
@@ -732,9 +1046,12 @@ class JavisDmcNode(Node):
             self.get_logger().warn(f'실행자를 찾을 수 없습니다: {main_state}')
             return False
 
+        self._stop_patrol('task_start')
         started = executor.execute(goal)
         if not started:
             self.get_logger().warn(f'작업 시작 실패: {main_state}')
+            if self.state_machine.mode == RobotMode.AUTONOMY:
+                self._start_patrol('task_start_failed')
             return False
 
         self.current_executor = executor
@@ -1017,9 +1334,13 @@ class JavisDmcNode(Node):
             self.state_machine.set_main_state(next_state)
 
         self.state_machine.set_sub_state(SubState.NONE)
+        if self.state_machine.main_state == MainState.ROAMING and self.state_machine.mode == RobotMode.AUTONOMY:
+            self._start_patrol('task_complete')
         self._active_goal_handle = None
         self._active_main_state = None
         self._publish_state_immediately()
+        self._last_main_state = self.state_machine.main_state
+        self._last_sub_state = self.state_machine.sub_state
 
     def _navigate_with_follow_mode(self, destination: Pose) -> bool:
         '''피안내자 추종 모드로 목적지까지 이동한다.'''
@@ -1107,7 +1428,7 @@ class JavisDmcNode(Node):
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f'도서 집기 명령 실패: {exc}')
             return False
-        success = self._wait_future_success(future, timeout=25.0)
+        success = self._wait_future_success(future, timeout=70.0)
         if success:
             self._arm_change_pose('carry')
         return success
@@ -1128,7 +1449,7 @@ class JavisDmcNode(Node):
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f'도서 적재 명령 실패: {exc}')
             return False
-        success = self._wait_future_success(future, timeout=25.0)
+        success = self._wait_future_success(future, timeout=70.0)
         return success
 
     def _arm_change_pose(self, pose_type: str) -> None:
@@ -1202,6 +1523,198 @@ class JavisDmcNode(Node):
                 interface.shutdown()
             except Exception as exc:
                 self.get_logger().error(f'인터페이스 종료 실패: {interface.__class__.__name__} - {exc}')
+
+    def _describe_modes(self) -> List[Dict[str, Any]]:
+        '''모드 정보를 사전 형태로 반환한다.'''
+        descriptions = {
+            RobotMode.STANDBY: '충전소 대기 및 수동 작업 모드',
+            RobotMode.AUTONOMY: '웨이포인트 순찰 및 자동 작업 모드',
+        }
+        return [
+            {
+                'id': mode.value,
+                'name': mode.name,
+                'description': descriptions.get(mode, ''),
+            }
+            for mode in RobotMode
+        ]
+
+    def _describe_main_states(self) -> List[Dict[str, Any]]:
+        '''메인 상태 메타 정보를 구성한다.'''
+        descriptions = {
+            MainState.INITIALIZING: '시스템 초기화 중',
+            MainState.CHARGING: '충전소에서 배터리 충전',
+            MainState.IDLE: '충전소에서 작업 대기',
+            MainState.MOVING_TO_CHARGER: '충전소로 이동 중',
+            MainState.PICKING_UP_BOOK: '도서를 픽업하는 작업 상태',
+            MainState.RESHELVING_BOOK: '반납 도서를 정리하는 작업 상태',
+            MainState.GUIDING: '사용자를 목적지로 안내 중',
+            MainState.CLEANING_DESK: '좌석 정리/쓰레기 수거 작업',
+            MainState.SORTING_SHELVES: '서가 정리 작업',
+            MainState.FORCE_MOVE_TO_CHARGER: '배터리 위험으로 긴급 충전 이동',
+            MainState.LISTENING: '사용자 음성 명령 수신 대기',
+            MainState.ROAMING: '자율 순찰 중',
+            MainState.EMERGENCY_STOP: '긴급 정지 상태',
+            MainState.MAIN_ERROR: '일반 오류 상태',
+        }
+        allowed_modes = {
+            MainState.IDLE: ['STANDBY'],
+            MainState.ROAMING: ['AUTONOMY'],
+            MainState.CHARGING: ['STANDBY', 'AUTONOMY'],
+            MainState.MOVING_TO_CHARGER: ['STANDBY', 'AUTONOMY'],
+            MainState.FORCE_MOVE_TO_CHARGER: ['STANDBY', 'AUTONOMY'],
+            MainState.LISTENING: ['STANDBY', 'AUTONOMY'],
+            MainState.EMERGENCY_STOP: ['STANDBY', 'AUTONOMY'],
+        }
+        task_states = {state for state in DmcStateMachine._TASK_STATES}
+        result: List[Dict[str, Any]] = []
+        for state in MainState:
+            result.append(
+                {
+                    'id': state.value,
+                    'name': state.name,
+                    'description': descriptions.get(state, ''),
+                    'type': 'task' if state in task_states else 'system',
+                    'modes': allowed_modes.get(state, ['STANDBY', 'AUTONOMY']),
+                }
+            )
+        return result
+
+    def _describe_sub_states(self) -> List[Dict[str, Any]]:
+        '''서브 상태 정보를 반환한다.'''
+        parent_map = {
+            SubState.NONE: 'GLOBAL',
+            SubState.MOVE_TO_PICKUP: MainState.PICKING_UP_BOOK.name,
+            SubState.PICKUP_BOOK: MainState.PICKING_UP_BOOK.name,
+            SubState.MOVE_TO_STORAGE: MainState.PICKING_UP_BOOK.name,
+            SubState.STOWING_BOOK: MainState.PICKING_UP_BOOK.name,
+            SubState.MOVE_TO_RETURN_DESK: MainState.RESHELVING_BOOK.name,
+            SubState.COLLECT_RETURN_BOOKS: MainState.RESHELVING_BOOK.name,
+            SubState.MOVE_TO_PLACE_SHELF: MainState.RESHELVING_BOOK.name,
+            SubState.PLACE_RETURN_BOOK: MainState.RESHELVING_BOOK.name,
+            SubState.SELECT_DEST: MainState.GUIDING.name,
+            SubState.SCAN_USER: MainState.GUIDING.name,
+            SubState.GUIDING_TO_DEST: MainState.GUIDING.name,
+            SubState.FIND_USER: MainState.GUIDING.name,
+            SubState.MOVE_TO_DESK: MainState.CLEANING_DESK.name,
+            SubState.SCAN_DESK: MainState.CLEANING_DESK.name,
+            SubState.CLEANING_TRASH: MainState.CLEANING_DESK.name,
+            SubState.MOVE_TO_BIN: MainState.CLEANING_DESK.name,
+            SubState.TIDYING_SHELVES: MainState.CLEANING_DESK.name,
+            SubState.MOVE_TO_SHELF: MainState.SORTING_SHELVES.name,
+            SubState.SCAN_BOOK: MainState.SORTING_SHELVES.name,
+            SubState.SORT_BOOK: MainState.SORTING_SHELVES.name,
+            SubState.SUB_ERROR: 'ERROR',
+        }
+        descriptions = {
+            SubState.MOVE_TO_PICKUP: '픽업 지점으로 이동',
+            SubState.PICKUP_BOOK: '도서 집기 수행',
+            SubState.MOVE_TO_STORAGE: '보관함으로 이동',
+            SubState.STOWING_BOOK: '보관함 적재',
+            SubState.MOVE_TO_RETURN_DESK: '반납 데스크 이동',
+            SubState.COLLECT_RETURN_BOOKS: '반납 도서 수거',
+            SubState.MOVE_TO_PLACE_SHELF: '배치 서가로 이동',
+            SubState.PLACE_RETURN_BOOK: '반납 도서 배치',
+            SubState.SELECT_DEST: '목적지 선택 대기',
+            SubState.SCAN_USER: '피안내자 등록/스캔',
+            SubState.GUIDING_TO_DEST: '목적지 안내 중',
+            SubState.FIND_USER: '피안내자 재탐색',
+            SubState.MOVE_TO_DESK: '좌석으로 이동',
+            SubState.SCAN_DESK: '좌석 상태 분석',
+            SubState.CLEANING_TRASH: '쓰레기 수거',
+            SubState.MOVE_TO_BIN: '쓰레기통으로 이동',
+            SubState.TIDYING_SHELVES: '선반 정리',
+            SubState.MOVE_TO_SHELF: '서가로 이동',
+            SubState.SCAN_BOOK: '도서 스캔',
+            SubState.SORT_BOOK: '도서 정렬',
+            SubState.SUB_ERROR: '작업 중 오류',
+        }
+        return [
+            {
+                'id': state.value,
+                'name': state.name,
+                'description': descriptions.get(state, ''),
+                'parent': parent_map.get(state, 'GLOBAL'),
+            }
+            for state in SubState
+        ]
+
+    def _describe_transitions(self) -> List[Dict[str, Any]]:
+        '''주요 상태 전이 규칙을 요약한다.'''
+        transitions = [
+            {'from': 'INITIALIZING', 'to': 'IDLE', 'trigger': 'init_complete'},
+            {'from': 'IDLE', 'to': 'LISTENING', 'trigger': 'voice_request'},
+            {'from': 'IDLE', 'to': 'PICKING_UP_BOOK', 'trigger': 'task_assigned_pickup'},
+            {'from': 'IDLE', 'to': 'RESHELVING_BOOK', 'trigger': 'task_assigned_reshelving'},
+            {'from': 'IDLE', 'to': 'GUIDING', 'trigger': 'task_assigned_guiding'},
+            {'from': 'IDLE', 'to': 'CLEANING_DESK', 'trigger': 'task_assigned_cleaning'},
+            {'from': 'IDLE', 'to': 'SORTING_SHELVES', 'trigger': 'task_assigned_sorting'},
+            {'from': 'IDLE', 'to': 'MOVING_TO_CHARGER', 'trigger': 'battery_warning'},
+            {'from': 'ROAMING', 'to': 'LISTENING', 'trigger': 'voice_request'},
+            {'from': 'ROAMING', 'to': 'PICKING_UP_BOOK', 'trigger': 'task_assigned_pickup'},
+            {'from': 'ROAMING', 'to': 'RESHELVING_BOOK', 'trigger': 'task_assigned_reshelving'},
+            {'from': 'ROAMING', 'to': 'GUIDING', 'trigger': 'task_assigned_guiding'},
+            {'from': 'ROAMING', 'to': 'CLEANING_DESK', 'trigger': 'task_assigned_cleaning'},
+            {'from': 'ROAMING', 'to': 'SORTING_SHELVES', 'trigger': 'task_assigned_sorting'},
+            {'from': 'ROAMING', 'to': 'MOVING_TO_CHARGER', 'trigger': 'battery_warning'},
+            {'from': 'LISTENING', 'to': 'IDLE', 'trigger': 'timeout_or_cancel'},
+            {'from': 'LISTENING', 'to': 'ROAMING', 'trigger': 'timeout_or_cancel'},
+            {'from': 'LISTENING', 'to': 'GUIDING', 'trigger': 'task_confirmed'},
+            {'from': 'MOVING_TO_CHARGER', 'to': 'CHARGING', 'trigger': 'charger_arrived'},
+            {'from': 'CHARGING', 'to': 'IDLE', 'trigger': 'charge_complete_standby'},
+            {'from': 'CHARGING', 'to': 'ROAMING', 'trigger': 'charge_complete_autonomy'},
+            {'from': 'FORCE_MOVE_TO_CHARGER', 'to': 'CHARGING', 'trigger': 'charger_arrived'},
+            {'from': 'EMERGENCY_STOP', 'to': 'IDLE', 'trigger': 'resume_standby'},
+            {'from': 'EMERGENCY_STOP', 'to': 'ROAMING', 'trigger': 'resume_autonomy'},
+        ]
+        task_completion_transitions = [
+            {'from': state.name, 'to': 'IDLE', 'trigger': 'task_complete_standby'}
+            for state in DmcStateMachine._TASK_STATES
+        ]
+        task_completion_transitions.extend(
+            {'from': state.name, 'to': 'ROAMING', 'trigger': 'task_complete_autonomy'}
+            for state in DmcStateMachine._TASK_STATES
+        )
+        task_completion_transitions.append({'from': 'ANY_TASK', 'to': 'MOVING_TO_CHARGER', 'trigger': 'task_complete_battery_warning'})
+        task_completion_transitions.append({'from': 'ANY_TASK', 'to': 'FORCE_MOVE_TO_CHARGER', 'trigger': 'battery_critical'})
+        emergency_transition = {'from': 'ANY', 'to': 'EMERGENCY_STOP', 'trigger': 'emergency_stop'}
+        return transitions + task_completion_transitions + [emergency_transition]
+
+    def _on_parameters(self, params):
+        for param in params:
+            if param.name == 'use_mock_interfaces':
+                self.use_mock_interfaces = bool(param.value)
+                mode_text = 'Mock' if self.use_mock_interfaces else 'Real'
+                self.get_logger().info(
+                    f'use_mock_interfaces 파라미터가 {self.use_mock_interfaces}로 설정되었습니다 (모드: {mode_text}). 현재 세션에서는 즉시 적용되지 않으므로 노드 재시작이 필요합니다.'
+                )
+            elif param.name.startswith('mock_mode_'):
+                interface = param.name[len('mock_mode_'):]
+                try:
+                    mode_value = int(param.value)
+                except (TypeError, ValueError):
+                    mode_value = -1
+                if mode_value not in (-1, 0, 1):
+                    mode_value = max(-1, min(1, mode_value))
+                self._mock_modes[interface] = mode_value
+                label = {1: 'Mock', 0: 'Real', -1: 'Auto'}.get(mode_value, 'Auto')
+                self.get_logger().info(
+                    f'{interface} 인터페이스 Mock 모드가 {label}({mode_value})로 설정되었습니다. 현재 세션에서는 즉시 적용되지 않으므로 노드 재시작이 필요합니다.'
+                )
+        result = SetParametersResult()
+        result.successful = True
+        result.reason = ''
+        return result
+
+    @staticmethod
+    def _parse_mock_scenario(scenario: str) -> Tuple[str, str]:
+        text = (scenario or '').strip()
+        if not text:
+            return '', ''
+        if ':' in text:
+            method, error = text.split(':', 1)
+            return method.strip(), error.strip()
+        return text, ''
 
     def _build_feedback(self, main_state: MainState, progress: float):
         '''작업 유형에 맞는 피드백 메시지를 생성한다.'''

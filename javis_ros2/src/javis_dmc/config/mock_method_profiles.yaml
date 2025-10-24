@@ -1,0 +1,30 @@
+mock_methods:
+  drive:
+    - move_to_target
+    - start_patrol
+    - cancel_patrol
+    - enable_follow_mode
+    - disable_follow_mode
+    - stop
+    - resume
+    - rotate_in_place
+  arm:
+    - pick_book
+    - place_book
+    - collect_books
+    - collect_trash
+    - dispose_trash
+    - change_pose
+    - get_carrier_status
+  ai:
+    - detect_book
+    - check_storage_box
+    - verify_book_position
+    - identify_bookshelf
+    - detect_trash
+    - change_tracking_mode
+    - subscribe_tracking_status
+  gui:
+    - subscribe_screen_event
+    - simulate_screen_event
+    - get_current_screen_info
