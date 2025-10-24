@@ -12,6 +12,17 @@ ROS2와 AI를 활용한 자율주행 로봇개발자 부트캠프 2팀 저장소
 
 ---
 
+### *** git clone 이후 아래 과정을 먼저 진행해 주세요 ***
+```
+cd roscamp-repo-2/
+cp gitmessage ~/.gitmessage
+git config --global commit.template ~/.gitmessage
+```
+git commit 시 message 통일을 위해 template을 적용했습니다.
+
+위 명령어 진행하신 뒤 git commit/push 부탁드립니다.
+
+
 ### 파이선 버전 : 3.12( 추가적으로 다른 버전 사용시 패키지 옆에 명시)
 
 
@@ -60,23 +71,25 @@ ROS2와 AI를 활용한 자율주행 로봇개발자 부트캠프 2팀 저장소
 
        
 ```
- <type>(<scope>): <subject>
-    예시: feat(dmc): 도서 픽업 기능 추가
+ [Type/Scope]: <Subject>
+    예시: [FEAT/DMC]: 도서 픽업 기능 추가
 ```
 
 #### 2. Type (커밋 종류)
 
 ```
-    Type설명
-        feat 새 기능
-        fix 버그 수정
-        refactor 코드 개선 (기능 변화 없음)
-        docs 문서 수정
-        est 테스트 추가/수정
-        chore 빌드, 설정 변경
-        style 코드 포맷팅
+    Type 설명
+        FEAT 새 기능
+        FIX 버그 수정
+        REFACTOR 코드 개선 (기능 변화 없음)
+        DOCS 문서 수정
+        TEST 테스트 추가/수정
+        ENVIR 빌드, 설정 변경
+        STYLE 코드 포맷팅
 ```
+commit 시 template에서 확인할 수 있도록 적용했습니다.
 
+프로젝트 규칙 아래 과정 진행 부탁드립니다.
 
 #### 3. Scope (영향 범위)
 
