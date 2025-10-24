@@ -40,6 +40,8 @@ class WindowClass(QMainWindow, form_window, Node) :
         # 3. UI 설정
         self.setupUi(self)
 
+        self.current_movie = None
+
         # QMovie 객체를 클래스 멤버 변수로 선언하고, 동적 경로를 사용합니다.
         #    GIF 파일명을 정확히 반영합니다. (Loading.gif, Charging.gif, Walking.gif)
         self.movie_loading  = QMovie(os.path.join(IMAGE_DIR, 'Loading.gif'), QByteArray(), self)
@@ -127,87 +129,67 @@ class WindowClass(QMainWindow, form_window, Node) :
 
         self.init_gif_setup() # 초기 GIF 설정 및 디버깅
 
-
     def init_gif_setup(self):
-        """초기 GIF를 설정하고, 파일 경로 유효성을 검사합니다."""
-        
+        """프로그램 시작 시 초기 GIF(Loading)를 설정하고 재생합니다."""
         loading_path = os.path.join(IMAGE_DIR, 'Loading.gif')
-
         if not os.path.exists(loading_path):
-             print(f"ERROR: '{loading_path}' 경로에 파일이 존재하지 않습니다. 경로/파일명이 올바른지 확인하세요!")
-             self.label_loading.setText(f"FATAL ERROR: Loading GIF 로드 실패.\n['{loading_path}']경로를 확인하세요.")
-             return
+            self.get_logger().error(f"초기 GIF 파일 없음: '{loading_path}'")
+            self.label_loading.setText(f"ERROR: Loading.gif 파일을 찾을 수 없습니다.")
+            return
 
-        # 초기 상태: Loading GIF (ID 3) 설정
-        if self.movie_loading.isValid():
-            self.label_loading.setMovie(self.movie_loading)
-            self.movie_loading.start()
+        # 초기 페이지(Loading, 인덱스 2) 및 GIF 설정
+        initial_page_index = 2
+        initial_label = self.label_map.get(initial_page_index)
+        initial_movie = self.movie_loading
+
+        if initial_label and initial_movie.isValid():
+            self.stackedWidget_gif.setCurrentIndex(initial_page_index)
+            initial_label.setMovie(initial_movie)
+            initial_movie.start()
+            # [수정] 초기 GIF를 current_movie로 지정합니다.
+            self.current_movie = initial_movie
         else:
-             print("ERROR: Loading GIF 파일이 유효하지 않습니다. (파일 손상 가능성)")
-             self.label_loading.setText("Loading GIF 로드 실패. 파일이 유효한지 확인하세요.")
-             
-        # 초기 상태: Loading 페이지 (Index 2) 설정
-        self.stackedWidget_gif.setCurrentIndex(2)
-
-# 🌟 4. 로봇 상태 콜백 함수 구현
+            self.get_logger().error("Loading.gif 파일이 유효하지 않거나 손상되었습니다.")
+            initial_label.setText("Loading GIF 로드 실패.")
+            
     def robot_state_callback(self, msg):
         """DobbyState 메시지를 받아 화면을 전환하고 GIF를 제어합니다."""
-        main_state = msg.main_state
-        current_page_index = self.state_to_page_map.get(main_state)
-        new_movie = self.state_to_movie_map.get(main_state)
         
-        # 페이지 인덱스 확인 및 전환
-        if current_page_index is None:
-            self.get_logger().warn(f"알 수 없는 Main State ({main_state})입니다. 기본 화면 유지.")
-            return
-
-        # 1. 페이지 전환
-        self.stackedWidget_gif.setCurrentIndex(current_page_index)
-        
-        # 2. 해당 페이지의 라벨에 무비 설정 및 시작
-        current_label = self.label_map.get(current_page_index)
-        
-
-        # ⚠️ 에러 상태를 최우선으로 처리합니다.
-        if msg.is_error:
-            # 기존 GIF 정지
-            if self.current_movie:
-                self.current_movie.stop()
-
-            self.stackedWidget_gif.setCurrentIndex(5) 
-            current_label = self.label_map.get(5)
-            error_movie = self.state_to_movie_map.get(DobbyState.MAIN_ERROR)
-
-            if current_label and error_movie and error_movie.isValid():
-                current_label.setMovie(error_movie)
-                error_movie.start()
-                # 에러 메시지를 QLabel에 텍스트로 함께 표시 (GIF 위에 텍스트가 겹칠 수 있음)
-                # current_label.setText(f"ERROR: {msg.error_message}") # 필요 시 주석 해제
-                self.get_logger().error(f"로봇 에러 발생: {msg.error_message}")
-                self.current_movie = error_movie
-            elif current_label:
-                current_label.setText(f"FATAL ERROR: 에러 GIF 로드 실패\n{msg.error_message}")
-            return # 에러 처리 후 함수 종료
-        
-        if current_page_index is None:
-            self.get_logger().warn(f"알 수 없는 Main State ({main_state})입니다. 기본 화면 유지.")
-            return
-
-        # 1. 기존에 재생되던 GIF가 있다면 정지
+        # 1. 이전 GIF가 재생 중이었다면 정지
         if self.current_movie:
             self.current_movie.stop()
 
-        # 2. 페이지 전환
-        self.stackedWidget_gif.setCurrentIndex(current_page_index)
+        # 2. 메시지 상태에 따라 표시할 페이지와 GIF 결정
+        # 에러 상태를 최우선으로 처리
+        if msg.is_error:
+            page_index = 5  # 에러 페이지
+            new_movie = self.movie_error
+            self.get_logger().error(f"로봇 에러 수신: {msg.error_message}")
+        else:
+            main_state = msg.main_state
+            page_index = self.state_to_page_map.get(main_state)
+            new_movie = self.state_to_movie_map.get(main_state)
 
-        # 3. 새 페이지의 라벨에 새 GIF 설정 및 시작
-        current_label = self.label_map.get(current_page_index)
+        # 3. 유효한 상태가 아니면 경고 후 현재 상태 유지
+        if page_index is None:
+            self.get_logger().warn(f"정의되지 않은 상태값({main_state}) 수신. 화면을 유지합니다.")
+            if self.current_movie: # 이전 GIF를 다시 재생
+                self.current_movie.start()
+            return
+
+        # 4. 결정된 페이지와 GIF를 화면에 적용
+        current_label = self.label_map.get(page_index)
+
         if current_label and new_movie and new_movie.isValid():
+            self.stackedWidget_gif.setCurrentIndex(page_index)
             current_label.setMovie(new_movie)
             new_movie.start()
             self.current_movie = new_movie # 현재 재생 중인 GIF 업데이트
         else:
-            self.get_logger().warn(f"State ({main_state})에 대한 Label 또는 Movie가 유효하지 않습니다.")
+            self.get_logger().error(f"상태({main_state})에 대한 UI 위젯 또는 GIF 파일이 유효하지 않습니다.")
+            # 비상시 에러 페이지로 전환
+            self.stackedWidget_gif.setCurrentIndex(5)
+            self.label_error.setText(f"UI 표시 오류!\nState: {main_state}")
 
 def main(args=None):
     # ROS 2 초기화
@@ -219,16 +201,16 @@ def main(args=None):
     # 👈 Ctrl+C (SIGINT) 신호에 대한 핸들러 설정
     signal.signal(signal.SIGINT, lambda sig, frame: QApplication.quit())
     
-    adminWindow = WindowClass(robot_name='dobby1') 
+    adminWindow = WindowClass(robot_name='dobby') 
     
     # ROS 2 이벤트를 PyQt 이벤트 루프에 통합
     timer = QTimer()
-    # 👈 람다 함수에서 불필요한 timeout_sec=0 제거 (기본값 사용)
-    timer.timeout.connect(lambda: rclpy.spin_once(adminWindow))
-    timer.start(500) # 10ms 마다 ROS 2 콜백 처리
+    # timeout_sec=0으로 설정하여 non-blocking으로 즉시 spin
+    timer.timeout.connect(lambda: rclpy.spin_once(adminWindow, timeout_sec=0))
+    
+    timer.start(100)
     
     adminWindow.show()
-    
     exit_code = app.exec_()
     
     # GUI 종료 후 ROS 2 정리
