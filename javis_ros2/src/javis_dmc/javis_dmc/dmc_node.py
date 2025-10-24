@@ -144,7 +144,6 @@ class JavisDmcNode(Node):
         self._tracking_lock = Lock()
         self._tracking_info: Dict[str, Any] = {
             'person_detected': False,
-            'tracking_id': '',
             'confidence': 0.0,
             'last_update': 0.0,
         }
@@ -1013,7 +1012,6 @@ class JavisDmcNode(Node):
         '''AI 추적 상태 업데이트를 저장한다.'''
         with self._tracking_lock:
             self._tracking_info['person_detected'] = bool(payload.get('person_detected', False))
-            self._tracking_info['tracking_id'] = str(payload.get('tracking_id', '')).strip()
             confidence = payload.get('confidence', 0.0)
             self._tracking_info['confidence'] = float(confidence or 0.0)
             self._tracking_info['last_update'] = time.monotonic()
@@ -1245,7 +1243,6 @@ class JavisDmcNode(Node):
                 detection_success, tracking_snapshot = self._wait_for_person_detection()
                 if detection_success:
                     person_detected = True
-                    self.destination_session.metadata['tracking_id'] = tracking_snapshot.get('tracking_id', '')
                     if not self.ai.change_tracking_mode('tracking'):
                         self.get_logger().warn('추적 모드 전환에 실패했습니다.')
                 else:

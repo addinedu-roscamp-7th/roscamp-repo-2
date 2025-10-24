@@ -112,7 +112,7 @@ commit 시 template에서 확인할 수 있도록 적용했습니다.
     dis - Dobby Image Service
     kc - Kreacher Controller
     kis - Kreacher Image Service
-    interfaces - 메시지/액션 정의
+    interfaces - 커스텀 서비스/메시지/액션 정의
 
     Firmware
     fw/auth - 인증 컨트롤러

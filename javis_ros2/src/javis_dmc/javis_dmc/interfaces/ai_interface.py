@@ -214,7 +214,6 @@ class RosAIInterface(AIInterface):
             'idle': ChangeTrackingMode.Request.IDLE_MODE,
         }
         request.mode = mode_map.get(mode, ChangeTrackingMode.Request.IDLE_MODE)
-        request.tracking_id = ''
         response = self._call_service(self._change_mode_client, request)
         if response is None:
             return False
@@ -275,7 +274,6 @@ class RosAIInterface(AIInterface):
         if self._tracking_callback is None:
             return
         payload = {
-            'tracking_id': msg.tracking_id,
             'person_detected': msg.person_detected,
             'person_pose': msg.person_pose,
             'distance': msg.distance_to_person,

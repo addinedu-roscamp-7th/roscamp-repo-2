@@ -1,5 +1,9 @@
+# ForceTaskResult.srv
+
+# Request 
 bool success
 string message
 ---
+# Response
 bool applied
 string detail
