@@ -62,7 +62,7 @@ def main():
 
     rclpy.init()
 
-    node = GuidePersonServer(namespace='dobby1/main')
+    node = GuidePersonServer(namespace='dobby2/main')
 
     try:
         rclpy.spin(node)

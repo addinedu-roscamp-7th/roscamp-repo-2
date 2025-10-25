@@ -131,7 +131,7 @@ class DobbyStatePublisher(Node):
 
 def main():
     rclpy.init()
-    node = DobbyStatePublisher(namespace='dobby1')
+    node = DobbyStatePublisher(namespace='dobby2')
     try:
         rclpy.spin(node) # 노드가 메시지 콜백, 타이머 콜백 등을 처리하도록 합니다.
     except KeyboardInterrupt:

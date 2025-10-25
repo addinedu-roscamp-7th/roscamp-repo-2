@@ -21,7 +21,7 @@ class DobbyReshelvingBookServer(Node):
         return CancelResponse.ACCEPT
     
     def goal_callback(self, goal_request: ReshelvingBook.Goal):
-        self.get_logger().info(f'작업 아이디 : {goal_request.task_id}, 책상 위치 : [location: {goal_request.return_desk_location}, pose: {goal_request.return_desk_pose}]')
+        self.get_logger().info(f'책상 위치 : [location: {goal_request.return_desk_location}, pose: {goal_request.return_desk_pose}]')
         return GoalResponse.ACCEPT
     
     async def execute_callback(self, goal_handle):
@@ -35,7 +35,6 @@ class DobbyReshelvingBookServer(Node):
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 result = ReshelvingBook.Result()
-                result.task_id = goal.task_id
                 result.succes = False
                 result.message = '재배치 작업 취소'
                 result.failed_book_ids = ["마법천자문 3권", "코믹 메이플 60권"]
@@ -51,7 +50,6 @@ class DobbyReshelvingBookServer(Node):
         goal_handle.succeed()
 
         result = ReshelvingBook.Result()
-        result.task_id = goal.task_id
         result.success = True
         result.message = '5권중 2권 성공'
         result.books_processed = 2

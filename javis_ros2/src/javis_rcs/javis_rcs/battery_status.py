@@ -28,7 +28,7 @@ class BatteryStatusMonitor(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    battery_monitor = BatteryStatusMonitor(namespace='dobby1')
+    battery_monitor = BatteryStatusMonitor(namespace='dobby2')
     rclpy.spin(battery_monitor)
     battery_monitor.destroy_node()
     rclpy.shutdown()

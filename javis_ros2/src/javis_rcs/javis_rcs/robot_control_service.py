@@ -10,11 +10,12 @@ import threading
 from javis_interfaces.srv import MyJson
 from javis_interfaces.msg import DobbyState, BatteryStatus
 from geometry_msgs.msg import Pose, Pose2D, Point, Quaternion # Pose, Pose2D, Point, Quaternion 추가
-from javis_interfaces.action import PickupBook, CleanSeat, GuidePerson, ReshelvingBook
+from javis_interfaces.action import PickupBook, CleanSeat, GuidePerson, ReshelvingBook, PerformTask
 from .clean_seat import CleanSeat as CleanSeatNode # CleanSeat 노드 클래스를 직접 임포트
 from .pickup_book import PickupBook as PickupBookNode # PickupBook 노드 클래스를 직접 임포트
 from .guide_person import GuidePerson as GuidePersonNode
 from .reshelving_book import ReshelvingBook as ReshelvingBookNode
+from .kreacher_perform import KreacherPerform as KreacherNode 
 
 class OrchestratorNode(Node):
     """
@@ -25,7 +26,7 @@ class OrchestratorNode(Node):
         super().__init__('robot_control_service')
 
         # --- 파라미터 선언 및 초기화 ---
-        self.declare_parameter('robot_namespaces', ['dobby1', 'dobby2'])
+        self.declare_parameter('robot_namespaces', ['dobby1', 'dobby2', 'kreacher'])
         self.robot_namespaces = self.get_parameter('robot_namespaces').get_parameter_value().string_array_value
         
         self.robot_states = {}
@@ -35,7 +36,7 @@ class OrchestratorNode(Node):
         # --- ROS2 인터페이스 초기화 ---
         # 외부로부터 작업 요청을 받는 서비스 서버
         self.task_service = self.create_service(MyJson, 'robot_task', self.task_service_callback)
-
+        
         # 각 로봇의 상태와 배터리를 구독
         for ns in self.robot_namespaces:
             self.robot_states[ns] = {'state': None, 'battery': None}
@@ -59,9 +60,11 @@ class OrchestratorNode(Node):
                 'clean_seat': ActionClient(self, CleanSeat, f'/{ns}/main/clean_seat'),
                 'guide_person': ActionClient(self, GuidePerson, f'/{ns}/main/guide_person'),
                 'reshelving_book': ActionClient(self, ReshelvingBook, f'/{ns}/main/reshelving_book'),
+                'kreacher': ActionClient(self, PerformTask, f'/kreacher/action/perform_task'),
             }
 
         # 주기적으로 작업 큐를 확인하고 할당을 시도하는 타이머
+
         self.assignment_timer = self.create_timer(1.0, self.process_task_queue)
 
         self.get_logger().info(f"OrchestratorNode is ready, managing robots: {self.robot_namespaces}")
@@ -85,6 +88,8 @@ class OrchestratorNode(Node):
             self.get_logger().error(f"Failed to decode task request: {request.payload}")
         
         return response
+    
+
 
     def robot_state_callback(self, msg, namespace):
         """로봇의 메인 상태를 업데이트합니다."""
@@ -106,18 +111,28 @@ class OrchestratorNode(Node):
         # 가장 기본적인 할당 로직: IDLE 상태인 첫 번째 로봇을 찾는다.
         # 향후 로봇의 위치, 배터리 잔량 등을 고려하여 고도화할 수 있습니다.
         available_robot = None
+        task_to_assign = self.task_queue[0] # pop 대신 peek (첫 번째 원소 확인)
         for ns, status in self.robot_states.items():
-            # DobbyState.msg의 IDLE 상태 값은 2입니다. (DevelopmentPlan.md 참조)
-            if status['state'] == DobbyState.IDLE:
+            if task_to_assign.get('task_name') == 'kreacher' and ns == 'kreacher':
                 available_robot = ns
                 break
+            # DobbyState.msg의 IDLE 상태 값은 2입니다. (DevelopmentPlan.md 참조)
+            # 'kreacher' 작업이 아닐 때만 IDLE 상태의 다른 로봇을 찾습니다.
+            if task_to_assign.get('task_name') != 'kreacher' and status['state'] == DobbyState.IDLE:
+                available_robot = ns
+                break
+            
         
-        if available_robot:
-            task_to_assign = self.task_queue.popleft()
+        if available_robot :
+            task_to_assign = self.task_queue.popleft() # 할당이 결정되면 여기서 pop
             self.get_logger().info(f"Assigning task '{task_to_assign.get('task_name')}' to robot '{available_robot}'")
             self.execute_task(available_robot, task_to_assign)
         else:
-            self.get_logger().info("No available robots at the moment. Task remains in queue.")
+            self.get_logger().debug("No available robots at the moment. Task remains in queue.")
+
+    def kreacher_task_queue(self):
+        
+        self.execute_task('kreacher', {'task_name': 'kreacher', 'member_id': 1})
 
     def execute_task(self, robot_namespace, task_data):
         """선택된 로봇에게 실제 작업을 지시합니다."""
@@ -149,6 +164,12 @@ class OrchestratorNode(Node):
             self.get_logger().info(f"Sending 'reshelving_book' goal for return_desk_id {return_desk_id} to robot '{robot_namespace}'")
 
             thread = threading.Thread(target=self._run_reshelving_book_task, args=(robot_namespace, return_desk_id, task_data))
+            thread.start()
+        elif task_name == 'kreacher':
+            member_id = task_data.get('member_id')
+            self.get_logger().info(f"Sending 'kreacher' goal for member_id {member_id} to robot '{robot_namespace}'")
+
+            thread = threading.Thread(target=self._run_kreacher_task, args=(robot_namespace, member_id, task_data))
             thread.start()
 
     def _run_clean_seat_task(self, robot_namespace, seat_id, task_data):
@@ -240,6 +261,27 @@ class OrchestratorNode(Node):
         finally:
             if reshelving_book_node:
                 reshelving_book_node.destroy_node()
+            temp_executor.shutdown()
+    def _run_kreacher_task(self, robot_namespace, member_id, task_data):
+        temp_executor = SingleThreadedExecutor()
+        kreacher_node = None
+        try:
+            kreacher_node = KreacherNode(namespace=f'{robot_namespace}/action')
+            temp_executor.add_node(kreacher_node)
+
+            kwargs = {k: v for k, v in task_data.items() if k != 'dest_location'}
+
+            task_future = kreacher_node.run_task(member_id, **kwargs)
+            temp_executor.spin_until_future_complete(task_future)
+
+            result = task_future.result()
+            self.get_logger().info(f"Reshelving book task for '{robot_namespace}' completed. Success : {result['success']}, Msg: '{result['message']}'")
+
+        except Exception as e:
+            self.get_logger().error(f"An error occurred during krecaher task for '{robot_namespace}': {e}")
+        finally:
+            if kreacher_node:
+                kreacher_node.destroy_node()
             temp_executor.shutdown()
 
     def goal_response_callback(self, robot_namespace, future):

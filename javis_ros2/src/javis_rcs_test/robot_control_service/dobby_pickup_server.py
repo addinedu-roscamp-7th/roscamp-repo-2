@@ -66,7 +66,7 @@ class DobbyPickupServer(Node):
 def main():
     rclpy.init()
 
-    node = DobbyPickupServer(namespace='dobby1/main')
+    node = DobbyPickupServer(namespace='dobby2/main')
 
     try:
         rclpy.spin(node)
