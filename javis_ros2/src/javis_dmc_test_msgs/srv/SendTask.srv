@@ -1,0 +1,9 @@
+# Mock RCS에서 DMC로 작업 전송 서비스
+
+# 작업 타입 (pickup, guiding, reshelving, clean_seat, sort_shelf)
+string task_type
+---
+# 전송 결과
+bool success
+# 상세 메시지
+string message
