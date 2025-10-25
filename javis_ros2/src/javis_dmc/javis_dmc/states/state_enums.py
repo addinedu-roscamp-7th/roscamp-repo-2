@@ -23,6 +23,7 @@ class MainState(IntEnum):
     FORCE_MOVE_TO_CHARGER = 9
     LISTENING = 10
     ROAMING = 11
+    WAITING_FOR_INPUT = 12
     EMERGENCY_STOP = 98
     MAIN_ERROR = 99
 
