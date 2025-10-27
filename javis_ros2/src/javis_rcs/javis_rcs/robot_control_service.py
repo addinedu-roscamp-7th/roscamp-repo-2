@@ -5,10 +5,11 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.executors import SingleThreadedExecutor
 from collections import deque
+from datetime import datetime
 import threading
 
 from javis_interfaces.srv import MyJson
-from javis_interfaces.msg import DobbyState, BatteryStatus
+from javis_interfaces.msg import DobbyState, BatteryStatus, Scheduling
 from geometry_msgs.msg import Pose, Pose2D, Point, Quaternion # Pose, Pose2D, Point, Quaternion 추가
 from javis_interfaces.action import PickupBook, CleanSeat, GuidePerson, ReshelvingBook, PerformTask
 from .clean_seat import CleanSeat as CleanSeatNode # CleanSeat 노드 클래스를 직접 임포트
@@ -32,6 +33,9 @@ class OrchestratorNode(Node):
         self.task_queue = deque()
         self.action_clients = {}
 
+        # Scheduling 메시지를 발행할 퍼블리셔를 생성합니다.
+        
+
         self.task_service = self.create_service(MyJson, 'robot_task', self.task_service_callback)
         
         for ns in self.robot_namespaces:
@@ -50,6 +54,8 @@ class OrchestratorNode(Node):
                     lambda msg, namespace=ns: self.battery_status_callback(msg, namespace),
                     10
                 )
+                
+            self.task_scheduling_pub = self.create_publisher(Scheduling, f'/{ns}/status/task_scheduling', 10)
             self.get_logger().info(f"Subscribing to topics for robot '{ns}'")
 
             self.action_clients[ns] = {
@@ -117,6 +123,21 @@ class OrchestratorNode(Node):
         if available_robot:
             task_to_assign = self.task_queue.popleft()
             self.get_logger().info(f"Assigning task '{task_to_assign.get('task_name')}' to robot '{available_robot}'")
+
+            # Scheduling 메시지를 생성하고 발행합니다.
+            scheduling_msg = Scheduling()
+            # task_data에서 값을 가져오거나, 없으면 기본값을 사용합니다.
+            scheduling_msg.no = task_to_assign.get('no', 0) 
+            scheduling_msg.robot_name = available_robot
+            scheduling_msg.task_id = task_to_assign.get('task_id', 0)
+            scheduling_msg.priority = task_to_assign.get('priority', 0)
+            scheduling_msg.status = 1  # 1: 작업 할당됨 (Assigned) 상태로 가정
+            scheduling_msg.task_create_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            self.task_scheduling_pub.publish(scheduling_msg)
+            self.get_logger().info(f"Published scheduling message for task_id: {scheduling_msg.task_id} to robot: {scheduling_msg.robot_name}")
+
+
             self.execute_task(available_robot, task_to_assign)
         else:
             self.get_logger().debug("No available robots at the moment. Task remains in queue.")

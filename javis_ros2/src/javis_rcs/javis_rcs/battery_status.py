@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from javis_interfaces.msg import BatteryStatus
 
+import sys
 class BatteryStatusMonitor(Node):
     def __init__(self, namespace):
         super().__init__('battery_status_monitor', namespace=namespace)
@@ -28,7 +29,13 @@ class BatteryStatusMonitor(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    battery_monitor = BatteryStatusMonitor(namespace='dobby2')
+    if len(sys.argv) < 2:
+        # setup.py의 entry_points에 'battery_test'로 등록되어 있으므로 사용법에 반영합니다.
+        print("Usage: ros2 run javis_rcs battery_test <namespace>")
+        return
+
+    namespace = sys.argv[1]
+    battery_monitor = BatteryStatusMonitor(namespace=namespace)
     rclpy.spin(battery_monitor)
     battery_monitor.destroy_node()
     rclpy.shutdown()

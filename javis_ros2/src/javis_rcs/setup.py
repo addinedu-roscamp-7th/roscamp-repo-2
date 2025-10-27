@@ -36,7 +36,8 @@ setup(
             'battery_test = javis_rcs.battery_status:main',
             'dobby_state_publisher = javis_rcs.dobby_state_publisher:main', # 이 라인을 추가
             'gateway_http_to_service = javis_rcs.gateway_http_to_service:main',
-            'kreacher_perform = javis_rcs.kreacher_perform:main'
+            'kreacher_perform = javis_rcs.kreacher_perform:main',
+            'task_pub = javis_rcs.task_publish:main'
         ],
     },
 )

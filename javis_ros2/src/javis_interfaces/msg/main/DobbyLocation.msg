@@ -1,0 +1,2 @@
+string robot_name
+geometry_msgs/Pose2D robot_loaction
