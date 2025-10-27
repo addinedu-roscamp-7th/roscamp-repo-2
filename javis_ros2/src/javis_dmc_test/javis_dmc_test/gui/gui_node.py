@@ -98,6 +98,10 @@ class GuiNode(Node, QObject):
             node_name: Mock 노드 이름 (예: "mock_ddc_navigate_to_pose")
             mode: 변경할 모드 ("active", "error", "on", "off")
         """
+        if not self.context.ok():
+            self.get_logger().error('ROS 컨텍스트가 종료되어 Mock 모드를 변경할 수 없습니다.')
+            return False
+
         try:
             from rclpy.parameter import Parameter
             from rcl_interfaces.srv import SetParameters
@@ -142,6 +146,10 @@ class GuiNode(Node, QObject):
         Args:
             location_name: 조회할 위치 이름 (빈 문자열이면 전체 목록)
         """
+        if not self.context.ok():
+            self.get_logger().error('ROS 컨텍스트가 종료되어 위치 조회를 수행할 수 없습니다.')
+            self.query_location_signal.emit(False, '', 0.0, 0.0, 0.0, 'ROS 컨텍스트가 종료되었습니다. GUI를 재시작하세요.')
+            return
         if not self.query_location_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().error('QueryLocationInfo service not available')
             self.query_location_signal.emit(False, '', 0.0, 0.0, 0.0, 'Service not available')
@@ -183,6 +191,10 @@ class GuiNode(Node, QObject):
             dest_x, dest_y, dest_theta: 목적지 좌표
             source: 요청 출처 ("gui" or "voice")
         """
+        if not self.context.ok():
+            self.get_logger().error('ROS 컨텍스트가 종료되어 길안내 요청을 처리할 수 없습니다.')
+            self.request_guidance_signal.emit(False, '', 'ROS 컨텍스트가 종료되었습니다. GUI를 재시작하세요.')
+            return
         if not self.request_guidance_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().error('RequestGuidance service not available')
             self.request_guidance_signal.emit(False, '', 'Service not available')
@@ -222,6 +234,10 @@ class GuiNode(Node, QObject):
             destination_name: 목적지 이름
             dest_x, dest_y, dest_theta: 목적지 좌표
         """
+        if not self.context.ok():
+            self.get_logger().error('ROS 컨텍스트가 종료되어 작업 생성을 처리할 수 없습니다.')
+            self.create_task_signal.emit(False, '', 'ROS 컨텍스트가 종료되었습니다. GUI를 재시작하세요.')
+            return
         if not self.create_user_task_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().error('CreateUserTask service not available')
             self.create_task_signal.emit(False, '', 'Service not available')

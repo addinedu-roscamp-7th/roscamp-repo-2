@@ -50,14 +50,21 @@ class MockPlaceBookServer(MockServerBase):
         for i in range(1, 4):
             if not goal_handle.is_active:
                 self.get_logger().warn('PlaceBook Action canceled')
-                return PlaceBook.Result(success=False, message='Canceled')
+                cancel_result = PlaceBook.Result()
+                cancel_result.book_id = goal.book_id
+                cancel_result.storage_box_id = goal.storage_box_id
+                cancel_result.success = False
+                cancel_result.message = 'Canceled'
+                return cancel_result
             
-            feedback_msg.status = f'책 배치 중... {i}/3'
+            feedback_msg.current_action = f'책 배치 중... {i}/3'
             goal_handle.publish_feedback(feedback_msg)
             time.sleep(0.5)
         
         # Result 반환
         result = PlaceBook.Result()
+        result.book_id = goal.book_id
+        result.storage_box_id = goal.storage_box_id
         
         if self.is_error():
             # Error 모드: 배치 실패

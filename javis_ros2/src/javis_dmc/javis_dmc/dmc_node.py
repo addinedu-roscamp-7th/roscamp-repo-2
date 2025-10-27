@@ -1332,6 +1332,15 @@ class JavisDmcNode(Node):
         '''작업 종료 후 상태를 정리한다.'''
         self.current_executor = None
 
+        if self.state_machine.is_emergency():
+            self.state_machine.set_sub_state(SubState.NONE)
+            self._active_goal_handle = None
+            self._active_main_state = None
+            self._publish_state_immediately()
+            self._last_main_state = self.state_machine.main_state
+            self._last_sub_state = self.state_machine.sub_state
+            return
+
         if forced_state is not None:
             self.state_machine.set_main_state(forced_state)
         else:
@@ -1438,7 +1447,6 @@ class JavisDmcNode(Node):
         if not self.arm.is_initialized():
             self.get_logger().warn('Arm 인터페이스가 초기화되지 않아 도서 집기를 수행할 수 없습니다.')
             return False
-        self._arm_change_pose('observe')
         try:
             future = self.arm.pick_book(goal.book_id, goal.book_pick_pose, goal.storage_id)
         except Exception as exc:  # noqa: BLE001
@@ -1481,13 +1489,21 @@ class JavisDmcNode(Node):
             return False
 
         if hasattr(future, 'done') and hasattr(future, 'result'):
-            try:
+            deadline = time.monotonic() + float(timeout)
+            while time.monotonic() < deadline:
                 if future.done():
-                    result = future.result()
-                else:
-                    result = future.result(timeout=timeout)
+                    break
+                try:
+                    rclpy.spin_once(self, timeout_sec=0.1)
+                except Exception:  # noqa: BLE001
+                    break
+            if not future.done():
+                self.get_logger().info('비동기 작업이 아직 완료되지 않아 후속 콜백에서 결과를 대기합니다.')
+                return True
+            try:
+                result = future.result()
             except TimeoutError:
-                self.get_logger().warn('비동기 작업이 타임아웃되어 성공으로 간주합니다.')
+                self.get_logger().info('비동기 작업 완료 대기 중 타임아웃되어 후속 콜백으로 결과를 처리합니다.')
                 return True
             except Exception as exc:  # noqa: BLE001
                 self.get_logger().error(f'비동기 작업 처리 실패: {exc}')

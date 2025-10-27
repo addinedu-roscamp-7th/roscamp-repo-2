@@ -153,6 +153,28 @@ class StatusGuiApp:
         'SORTING_SHELVES': ('#00796b', '#ffffff'),
         'MAIN_ERROR': ('#d32f2f', '#ffffff'),
     }
+    _SUB_STATE_COLORS = {
+        'MOVE_TO_PICKUP': ('#2b3f55', '#e1ecf8'),
+        'MOVE_TO_STORAGE': ('#2b3f55', '#e1ecf8'),
+        'MOVE_TO_RETURN_DESK': ('#2b3f55', '#e1ecf8'),
+        'MOVE_TO_PLACE_SHELF': ('#2b3f55', '#e1ecf8'),
+        'MOVE_TO_DESK': ('#2b3f55', '#e1ecf8'),
+        'MOVE_TO_BIN': ('#2b3f55', '#e1ecf8'),
+        'MOVE_TO_SHELF': ('#2b3f55', '#e1ecf8'),
+        'PICKUP_BOOK': ('#2f5d4a', '#e4f7ef'),
+        'STOWING_BOOK': ('#2f5d4a', '#e4f7ef'),
+        'COLLECT_RETURN_BOOKS': ('#2f5d4a', '#e4f7ef'),
+        'PLACE_RETURN_BOOK': ('#2f5d4a', '#e4f7ef'),
+        'SCAN_USER': ('#364773', '#e7ecff'),
+        'GUIDING_TO_DEST': ('#364773', '#e7ecff'),
+        'FIND_USER': ('#364773', '#e7ecff'),
+        'SCAN_DESK': ('#3b5b66', '#e6f5f9'),
+        'CLEANING_TRASH': ('#3b5b66', '#e6f5f9'),
+        'TIDYING_SHELVES': ('#3b5b66', '#e6f5f9'),
+        'SCAN_BOOK': ('#3b5d7a', '#e6f1ff'),
+        'SORT_BOOK': ('#3b5d7a', '#e6f1ff'),
+        'SUB_ERROR': ('#5a2a2a', '#ffe8e8'),
+    }
 
     _BATTERY_THRESHOLDS = [
         (75.0, ('#43a047', '#ffffff')),
@@ -416,7 +438,7 @@ class StatusGuiApp:
 
         # 상태별 색상 적용
         main_colors = self._STATE_COLORS.get(main_state, self._DEFAULT_LABEL)
-        sub_colors = self._STATE_COLORS.get(sub_state, self._DEFAULT_LABEL) if sub_state != 'NONE' else self._DEFAULT_LABEL
+        sub_colors = self._SUB_STATE_COLORS.get(sub_state, self._DEFAULT_LABEL) if sub_state != 'NONE' else self._DEFAULT_LABEL
 
         self._status_labels['main_state'].config(bg=main_colors[0], fg=main_colors[1])
         self._status_labels['sub_state'].config(bg=sub_colors[0], fg=sub_colors[1])

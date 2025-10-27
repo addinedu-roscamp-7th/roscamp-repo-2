@@ -37,7 +37,6 @@ string book_id
 string message
 ---
 # Feedback
-string status
 string current_action
 ```
 
@@ -56,7 +55,6 @@ string book_id
 string message
 ---
 # Feedback
-string status
 string current_action
 ```
 
@@ -163,3 +161,7 @@ geometry_msgs/Pose target_pose
 bool success
 string message
 ```
+
+> **비고:**  
+> - `PickBook`/`PlaceBook` 액션은 관측 자세 전환을 자체적으로 처리하므로 DMC가 별도로 관측 자세를 지시하지 않는다.  
+> - `ChangeArmPose` 서비스는 이동 전 초기 자세 복귀 등 외부에서 명시적으로 요청해야 하는 경우에만 사용한다.
