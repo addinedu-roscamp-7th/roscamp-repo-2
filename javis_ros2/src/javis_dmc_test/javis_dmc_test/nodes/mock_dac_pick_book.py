@@ -50,14 +50,19 @@ class MockPickBookServer(MockServerBase):
         for i in range(1, 4):
             if not goal_handle.is_active:
                 self.get_logger().warn('PickBook Action canceled')
-                return PickBook.Result(success=False, message='Canceled')
+                cancel_result = PickBook.Result()
+                cancel_result.book_id = goal.book_id
+                cancel_result.success = False
+                cancel_result.message = 'Canceled'
+                return cancel_result
             
-            feedback_msg.status = f'책 픽업 중... {i}/3'
+            feedback_msg.current_action = f'책 픽업 중... {i}/3'
             goal_handle.publish_feedback(feedback_msg)
             time.sleep(0.5)
         
         # Result 반환
         result = PickBook.Result()
+        result.book_id = goal.book_id
         
         if self.is_error():
             # Error 모드: 픽업 실패

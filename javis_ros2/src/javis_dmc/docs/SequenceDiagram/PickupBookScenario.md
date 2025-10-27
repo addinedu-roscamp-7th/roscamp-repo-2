@@ -81,13 +81,13 @@ sequenceDiagram
     DMC->>DMC: 운반함 공간 배정
     DMC->>DAC: 도서 꺼내기 동작 요청<br>{도서 id, 도서 위치, 운반함 위치}
     activate DAC
-    DAC->>DAC: 관측 자세
+    DAC->>DAC: 관측 자세 전환 (내부 자동)
     DAC->>AI: 도서 감지 요청{도서 ID}
     activate AI
     AI->>AI: 이미지에서 도서 감지
     AI-->>DAC: 도서 감지 {도서ID}
     deactivate AI
-    DAC->>DAC: 도서 집고 해당 운반함에<br>보관 후 관측 자세
+    DAC->>DAC: 도서 집고 해당 운반함에<br>보관 후 관측 자세(내부)
     DAC-->>DMC: 동작완료
     deactivate DAC
     DMC->>DMC: 상태변경<br>상위[도서픽업중]<br>하위[보관위치이동]

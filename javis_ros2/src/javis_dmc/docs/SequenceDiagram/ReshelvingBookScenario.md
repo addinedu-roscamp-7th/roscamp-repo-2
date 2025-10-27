@@ -32,9 +32,9 @@ sequenceDiagram
     participant AIS as AI Image<br/>Service
     participant RCS as Robot Control<br/>Service
     participant AS as Application<br/>Service
-    DMC->>DAC: 반납대 관측 자세 이동
+    DMC->>DAC: 반납대 작업 준비(초기 자세 요청)
     activate DAC
-    DAC->>DAC: 반납대 관측 자세<br/>이동
+    DAC->>DAC: 초기 자세 전환
     DAC-->>DMC: 이동완료
     deactivate DAC
     DMC->>AIS: 반납도서 스캔  [ROS2]
@@ -47,7 +47,7 @@ sequenceDiagram
     activate DAC
     rect rgb(220, 240, 255)
         Note over DMC,DAC: loop [반납 도서 > 1]
-        DAC->>DAC: 도서 피킹 후<br/>운반함넣기
+        DAC->>DAC: 도서 피킹 후<br/>운반함넣기(관측 자세 자동 전환)
     end
     DAC-->>DMC: 회수 완료 [ROS2]
     deactivate DAC
