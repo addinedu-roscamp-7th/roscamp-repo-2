@@ -128,7 +128,7 @@ class RosDriveInterface(DriveInterface):
     def move_to_target(self, pose: Pose, location_name: str = '') -> Future:
         '''지정된 위치로 이동을 수행한다.'''
         goal = MoveToTarget.Goal()
-        goal.target_pose = pose
+        goal.target_location = pose
         goal.location_name = location_name
         return self._send_goal(self._move_client, goal)
 

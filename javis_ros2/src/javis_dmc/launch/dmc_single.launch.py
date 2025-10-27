@@ -24,7 +24,7 @@ def generate_launch_description():
         Node(
             package='javis_dmc',
             executable='dmc_node',
-            name='javis_dmc_node',
+            name='dmc_node',
             namespace=robot_namespace,
             output='screen',
             parameters=[

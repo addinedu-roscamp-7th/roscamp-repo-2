@@ -1,0 +1,15 @@
+# RequestGuidance.srv
+# 길안내 작업 요청 서비스 (GUI 터치 및 VRC 음성 공통 사용)
+# DMC가 RCS에 길안내 작업 생성을 요청하고, RCS는 작업을 큐에 추가한 후 
+# guide_person Action으로 DMC에 다시 할당
+
+# Request
+string destination_name       # 목적지 이름 (예: "화장실", "카페", "출입구")
+geometry_msgs/Pose2D dest_pose  # 목적지 2D 좌표 (x, y, theta)
+string request_source         # 요청 출처 ("gui" 또는 "voice")
+string user_context           # 사용자 컨텍스트 (선택사항, 예: "voice_session_id")
+---
+# Response
+bool success                  # 요청 성공 여부
+string message                # 응답 메시지
+string task_id                # 생성된 작업 ID (RCS에서 할당)

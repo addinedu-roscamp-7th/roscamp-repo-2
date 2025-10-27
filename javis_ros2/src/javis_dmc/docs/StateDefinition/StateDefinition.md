@@ -103,12 +103,28 @@ Robot Mode (로봇 모드)
 | DB_S05   | 음성 인식 중   | LISTENING             | 사용자 음성 명령 대기 중      | -       | 모든 모드 |
 | DB_S99   | 긴급 정지     | EMERGENCY_STOP        | 관리자 긴급 정지           | -       | 모든 모드 |
 
-#### 3.2 자율이동 모드 전용 상태
+#### 3.2 사용자 인터랙션 상태
+| State ID | 한글명      | 영문명                | 설명                         | 배터리 조건 | 모드 호환성 | RCS 작업 할당 | 진입 경로 |
+| -------- | -------- | -------------------- | ---------------------------- | -------- | ------- | ----------- | --------- |
+| DB_S05   | 음성 인식 중 | LISTENING | VRC 음성 인식 처리 중 (20초) | -   | 모든 모드 | ❌ 불가 | VRC wakeWord |
+| DB_S06   | 목적지 입력 대기 | WAITING_DEST_INPUT | GUI에서 목적지 선택 대기 (60초) | ≥ 40%   | 모든 모드 | ❌ 불가 | GUI QueryLocationInfo |
+
+**특징:**
+- **RCS 작업 할당 불가**: 외부에서 책장 정리, 도서 픽업 등 신규 작업 할당 받지 않음
+- **사용자 주도 작업 가능**: RequestGuidance 받으면 DMC가 RCS에 사용자 작업 생성 요청 → GUIDING 전환
+- **연결 인터페이스**: 
+  - LISTENING: VRC 전용 (음성 인식)
+  - WAITING_DEST_INPUT: GUI 전용 (QueryLocationInfo = 목적지 입력 의사 표현)
+- **타임아웃**: 
+  - LISTENING: 20초 후 이전 상태 복귀
+  - WAITING_DEST_INPUT: 60초 후 이전 상태 복귀
+
+#### 3.3 자율이동 모드 전용 상태
 | State ID | 한글명   | 영문명     | 설명          | 배터리 조건 |
 | -------- | ----- | ------- | ----------- | -------- |
-| DB_S06   | 자율이동중 | ROAMING | 웨이포인트 기반 순찰 | ≥ 40% |
+| DB_S07   | 자율이동중 | ROAMING | 웨이포인트 기반 순찰 | ≥ 40% |
 
-#### 3.3 작업 상태(Task States)
+#### 3.4 작업 상태(Task States)
 | State ID | 한글명      | 영문명             | 설명                | 모드 호환성 |
 | -------- | -------- | --------------- | ----------------- | ------- |
 | DB_S10   | 책장 정리중   | SORTING_SHELVES | 책장 정리 작업 수행 중     | 모든 모드 |
@@ -128,10 +144,14 @@ stateDiagram-v2
     IDLE --> CHARGING: battery ≤ 40%
     IDLE --> FORCE_MOVE_TO_CHARGER: battery ≤ 20%
     IDLE --> LISTENING: wakeWordDetected
+    IDLE --> WAITING_DEST_INPUT: queryLocationInfo
     IDLE --> TASK_IN_PROGRESS: 작업요청
 
     LISTENING --> IDLE: timeout(20s)
-    LISTENING --> TASK_IN_PROGRESS: guidanceRequested
+    LISTENING --> GUIDING: requestGuidance (VRC 직접 호출)
+    
+    WAITING_DEST_INPUT --> GUIDING: requestGuidance
+    WAITING_DEST_INPUT --> IDLE: timeout(60s) or cancelled
 
     state TASK_IN_PROGRESS {
         direction LR
@@ -163,9 +183,15 @@ stateDiagram-v2
     CHARGING --> ROAMING: battery ≥ 40%
     ROAMING --> CHARGING: battery ≤ 40%
     ROAMING --> LISTENING: wakeWordDetected
+    ROAMING --> WAITING_DEST_INPUT: queryLocationInfo
     ROAMING --> TASK_IN_PROGRESS: 작업요청
     ROAMING --> FORCE_MOVE_TO_CHARGER: battery ≤ 20%
+    
     LISTENING --> ROAMING: timeout(20s) or 대화종료
+    LISTENING --> GUIDING: requestGuidance (VRC 직접 호출)
+    
+    WAITING_DEST_INPUT --> GUIDING: requestGuidance
+    WAITING_DEST_INPUT --> ROAMING: timeout(60s) or cancelled
     
     state TASK_IN_PROGRESS {
         direction LR
@@ -220,12 +246,19 @@ stateDiagram-v2
     STOWING_BOOK --> [*]: 완료
 
 6.4 길 안내 (GUIDING)
+```
 stateDiagram-v2
     direction LR
-    [*] --> SELECT_DEST
-    SELECT_DEST --> SCAN_USER
-    SCAN_USER --> GUIDING_TO_DEST
+    [*] --> SCAN_USER: requestGuidance
+    SCAN_USER --> GUIDING_TO_DEST: 사용자 등록 완료
+    GUIDING_TO_DEST --> FIND_USER: 사용자 이탈
+    FIND_USER --> GUIDING_TO_DEST: 사용자 재발견
     GUIDING_TO_DEST --> [*]: 목적지 도착
+    FIND_USER --> [*]: 타임아웃
+    SCAN_USER --> [*]: 등록 실패
+```
+
+> **v4.0 변경사항**: SELECT_DEST 서브 상태 제거됨. 목적지 선택은 WAITING_DEST_INPUT(11) 메인 상태에서 처리됩니다.
 
 6.5 좌석 정리 (CLEANING_DESK)
 stateDiagram-v2
@@ -260,8 +293,23 @@ stateDiagram-v2
 | **MEDIUM**   | CHARGING              | ROAMING               | 충전 완료         | Battery ≥ 40%              |
 | **MEDIUM**   | ROAMING               | CHARGING              | 배터리 부족        | Battery ≤ 40%              |
 
----
-#### 7.4 배터리 관리 우선순위
+#### 7.4 사용자 인터랙션 전환 규칙 (v4.0 업데이트)
+| Priority     | From                  | To                    | Trigger              | Condition                  |
+| ------------ | --------------------- | --------------------- | -------------------- | -------------------------- |
+| **MEDIUM**   | IDLE/ROAMING          | LISTENING             | wakeWordDetected (VRC) | -                         |
+| **MEDIUM**   | IDLE/ROAMING          | WAITING_DEST_INPUT    | QueryLocationInfo 호출 (GUI) | Battery ≥ 40%              |
+| **MEDIUM**   | LISTENING             | GUIDING               | RequestGuidance 호출 (VRC) | Battery ≥ 40%              |
+| **MEDIUM**   | WAITING_DEST_INPUT    | GUIDING               | RequestGuidance 호출 (GUI) | Battery ≥ 40%              |
+| **LOW**      | LISTENING             | 이전 상태 (IDLE/ROAMING) | 20초 타임아웃            | 이전 상태 복원                 |
+| **LOW**      | WAITING_DEST_INPUT    | 이전 상태 (IDLE/ROAMING) | 60초 타임아웃 또는 취소      | 이전 상태 복원                 |
+
+> **정책**: 
+> - **LISTENING**: VRC 전용, wakeWord 감지 시 진입, 20초 내 RequestGuidance 미호출 시 복귀
+> - **WAITING_DEST_INPUT**: GUI 전용, QueryLocationInfo 호출 = 목적지 입력 의사 표현, 60초 내 RequestGuidance 미호출 시 복귀
+> - **음성 경로**: `IDLE/ROAMING → LISTENING → GUIDING` (WAITING_DEST_INPUT 거치지 않음)
+> - **GUI 경로**: `IDLE/ROAMING → QueryLocationInfo → WAITING_DEST_INPUT → RequestGuidance → GUIDING`
+
+#### 7.5 배터리 관리 우선순위
 ```
 ≤ 20%  → FORCE_MOVE_TO_CHARGER (모든 모드) (작업 긴급중단 상태)
 21~39% → MOVING_TO_CHARGER (작업 완료 후) 또는 CHARGING (직접 전환)(작업 할당 불가능 상태들)
@@ -271,10 +319,11 @@ stateDiagram-v2
 
 ### 8. 버전 히스토리
 ```
-Version  Date        Changes                                                   Author
-v3.1     2025-10-22  배터리 임계값 조정, 모드-상태 관계 명확화, 다이어그램 업데이트     System Architect
-v3.0     2025-01-21  모드 기반 아키텍처 도입, 배터리 임계값 변경, Mermaid 다이어그램 개편  System Architect
-v2.0     2025-01-21  State ID 체계 변경, Sub-state 다이어그램 추가               System Architect
+Version  Date        Changes                                                              Author
+v4.0     2025-10-27  WAITING_DEST_INPUT 상태 추가, SELECT_DEST 제거, 60초 타이머 정책 추가   System Architect
+v3.1     2025-10-22  배터리 임계값 조정, 모드-상태 관계 명확화, 다이어그램 업데이트            System Architect
+v3.0     2025-01-21  모드 기반 아키텍처 도입, 배터리 임계값 변경, Mermaid 다이어그램 개편     System Architect
+v2.0     2025-01-21  State ID 체계 변경, Sub-state 다이어그램 추가                        System Architect
 v1.0     2024-10-17  초기 문서 생성    
 ```
 

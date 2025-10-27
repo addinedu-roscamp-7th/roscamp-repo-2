@@ -1,0 +1,15 @@
+# QueryLocationInfo.srv
+# 도서관 내 시설 위치 정보 조회 서비스
+# GUI 터치 또는 음성으로 요청된 목적지의 좌표 및 메타정보를 반환
+
+# Request
+string location_name  # 조회할 위치 이름 (예: "화장실", "안내데스크", "카페", "출입구")
+---
+# Response
+bool found                    # 위치 정보 존재 여부
+string location_name          # 확인된 위치 이름
+string location_id            # 고유 식별자 (예: "restroom_1f", "info_desk")
+geometry_msgs/Pose2D pose     # 2D 위치 및 방향 (x, y, theta)
+string description            # 위치 설명 (예: "1층 남자 화장실")
+string[] aliases              # 별칭 목록 (예: ["화장실", "남자 화장실", "restroom"])
+string message                # 응답 메시지 (예: "위치를 찾았습니다" 또는 "위치를 찾을 수 없습니다")

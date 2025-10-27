@@ -435,12 +435,22 @@ GuidingExecutor 업데이트 포인트
 4. RCS `guide_person` Goal 수신 시 세션을 종료하고 GUIDING 메인 상태로 전환한다.
 5. 타임아웃/취소 발생 시 `handle_timeout`이 음성 스트림을 중단하고 상태를 IDLE 또는 기존 작업 상태로 복귀시킨다.
 
-#### 4.5.2 목적지 선택 타이머 시퀀스
+#### 4.5.2 목적지 선택 타이머 시퀀스 (DEPRECATED)
 
+> **⚠️ 설계 변경:** 길안내 플로우가 변경되어 이 섹션은 더 이상 사용되지 않습니다.
+> 새로운 플로우에서는 GUI/VRC가 사전에 목적지를 확정하므로 DMC 내부에서 목적지 선택 단계를 거치지 않습니다.
+> 자세한 내용은 `docs/DevelopmentPlan/GuidanceFlowRefactor.md` 참조.
+
+**기존 설계 (제거됨):**
 1. LISTENING → GUIDING 전환 직후 `DestinationSession.begin_selection()`으로 GUI 지도 열람을 요청하고 60초 타이머를 설정한다.
 2. 사용자가 목적지를 선택하면 `resolve_selection`이 Vision 등록 단계(`SCAN_USER`)로 전환하도록 상태 머신을 갱신한다.
 3. 타이머 만료 시 `abort_timeout`이 RCS Action Result `aborted(destination_timeout)`을 반환하고, `determine_post_task_state`를 호출해 후속 상태를 정한다.
 4. Vision 등록/추적 완료 이벤트 수신 시 `DestinationSession`을 완료 상태로 표시해 중복 실행을 방지한다.
+
+**새로운 설계:**
+- GUI/VRC → DMC: `QueryLocationInfo` 서비스로 위치 조회
+- GUI/VRC → DMC: `RequestGuidance` 서비스로 길안내 요청 (목적지 확정)
+- DMC: 바로 피안내자 스캔(`SCAN_USER`) → 추종 이동(`GUIDING_TO_DEST`)
 
 > **설계 의도:** Wake Word 세션과 목적지 선택 세션을 분리해 동시에 동작할 때 충돌을 피한다. 두 타이머 값(20초/60초)은 `config/action_timeouts.yaml`에서 관리해 테스트가 용이하도록 한다.
 
@@ -478,18 +488,29 @@ GuidingExecutor 업데이트 포인트
 | 8 | SORTING_SHELVES | 서가 정리 | -1%/min | ❌ |
 | 9 | FORCE_MOVE_TO_CHARGER | 강제 충전 복귀 | -1%/min | ❌ |
 | 10 | LISTENING | 음성 인식 대기 (Wake Word 후 20초) | 0 | ❌ |
-| 11 | ROAMING | 웨이포인트 순찰 (AUTONOMY 모드) | -1%/min | ✅ (≥ 40%) |
+| 11 | **WAITING_DEST_INPUT** | **GUI/VRC에서 목적지 입력 대기 중** | 0 | ❌ |
+| 12 | ROAMING | 웨이포인트 순찰 (AUTONOMY 모드) | -1%/min | ✅ (≥ 40%) |
 | 98 | EMERGENCY_STOP | 긴급 정지 (Admin) | 0 | ❌ |
 | 99 | MAIN_ERROR | 치명적 오류 | 없음 | ❌ |
+
+> **v7.0 변경사항:**  
+> - **WAITING_DEST_INPUT(11) 추가**: GUI/VRC에서 사용자가 목적지를 선택하는 동안의 상태  
+> - **ROAMING 번호 변경**: 11 → 12로 이동  
+> - 이 상태는 로봇이 물리적으로 정지한 채 사용자 입력을 기다리는 시스템 레벨 상태입니다
 
 ### 5.4 Sub State 정의 (공통 + 작업)
 
 - 공통: `NONE = 100`, `SUB_ERROR = 199`
 - Book Pickup: `MOVE_TO_PICKUP`, `PICKUP_BOOK`, `MOVE_TO_STORAGE`, `STOWING_BOOK`
 - Reshelving: `MOVE_TO_RETURN_DESK`, `COLLECT_RETURN_BOOKS`, `MOVE_TO_PLACE_SHELF`, `PLACE_RETURN_BOOK`
-- Guiding: `SELECT_DEST`, `SCAN_USER`, `GUIDING_TO_DEST`, `FIND_USER`
+- Guiding: ~~`SELECT_DEST = 109`~~ (DEPRECATED, 제거됨), `SCAN_USER = 110`, `GUIDING_TO_DEST = 111`, `FIND_USER = 112`
 - Cleaning (스켈레톤): `MOVE_TO_DESK`, `SCAN_DESK`, `CLEANING_TRASH`, `MOVE_TO_BIN`, `TIDYING_SHELVES`
 - Sorting (스켈레톤): `MOVE_TO_SHELF`, `SCAN_BOOK`, `SORT_BOOK`
+
+> **v7.0 변경사항:**  
+> - **SELECT_DEST(109) 제거**: 목적지 선택은 더 이상 Task Sub State가 아닌 **Main State WAITING_DEST_INPUT(11)**로 관리됩니다  
+> - 이유: 목적지 입력은 로봇의 전체 상태(사용자 인터랙션 대기)이지, GUIDING 작업의 하위 단계가 아니기 때문입니다  
+> - 길안내는 `RequestGuidance` 서비스 호출 후 즉시 `SCAN_USER`부터 시작합니다
 
 ### 5.5 Main State Diagram
 
@@ -501,6 +522,7 @@ stateDiagram-v2
     CHARGING --> IDLE: battery >= 40
 
     IDLE --> LISTENING: wake_word_detected
+    IDLE --> WAITING_DEST_INPUT: gui_map_opened or vrc_guidance_request
     IDLE --> PICKING_UP_BOOK: task_assigned(PICKUP)
     IDLE --> RESHELVING_BOOK: task_assigned(RESHELVING)
     IDLE --> GUIDING: task_assigned(GUIDING)
@@ -508,15 +530,19 @@ stateDiagram-v2
     IDLE --> SORTING_SHELVES: task_assigned(SORTING)
     IDLE --> FORCE_MOVE_TO_CHARGER: battery < 20
 
-    LISTENING --> GUIDING: guidance_confirmed
+    LISTENING --> WAITING_DEST_INPUT: location_query_initiated
+    LISTENING --> GUIDING: request_guidance_received
     LISTENING --> IDLE: timeout_20s or cancelled
     LISTENING --> FORCE_MOVE_TO_CHARGER: battery < 20
+
+    WAITING_DEST_INPUT --> GUIDING: request_guidance_received
+    WAITING_DEST_INPUT --> IDLE: timeout or user_cancelled
+    WAITING_DEST_INPUT --> FORCE_MOVE_TO_CHARGER: battery < 20
 
     GUIDING --> IDLE: complete & at_charger
     GUIDING --> MOVING_TO_CHARGER: complete & !at_charger
     GUIDING --> LISTENING: wake_word_detected (안내 중 호출)
     GUIDING --> FORCE_MOVE_TO_CHARGER: battery < 20
-    GUIDING --> IDLE: aborted(destination_timeout or user_cancel)
 
     MOVING_TO_CHARGER --> IDLE: arrived & battery >= 40
     MOVING_TO_CHARGER --> CHARGING: arrived & battery < 40
@@ -527,6 +553,11 @@ stateDiagram-v2
 
     MAIN_ERROR --> IDLE: error_resolved
 ```
+
+> **v7.0 변경사항:**  
+> - **WAITING_DEST_INPUT(11) 상태 추가**: GUI/VRC에서 목적지 입력 대기  
+> - IDLE/LISTENING → WAITING_DEST_INPUT → GUIDING 흐름 추가  
+> - 기존 destination_timeout 제거 (60초 타이머 삭제)
 
 ### 5.6 STANDBY MODE 상태 다이어그램
 
@@ -573,12 +604,17 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> ROAMING: admin=AUTONOMY & battery >= 40
     ROAMING --> LISTENING: wake_word_detected
+    ROAMING --> WAITING_DEST_INPUT: gui_guidance_initiated
     ROAMING --> TASK_IN_PROGRESS: task_assigned
     ROAMING --> MOVING_TO_CHARGER: battery <= 40
     ROAMING --> FORCE_MOVE_TO_CHARGER: battery <= 20
 
     LISTENING --> ROAMING: timeout_20s or cancel
-    LISTENING --> TASK_IN_PROGRESS: guidance_confirmed
+    LISTENING --> WAITING_DEST_INPUT: location_query_initiated
+    LISTENING --> TASK_IN_PROGRESS: request_guidance_received
+
+    WAITING_DEST_INPUT --> TASK_IN_PROGRESS: request_guidance_received
+    WAITING_DEST_INPUT --> ROAMING: timeout or user_cancelled
 
     state TASK_IN_PROGRESS {
         direction LR
@@ -602,7 +638,13 @@ stateDiagram-v2
     ROAMING --> EMERGENCY_STOP: emergency
     TASK_IN_PROGRESS --> EMERGENCY_STOP: emergency
     LISTENING --> EMERGENCY_STOP: emergency
+    WAITING_DEST_INPUT --> EMERGENCY_STOP: emergency
 ```
+
+> **v7.0 변경사항:**  
+> - **WAITING_DEST_INPUT(11) 추가**: ROAMING/LISTENING에서 목적지 입력 대기 상태로 전환  
+> - **ROAMING 상태 번호**: 11 → 12로 변경 (상태 번호만 변경, 기능 동일)  
+> - AUTONOMY 모드에서도 GUI/VRC 기반 길안내 지원
 
 > **관리자 요청:** AUTONOMY 모드에서 `Standby` 명령이 들어오면 현재 작업 종료 후 `MOVING_TO_CHARGER` → `CHARGING` → `IDLE` 순으로 복귀한다.
 
@@ -610,10 +652,7 @@ stateDiagram-v2
 
 ```
 stateDiagram-v2
-    [*] --> SELECT_DEST
-
-    SELECT_DEST --> SCAN_USER: dest_selected
-    SELECT_DEST --> [*]: destination_timeout
+    [*] --> SCAN_USER: request_guidance_received
 
     SCAN_USER --> GUIDING_TO_DEST: user_registered
     SCAN_USER --> [*]: scan_failed (3회 시)
@@ -625,7 +664,12 @@ stateDiagram-v2
     FIND_USER --> [*]: find_timeout
 ```
 
-타임아웃 이벤트는 모두 RCS Action Result(`aborted`, reason 포함)로 보고하고, `GuidingExecutor`는 `_publish_feedback`을 통해 GUI/RCS에 진행 상황을 공유한다.
+> **v7.0 변경사항:**  
+> - **SELECT_DEST 제거**: 목적지 선택은 Main State WAITING_DEST_INPUT(11)에서 처리  
+> - **시작점 변경**: `RequestGuidance` 서비스 호출 시 즉시 SCAN_USER(110)부터 시작  
+> - destination_timeout 제거 (60초 타이머 로직 삭제)
+
+타임아웃 이벤트는 모두 GuidePerson Action Result(`aborted`, reason 포함)로 보고하고, 진행 상황은 Feedback을 통해 GUI/RCS에 공유한다.
 
 
 ## 6. 배터리 관리
@@ -690,20 +734,26 @@ BatteryManager
 
 | 체크 항목 | 설명 | 담당 | 상태 | 문서 동기화 포인트 |
 | :--- | :--- | :--- | :--- | :--- |
+| **v4.0 WAITING_DEST_INPUT 구현** | QueryLocationInfo → WAITING_DEST_INPUT → RequestGuidance 플로우 구현, 60초 타이머 | System | ✅ 완료 | §4.5.2, `InterfaceSpecification/gui_to_dmc.md` |
+| **v4.0 SELECT_DEST 제거** | GuidingExecutor에서 SELECT_DEST 서브 상태 제거, 목적지 사전 확정 로직 적용 | System | ✅ 완료 | §4.5.2, §8.1 |
+| **v4.0 destination_session 정리** | v4.0에서 불필요한 destination_session 주석 처리 | System | ✅ 완료 | §7 |
+| **v4.0 state_machine 메서드 추가** | enter_waiting_dest_input(), exit_waiting_dest_input() 구현 | System | ✅ 완료 | §5.3 |
+| **QueryLocationInfo 전체 목록 반환** | srv 정의 수정 또는 JSON 응답으로 전체 위치 목록 제공 | - | 대기 | §4.5.2, `srv/gui/QueryLocationInfo.srv` |
+| **RequestGuidance → RCS 연동** | 임시 구현을 RCS CreateUserTask 패턴으로 변경 (user_initiated=True) | - | 대기 | §7, `InterfaceSpecification/gui_to_dmc.md` |
 | VoiceRecognitionInterface 리팩터링 | 아날로그 오디오 스트림 → Voice API 전송, `set_listening_mode` 서비스 구현 |  | 대기 | §2.3, §4.5.1, `Architecture/SoftwareArchitecture.md` |
 | LISTENING 세션 매니저 | Wake Word 타이머, 음성 스트림 제어, Voice API 응답 큐 구현 |  | 대기 | §4.5.1, `SequenceDiagram/GuidingScenario.md` |
-| 목적지 선택 타이머 | GUI 이벤트 60초 제한, Vision 연동, RCS 취소 플로우 |  | 대기 | §4.5.2 |
+| 목적지 선택 타이머 | GUI 이벤트 60초 제한, Vision 연동, RCS 취소 플로우 |  | ✅ 완료 | §4.5.2 |
 | 모드 전환/관리자 서비스 | `set_robot_mode`, `emergency_stop`, `resume_navigation` 서비스 처리 및 상태 브로드캐스트 |  | 대기 | §5.1~5.7 |
 | 상태 머신/Enum 동기화 | `ROAMING`, `EMERGENCY_STOP` 등 MainState 확장 및 전이 로직 구현 |  | 대기 | §5.3~5.7, `StateDefinition/StateDefinition.md` |
 | 타이머/파라미터 설정 | `action_timeouts.yaml`에 20s/60s 및 Voice API 엔드포인트 정의, 파라미터 로딩 |  | 대기 | §4.5, §7 |
 | 로그/모니터링 보강 | LISTENING/모드 전환/긴급 정지 로그와 Admin GUI 피드백 토픽 업데이트 |  | 대기 | §5.2, §7 |
-| 테스트 플랜 업데이트 | 단위 테스트/시나리오 테스트 확장 (모드 전환, Voice API 페이크) |  | 대기 | §8.1, `test/` |
+| **v4.0 테스트 서버 & 테스트 케이스** | Test Server 구현 및 단위/통합 테스트 작성 | - | 대기 | §8.3, `test/` |
 | Task Executor 정비 | 서브 상태 전환/피드백 구조 유지 여부 검토, 겹치는 로직 정리 |  | 대기 | §3.2, §8.1 |
 | Nav2 Waypoint 연동 | 순찰(ROAMING)용 Waypoint/Path 메시지 정의 및 DDC 인터페이스 확장 |  | 대기 | §3.2, §5.6, `DevelopmentPlan/NavWaypointDesign.md` |
 | Mock & Test GUI 정합성 | Mock API와 Test GUI 제어 경로 일치 여부 검토, 시나리오 Runner 설계 반영 |  | 대기 | §3.2, `DevelopmentPlan/TestGuiDesign.md` |
 | 상태 그래프 서비스 | DMC가 상태/전이 메타데이터를 서비스/토픽으로 제공, GUI가 시각화 |  | 대기 | §4.5, §5.3, `DevelopmentPlan/StateIntrospection.md` |
 
-> **체크 방법:** 담당자는 `상태` 열에 `진행중`, `완료` 등을 기입하고 완료 시 관련 문서 섹션 번호를 검토한다. 항목 추가가 필요하면 테이블에 바로 반영한다.
+> **체크 방법:** 담당자는 `상태` 열에 `진행중`, `✅ 완료` 등을 기입하고 완료 시 관련 문서 섹션 번호를 검토한다. 항목 추가가 필요하면 테이블에 바로 반영한다.
 
 ### 8.3 진행 로그 작성 가이드
 

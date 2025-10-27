@@ -1,0 +1,69 @@
+# library_locations.yaml
+# 도서관 내 주요 시설 위치 정보
+# DMC가 로드하여 길안내 요청 시 좌표 조회에 사용
+
+locations:
+  # 화장실
+  - name: "화장실"
+    id: "restroom_1f"
+    aliases: ["화장실", "남자 화장실", "여자 화장실", "restroom", "toilet"]
+    pose:
+      x: 10.5
+      y: -5.0
+      theta: 1.57  # 90도 (북쪽 향함)
+    description: "1층 화장실"
+    
+  # 안내 데스크
+  - name: "안내데스크"
+    id: "info_desk"
+    aliases: ["안내데스크", "안내", "데스크", "information", "desk"]
+    pose:
+      x: 2.0
+      y: 1.0
+      theta: 0.0
+    description: "1층 안내 데스크"
+    
+  # 카페
+  - name: "카페"
+    id: "cafe_1f"
+    aliases: ["카페", "커피", "휴게실", "cafe", "coffee"]
+    pose:
+      x: 15.0
+      y: 8.0
+      theta: 3.14  # 180도
+    description: "1층 카페테리아"
+    
+  # 출입구
+  - name: "출입구"
+    id: "entrance_main"
+    aliases: ["출입구", "입구", "나가는 곳", "entrance", "exit"]
+    pose:
+      x: 0.0
+      y: 0.0
+      theta: 0.0
+    description: "정문 출입구"
+    
+  # 열람실
+  - name: "열람실"
+    id: "reading_room_2f"
+    aliases: ["열람실", "독서실", "공부방", "reading room"]
+    pose:
+      x: 20.0
+      y: 12.0
+      theta: 0.0
+    description: "2층 열람실"
+    
+  # 반납대
+  - name: "반납대"
+    id: "return_desk"
+    aliases: ["반납대", "반납", "도서 반납", "return desk"]
+    pose:
+      x: 3.0
+      y: 2.5
+      theta: -1.57  # -90도
+    description: "1층 도서 반납대"
+
+# 설정
+settings:
+  default_approach_distance: 0.5  # 목적지 도착 판정 거리 (미터)
+  max_search_distance: 50.0       # 최대 검색 반경 (미터)

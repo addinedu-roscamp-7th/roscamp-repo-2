@@ -37,7 +37,6 @@ setup(
             "dmc_node = javis_dmc.dmc_node:main",
             "test_gui_node = test_gui.test_gui_node:main",
             "pick_book_action_client = javis_dmc.pick_book_action_client:main",
-
         ],
     },
 )

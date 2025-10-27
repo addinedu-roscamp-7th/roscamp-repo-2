@@ -1,0 +1,71 @@
+# RCS Mock 클라이언트가 DMC에 전송할 Action Goal 정의
+# 키 이름은 GUI 버튼의 ID 또는 Action 이름과 일치시킵니다.
+
+pickup_book:
+  goal:
+    book_id: "BK-12345"
+    storage_id: 1
+    shelf_approach_location:
+      x: 5.0
+      y: 3.0
+      theta: 0.0
+    storage_approach_location:
+      x: 2.0
+      y: 1.0
+      theta: 1.57
+
+guide_person:
+  goal:
+    dest_location:
+      x: 10.5
+      y: -5.0
+      theta: 1.57
+    user_initiated: false
+    # '화장실' 좌표 (library_locations.yaml과 동일)
+
+guide_person_cafe:
+  goal:
+    dest_location:
+      x: 15.0
+      y: 8.0
+      theta: 3.14
+    user_initiated: false
+    # '카페' 좌표
+
+guide_person_entrance:
+  goal:
+    dest_location:
+      x: 0.0
+      y: 0.0
+      theta: 0.0
+    user_initiated: false
+    # '출입구' 좌표
+
+guide_person_user_initiated:
+  goal:
+    dest_location:
+      x: 10.5
+      y: -5.0
+      theta: 1.57
+    user_initiated: true
+    # 사용자 주도 길안내 (GUI/VRC)
+
+clean_seat:
+  goal:
+    seat_id: 32
+    return_desk_location:
+      x: 3.0
+      y: 4.0
+      theta: 0.0
+    bin_location:
+      x: 8.0
+      y: 2.0
+      theta: 1.57
+
+reshelving_book:
+  goal:
+    return_desk_id: 1
+    return_desk_location:
+      x: 3.0
+      y: 4.0
+      theta: 0.0

@@ -319,7 +319,7 @@ mermaid
 
 ## 6. 주요 데이터 흐름
 
-### 6.1 음성 기반 길안내 요청 플로우
+### 6.1 음성 기반 길안내 요청 플로우 (v4.0 업데이트)
 ```
 [사용자] "도비야"
     ↓ 음성
@@ -333,6 +333,7 @@ mermaid
          ↓
 [DMC]
     ├─ listening_mode = True
+    ├─ State: ROAMING → LISTENING (20초 타이머)
     ├─ DDC.control_command(STOP) - 순찰 정지
     └─ 응답: success
          ↓
@@ -340,7 +341,7 @@ mermaid
     ├─ HTTP POST /voice/v1/greet → Voice API Service
     └─ 수신한 TTS 오디오 재생: "말씀해주세요"
          ↓
-[Speaker] → [사용자] "화장실 어디야?"
+[Speaker] → [사용자] "화장실 가고 싶어"
     ↓
 [Microphone]
     ↓ Serial
@@ -348,47 +349,39 @@ mermaid
     ├─ 오디오 청크를 HTTP 스트리밍으로 전송 (/voice/v1/stream)
     └─ 스트리밍 종료 신호 (`end_of_speech`)
          ↓
-[Voice API Service]
-    ├─ STT 변환: "화장실 어디야?"
+[Voice API Service (LLM)]
+    ├─ STT 변환: "화장실 가고 싶어"
     ├─ Intent 분석: intent="navigation", target="화장실"
-    ├─ 응답 JSON: {response: "화장실로 안내해드릴까요?", require_confirmation: true}
-    └─ TTS 오디오 생성
+    ├─ 목적지 좌표 획득: {x: 10.5, y: -5.0, theta: 1.57}
+    └─ TTS 오디오 생성: "화장실로 안내를 시작합니다"
          ↓
 [Voice Recognition Controller]
-    ├─ 수신한 TTS 오디오 재생: "화장실로 안내해드릴까요?"
-    └─ Intent JSON을 ROS2 Topic `/voice/dialog_event`로 발행
-         ↓
-[Speaker] → [사용자] "응"
-    ↓
-[Voice Recognition Controller]
-    ├─ 재스트리밍 (동일 과정)
-    └─ Voice API Service 응답 전달
-         ↓
-[Voice API Service]
-    ├─ Intent: confirmation, confirmed=true
-    ├─ 작업 요청 페이로드: {require_task: true, task_type: guide_person, destination: "화장실"}
-    └─ TTS: "앞으로 나와 주시면 안내를 시작할게요"
-         ↓
-[Voice Recognition Controller]
-    ├─ TTS 재생: "앞으로 나와 주시면 안내를 시작할게요"
-    └─ 작업 페이로드를 DMC 서비스 `/voice/intent_event`로 전달
+    ├─ TTS 재생: "화장실로 안내를 시작합니다"
+    └─ DMC로 길안내 직접 요청
          ↓
 [DMC]
-    ├─ request_task(guide_person, destination="화장실")
-    ├─ RCS Service: create_task()
-    ├─ listening_mode = False
-    └─ 응답: {success: true}
+    ├─ ROS2 Service: request_guidance("화장실", pose, "voice")
+    ├─ 배터리 체크 (≥40%)
+    ├─ 20초 타이머 취소
+    ├─ ROS2 Service: CreateUserTask → RCS (user_initiated=True)
          ↓
 [RCS]
-    ├─ 작업 검증 (App Service)
-    ├─ 작업 큐 추가
-    └─ ROS2 Action: /dobby1/main/guide_person (Goal 전송)
+    ├─ user_initiated=True 확인 → 상태 체크 무시
+    ├─ Task 생성 (task_id: "guidance_xxx")
+    └─ ROS2 Action: GuidePerson Goal (dest_pose, user_initiated=True) → DMC
          ↓
 [DMC]
-    ├─ Action 수락
-    ├─ State: ROAMING → GUIDING
+    ├─ Action Goal 수락
+    ├─ State: LISTENING → GUIDING
+    ├─ RequestGuidance 응답: {success: true, task_id: "guidance_xxx"}
     └─ GuidingExecutor 실행
 ```
+
+> **v4.0 핵심 변경사항**: 
+> - **QueryLocationInfo 제거**: VRC는 LLM Service에서 목적지 좌표 직접 획득
+> - **LISTENING → GUIDING 직행**: WAITING_DEST_INPUT 거치지 않음 (음성 경로)
+> - **DMC → RCS CreateUserTask**: 사용자 주도 작업은 Service로 요청
+> - **user_initiated 플래그**: RCS가 상태 체크 무시하고 즉시 Action 호출
 
 ---
 
@@ -561,8 +554,9 @@ mermaid
 | CLEANING_DESK | 7 | 좌석 정리 실행 | -1%/min | ❌ | ❌ |
 | SORTING_SHELVES | 8 | 서가 정리 실행 | -1%/min | ❌ | ❌ |
 | FORCE_MOVE_TO_CHARGER | 9 | 긴급 충전 복귀 | -1%/min | ❌ | ❌ |
-| LISTENING | 10 | 음성인식중 | -1%/min | ❌ |✅ |
-| ROAMING | 11 | 자율 순찰 중 | -1%/min | ✅ |✅ |
+| LISTENING | 10 | 음성인식중 (VRC 전용) | 0 | ❌ | ✅ |
+| WAITING_DEST_INPUT | 11 | 목적지 입력 대기 (GUI 전용, 60초) | 0 | ❌ | ✅ |
+| ROAMING | 12 | 자율 순찰 중 | -1%/min | ✅ |✅ |
 | EMERGENCY_STOP | 98 | 관리자 긴급 정지 (해제 필요) | - | ❌ | ❌ |
 | MAIN_ERROR | 99 | 에러 상태 | - | ❌ | ❌ |
 

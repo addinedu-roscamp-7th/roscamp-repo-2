@@ -1,0 +1,16 @@
+# CreateUserGuide.srv
+# DMC → RCS: 사용자 주도 길안내 작업 생성 요청
+# VRC/GUI에서 RequestGuidance 받은 후 RCS에 작업 생성 요청
+# Service Name: dobby1/control/create_user_guide (네임스페이스에 맞게 호출)
+
+# Request
+string task_type                    # 작업 타입 (현재는 "GUIDING"만 지원)
+geometry_msgs/Pose2D dest_location  # 목적지 좌표
+string destination_name             # 목적지 이름 (예: "화장실")
+bool user_initiated                 # True (사용자 주도 작업, 상태 체크 무시)
+
+---
+# Response
+bool success                        # 성공 여부
+string task_id                      # 생성된 작업 ID (예: "guidance_20250127_143022")
+string message                      # 상태 메시지

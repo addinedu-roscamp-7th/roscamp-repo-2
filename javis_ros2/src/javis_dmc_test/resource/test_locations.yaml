@@ -1,0 +1,42 @@
+# 테스트용 도서관 위치 정보 (javis_dmc/config/library_locations.yaml 복사본)
+
+locations:
+  - name: "화장실"
+    id: "restroom_1f"
+    aliases: ["화장실", "남자 화장실", "여자 화장실", "restroom", "toilet"]
+    pose:
+      x: 10.5
+      y: -5.0
+      theta: 1.57
+    description: "1층 화장실"
+  
+  - name: "카페"
+    id: "cafe_1f"
+    aliases: ["카페", "카페테리아", "cafe", "커피"]
+    pose:
+      x: 15.0
+      y: 8.0
+      theta: 3.14
+    description: "1층 카페테리아"
+  
+  - name: "출입구"
+    id: "entrance_main"
+    aliases: ["출입구", "입구", "정문", "entrance", "main door"]
+    pose:
+      x: 0.0
+      y: 0.0
+      theta: 0.0
+    description: "메인 출입구"
+  
+  - name: "안내데스크"
+    id: "info_desk"
+    aliases: ["안내데스크", "안내", "데스크", "information", "desk"]
+    pose:
+      x: 2.0
+      y: 1.0
+      theta: 0.0
+    description: "1층 안내 데스크"
+
+settings:
+  default_approach_distance: 0.5  # 도착 판정 거리 (미터)
+  max_search_distance: 50.0       # 최대 검색 반경 (미터)

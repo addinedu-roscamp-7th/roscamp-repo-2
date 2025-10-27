@@ -1,0 +1,150 @@
+<root main_tree_to_execute="DobbyMainTree">
+
+  <BehaviorTree ID="DobbyMainTree">
+    <Fallback name="Dobby_Root_Fallback">
+
+      <Sequence name="EStop_Sequence" comment="">
+        <Condition ID="IsEmergencyStopped"/>
+        <Action ID="HandleEmergencyStop"/>
+      </Sequence>
+      
+      <Sequence name="ForceCharge_Sequence" comment="">
+        <Condition ID="IsBatteryCritical" comment="&lt;= 20%"/>
+        <Inverter name="Invert_IsCharging">
+          <Condition ID="IsState" state="CHARGING" comment=""/>
+        </Inverter>
+        <Action ID="MoveTo" destination_key="charger_dock" comment="강제 충전 복귀 (FORCE_MOVE_TO_CHARGER)"/>
+      </Sequence>
+      
+      <Sequence name="Interaction_Listening_Sequence" comment="">
+        <Condition ID="IsState" state="LISTENING" comment=""/>
+        <Action ID="RunListeningSequence" timeout="20.0" comment=""/>
+      </Sequence>
+      
+      <Sequence name="TaskExecution_Sequence" comment="GUIDING, PICKING 등">
+        <Condition ID="IsTaskRunning"/>
+        <Action ID="RunSubTree" tree_name="TaskSubTree"/>
+      </Sequence>
+
+      <Sequence name="TaskAcceptance_Sequence" comment="RCS/GUI/음성으로 생성된 작업 수락">
+        <Condition ID="IsNewTaskFromRCS"/>
+        <Condition ID="IsBatterySufficientForNewTask" comment="&gt;= 40%"/>
+        <Action ID="AcceptNewTaskFromRCS"/>
+      </Sequence>
+      
+      <Fallback name="DefaultBehavior_Fallback">
+        <Sequence name="AutonomyMode_Sequence" comment="">
+          <Condition ID="IsCurrentMode" modes="AUTONOMY"/>
+          <Condition ID="IsBatterySufficientForNewTask" comment=""/>
+          <Action ID="StartPatrol" comment="ROAMING 상태 진입"/>
+        </Sequence>
+        <Sequence name="StandbyMode_Sequence" comment="">
+          <Condition ID="IsCurrentMode" modes="STANDBY"/>
+          <Condition ID="IsBatterySufficientForNewTask" comment=""/>
+          <Action ID="StopMotion" comment="IDLE 상태"/>
+        </Sequence>
+        <Sequence name="DefaultCharge_Sequence" comment="">
+          <Condition ID="IsBatteryWarning" comment="21-39%"/>
+          <Action ID="MoveTo" destination_key="charger_dock" comment="MOVING_TO_CHARGER 상태"/>
+        </Sequence>
+        <Action ID="ExecuteCharging" comment="CHARGING 상태"/>
+      </Fallback>
+    </Fallback>
+  </BehaviorTree>
+  
+  
+  <BehaviorTree ID="TaskSubTree">
+    <Fallback name="Task_SubTree_Selector">
+      
+      <Sequence name="Guiding_BT">
+        <Condition ID="IsCurrentTask" task_name="GUIDING" comment=""/>
+        <Fallback name="Destination_Check">
+          <Condition ID="IsDestinationKnownInGoal" comment="음성 시나리오"/>
+          <Action ID="CheckDestinationTimeout" comment="GUI 시나리오 (SubState: SELECT_DEST)"/>
+        </Fallback>
+        <Action ID="ScanUser" comment="SubState: SCAN_USER"/>
+        <Fallback name="Guiding_Recovery_Fallback" comment="">
+          <ReactiveSequence name="Guide_And_Monitor">
+            <Condition ID="IsUserInView"/>
+            <Action ID="GuideToDestination" comment="SubState: GUIDING_TO_DEST"/>
+          </ReactiveSequence>
+          <Sequence name="Find_User_Recovery">
+            <Action ID="StopMotion"/>
+            <Action ID="FindUser" comment="SubState: FIND_USER"/>
+          </Sequence>
+        </Fallback>
+        <Action ID="ClearCurrentTask" success="true" message="Guiding complete."/>
+      </Sequence>
+      
+      <Sequence name="CleaningDesk_BT">
+        <Condition ID="IsCurrentTask" task_name="CLEANING_DESK" comment=""/>
+        <Action ID="MoveTo" destination_key="current_task.destination" comment="SubState: MOVE_TO_DESK"/>
+        <Action ID="MoveArmToPose" pose_name="scan_desk" comment=""/>
+        <Fallback name="Collect_Trash_Loop">
+          <Repeat num_cycles="-1">
+            <Sequence name="Scan_And_Collect">
+              <Action ID="ScanDeskForTrash" comment="성공=쓰레기 발견"/>
+              <Action ID="CollectTrash" comment="SubState: COLLECT_TRASH"/>
+            </Sequence>
+          </Repeat>
+          <AlwaysSuccess/> </Fallback>
+        <Action ID="MoveTo" destination_key="trash_bin" comment="SubState: MOVE_TO_BIN"/>
+        <Action ID="DumpTrash" comment="SubState: DUMP_TRASH"/>
+        <Action ID="ClearCurrentTask" success="true" message="Cleaning complete."/>
+      </Sequence>
+      
+      <Sequence name="PickupBook_BT">
+        <Condition ID="IsCurrentTask" task_name="PICKING_UP_BOOK" comment=""/>
+        <Action ID="MoveTo" destination_key="current_task.pickup_loc" comment="SubState: MOVE_TO_PICKUP"/>
+        <Action ID="PickObject" comment="SubState: PICKING_BOOK"/>
+        <Action ID="MoveTo" destination_key="current_task.storage_loc" comment="SubState: MOVE_TO_STORAGE"/>
+        <Action ID="PlaceObject" comment="SubState: STOWING_BOOK"/>
+        <Action ID="ClearCurrentTask" success="true" message="Pickup complete."/>
+      </Sequence>
+      
+      <Sequence name="ReshelvingBook_BT">
+        <Condition ID="IsCurrentTask" task_name="RESHELVING_BOOK" comment=""/>
+        <Action ID="MoveTo" destination_key="current_task.return_desk" comment="SubState: MOVE_TO_RETURN_DESK"/>
+        <Fallback name="Collect_All_Books_Loop">
+          <Repeat num_cycles="-1">
+            <Sequence name="Scan_And_Collect_Return">
+              <Action ID="ScanForReturnBook" comment="성공=책 발견"/>
+              <Action ID="PickObject" comment="SubState: COLLECT_RETURN_BOOKS"/>
+            </Sequence>
+          </Repeat>
+          <AlwaysSuccess/>
+        </Fallback>
+        <Fallback name="Reshelve_All_Books_Loop">
+          <Repeat num_cycles="-1">
+            <Sequence name="Deliver_One_Book_Cycle" comment="">
+              <Action ID="GetNextBookDestination" comment="성공=다음 책 있음"/>
+              <Action ID="MoveTo" destination_key="next_book.shelf" comment="SubState: MOVE_TO_PLACE_SHELF"/>
+              <Action ID="PlaceReturnBook" comment="SubState: PLACE_RETURN_BOOK"/>
+            </Sequence>
+          </Repeat>
+          <AlwaysSuccess/>
+        </Fallback>
+        <Action ID="ClearCurrentTask" success="true" message="Reshelving complete."/>
+      </Sequence>
+      
+      <Sequence name="SortingShelves_BT">
+        <Condition ID="IsCurrentTask" task_name="SORTING_SHELVES" comment=""/>
+        <Action ID="MoveTo" destination_key="current_task.shelf_loc" comment="SubState: MOVE_TO_SHELF"/>
+        <Fallback name="Sort_Shelf_Loop" comment="">
+          <Repeat num_cycles="-1">
+            <Sequence name="Scan_And_Sort">
+              <Action ID="ScanBook" comment="성공=잘못된 책 발견"/>
+              <Action ID="SortBook" comment="SubState: SORT_BOOK"/>
+            </Sequence>
+          </Repeat>
+          <AlwaysSuccess/>
+        </Fallback>
+        <Action ID="ClearCurrentTask" success="true" message="Sorting complete."/>
+      </Sequence>
+      
+      <Action ID="ClearCurrentTask" success="false" message="Unknown or failed task."/>
+      
+    </Fallback>
+  </BehaviorTree>
+  
+</root>
