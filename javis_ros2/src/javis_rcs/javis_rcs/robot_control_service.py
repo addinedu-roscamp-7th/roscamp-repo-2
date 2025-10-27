@@ -15,7 +15,7 @@ from .clean_seat import CleanSeat as CleanSeatNode # CleanSeat 노드 클래스�
 from .pickup_book import PickupBook as PickupBookNode # PickupBook 노드 클래스를 직접 임포트
 from .guide_person import GuidePerson as GuidePersonNode
 from .reshelving_book import ReshelvingBook as ReshelvingBookNode
-from .kreacher_perform import KreacherPerform as KreacherNode 
+from .kreacher_perform import KreacherPerform as KreacherNode, get_kreacher_state
 
 class OrchestratorNode(Node):
     """
@@ -25,45 +25,40 @@ class OrchestratorNode(Node):
     def __init__(self):
         super().__init__('robot_control_service')
 
-        # --- 파라미터 선언 및 초기화 ---
         self.declare_parameter('robot_namespaces', ['dobby1', 'dobby2', 'kreacher'])
         self.robot_namespaces = self.get_parameter('robot_namespaces').get_parameter_value().string_array_value
         
         self.robot_states = {}
         self.task_queue = deque()
-        self.action_clients = {} # 로봇별 액션 클라이언트를 저장
+        self.action_clients = {}
 
-        # --- ROS2 인터페이스 초기화 ---
-        # 외부로부터 작업 요청을 받는 서비스 서버
         self.task_service = self.create_service(MyJson, 'robot_task', self.task_service_callback)
         
-        # 각 로봇의 상태와 배터리를 구독
         for ns in self.robot_namespaces:
             self.robot_states[ns] = {'state': None, 'battery': None}
-            self.create_subscription(
-                DobbyState,
-                f'/{ns}/status/robot_state',
-                lambda msg, namespace=ns: self.robot_state_callback(msg, namespace),
-                10
-            )
-            self.create_subscription(
-                BatteryStatus,
-                f'/{ns}/status/battery_status',
-                lambda msg, namespace=ns: self.battery_status_callback(msg, namespace),
-                10
-            )
+            # kreacher는 상태 토픽을 발행하지 않으므로 구독에서 제외
+            if ns != 'kreacher':
+                self.create_subscription(
+                    DobbyState,
+                    f'/{ns}/status/robot_state',
+                    lambda msg, namespace=ns: self.robot_state_callback(msg, namespace),
+                    10
+                )
+                self.create_subscription(
+                    BatteryStatus,
+                    f'/{ns}/status/battery_status',
+                    lambda msg, namespace=ns: self.battery_status_callback(msg, namespace),
+                    10
+                )
             self.get_logger().info(f"Subscribing to topics for robot '{ns}'")
 
-            # 로봇별 액션 클라이언트 생성 및 저장
             self.action_clients[ns] = {
                 'pickup_book': ActionClient(self, PickupBook, f'/{ns}/main/pickup_book'),
                 'clean_seat': ActionClient(self, CleanSeat, f'/{ns}/main/clean_seat'),
                 'guide_person': ActionClient(self, GuidePerson, f'/{ns}/main/guide_person'),
                 'reshelving_book': ActionClient(self, ReshelvingBook, f'/{ns}/main/reshelving_book'),
                 'kreacher': ActionClient(self, PerformTask, f'/kreacher/action/perform_task'),
-            }
-
-        # 주기적으로 작업 큐를 확인하고 할당을 시도하는 타이머
+            } 
 
         self.assignment_timer = self.create_timer(1.0, self.process_task_queue)
 
@@ -71,13 +66,10 @@ class OrchestratorNode(Node):
         self.get_logger().info("Service [/robot_task] is ready.")
 
     def task_service_callback(self, request, response):
-        """외부로부터 작업 요청을 받아 큐에 추가합니다."""
         try:
             task_data = json.loads(request.payload)
             self.get_logger().info(f"New task received: {task_data.get('task_name', 'Unknown')}")
-            
-            # TODO: 작업 데이터 유효성 검증
-            
+
             self.task_queue.append(task_data)
             
             response.ok = True
@@ -95,44 +87,40 @@ class OrchestratorNode(Node):
         """로봇의 메인 상태를 업데이트합니다."""
         if self.robot_states.get(namespace):
             self.robot_states[namespace]['state'] = msg.main_state
-            # self.get_logger().info(f"State update for {namespace}: {msg.main_state}") # 디버깅용
 
     def battery_status_callback(self, msg, namespace):
         """로봇의 배터리 상태를 업데이트합니다."""
         if self.robot_states.get(namespace):
             self.robot_states[namespace]['battery'] = msg.charge_percentage
-            # self.get_logger().info(f"Battery update for {namespace}: {msg.percentage}%") # 디버깅용
 
     def process_task_queue(self):
         """작업 큐를 확인하고 가능한 경우 로봇에게 작업을 할당합니다."""
         if not self.task_queue:
             return
-
-        # 가장 기본적인 할당 로직: IDLE 상태인 첫 번째 로봇을 찾는다.
-        # 향후 로봇의 위치, 배터리 잔량 등을 고려하여 고도화할 수 있습니다.
+       
+        task_to_assign = self.task_queue[0]
+        task_name = task_to_assign.get('task_name')
         available_robot = None
-        task_to_assign = self.task_queue[0] # pop 대신 peek (첫 번째 원소 확인)
-        for ns, status in self.robot_states.items():
-            if task_to_assign.get('task_name') == 'kreacher' and ns == 'kreacher':
-                available_robot = ns
-                break
-            # DobbyState.msg의 IDLE 상태 값은 2입니다. (DevelopmentPlan.md 참조)
-            # 'kreacher' 작업이 아닐 때만 IDLE 상태의 다른 로봇을 찾습니다.
-            if task_to_assign.get('task_name') != 'kreacher' and status['state'] == DobbyState.IDLE:
-                available_robot = ns
-                break
-            
+
+        # 작업 종류에 따라 적합한 로봇을 찾습니다.
+        if task_name == 'kreacher':
+            # 'kreacher' 작업은 kreacher의 상태를 직접 확인합니다.
+            if get_kreacher_state():
+                available_robot = 'kreacher'
+        else:
+            # 그 외 작업(dobby 작업)은 유휴 상태의 dobby 로봇을 찾습니다.
+            for ns, status in self.robot_states.items():
+                if ns != 'kreacher' and status['state'] == DobbyState.IDLE:
+                    available_robot = ns
+                    break
         
-        if available_robot :
-            task_to_assign = self.task_queue.popleft() # 할당이 결정되면 여기서 pop
+        if available_robot:
+            task_to_assign = self.task_queue.popleft()
             self.get_logger().info(f"Assigning task '{task_to_assign.get('task_name')}' to robot '{available_robot}'")
             self.execute_task(available_robot, task_to_assign)
         else:
             self.get_logger().debug("No available robots at the moment. Task remains in queue.")
-
-    def kreacher_task_queue(self):
-        
-        self.execute_task('kreacher', {'task_name': 'kreacher', 'member_id': 1})
+    
 
     def execute_task(self, robot_namespace, task_data):
         """선택된 로봇에게 실제 작업을 지시합니다."""
@@ -146,11 +134,11 @@ class OrchestratorNode(Node):
             thread = threading.Thread(target=self._run_pickup_book_task, args=(robot_namespace, book_id, task_data))
             thread.start()
         elif task_name == 'clean_seat':
-            # [수정됨] Executor를 사용하여 'clean_seat' 노드의 로직을 현재 프로세스에서 실행
+            
             seat_id = task_data.get('seat_id', 0)
             self.get_logger().info(f"Executing 'clean_seat' task for seat {seat_id} on robot '{robot_namespace}' using an executor.")
             
-            # 별도의 스레드에서 작업을 실행하여 메인 스레드(Orchestrator)의 스핀을 막지 않도록 합니다.
+            
             thread = threading.Thread(target=self._run_clean_seat_task, args=(robot_namespace, seat_id, task_data))
             thread.start()
         elif task_name == 'guide_person':
@@ -269,13 +257,13 @@ class OrchestratorNode(Node):
             kreacher_node = KreacherNode(namespace=f'{robot_namespace}/action')
             temp_executor.add_node(kreacher_node)
 
-            kwargs = {k: v for k, v in task_data.items() if k != 'dest_location'}
+            kwargs = {k: v for k, v in task_data.items() if k != 'member_id'}
 
             task_future = kreacher_node.run_task(member_id, **kwargs)
             temp_executor.spin_until_future_complete(task_future)
 
             result = task_future.result()
-            self.get_logger().info(f"Reshelving book task for '{robot_namespace}' completed. Success : {result['success']}, Msg: '{result['message']}'")
+            self.get_logger().info(f"Kreacher task for '{robot_namespace}' completed. Success : {result['success']}, Msg: '{result['message']}'")
 
         except Exception as e:
             self.get_logger().error(f"An error occurred during krecaher task for '{robot_namespace}': {e}")
@@ -303,7 +291,6 @@ class OrchestratorNode(Node):
         self.get_logger().info(
             f"Result for '{robot_namespace}': success={result.success}, message='{result.message}'"
         )
-        # TODO: 작업 완료 후 로봇 상태를 다시 IDLE로 변경하거나 후속 조치 수행
 
     def feedback_callback(self, robot_namespace, feedback_msg):
         """액션 실행 중 서버로부터 오는 피드백을 처리합니다."""
