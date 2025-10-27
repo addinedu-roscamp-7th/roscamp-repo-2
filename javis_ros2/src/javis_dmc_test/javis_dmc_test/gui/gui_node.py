@@ -95,7 +95,7 @@ class GuiNode(Node, QObject):
         특정 Mock 노드의 mode 파라미터 변경
         
         Args:
-            node_name: Mock 노드 이름 (예: "mock_ddc_move_to_target")
+            node_name: Mock 노드 이름 (예: "mock_ddc_navigate_to_pose")
             mode: 변경할 모드 ("active", "error", "on", "off")
         """
         try:

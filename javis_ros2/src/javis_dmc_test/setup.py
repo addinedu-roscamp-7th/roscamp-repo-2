@@ -35,7 +35,7 @@ setup(
             'mock_rcs_create_user_guide = javis_dmc_test.nodes.mock_rcs_create_user_guide:main',
             
             # DDC Mock (3개)
-            'mock_ddc_move_to_target = javis_dmc_test.nodes.mock_ddc_move_to_target:main',
+            'mock_ddc_navigate_to_pose = javis_dmc_test.nodes.mock_ddc_navigate_to_pose:main',
             'mock_ddc_guide_navigation = javis_dmc_test.nodes.mock_ddc_guide_navigation:main',
             'mock_ddc_control_command = javis_dmc_test.nodes.mock_ddc_control_command:main',
             

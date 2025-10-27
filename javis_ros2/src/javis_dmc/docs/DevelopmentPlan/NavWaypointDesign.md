@@ -11,7 +11,7 @@
 | 구성요소 | 책임 | 비고 |
 | :--- | :--- | :--- |
 | DMC (`JavisDmcNode`) | 순찰 시작/정지 트리거, 웨이포인트 목록 로딩, Drive 인터페이스 호출 | 순찰 상태 전이 로직은 `DmcStateMachine`에 추가 |
-| Drive Interface (`RosDriveInterface`) | NAV2 Waypoint 액션 클라이언트 생성, Goal 전송/취소, 피드백 전달 | 기존 `move_to_target`, `guide_navigation`과 동일한 callback group 공유 |
+| Drive Interface (`RosDriveInterface`) | NAV2 Waypoint 액션 클라이언트 생성, Goal 전송/취소, 피드백 전달 | `navigate_to_pose`, `guide_navigation`과 동일한 callback group 공유 |
 | Dobby Drive Controller (DDC) | NAV2 Waypoint 실행 서버, 경로 리스트 소비, 주행 상태/도착 이벤트 발행 | 실행 실패 시 오류 코드/메시지를 Result로 제공 |
 | NAV2 | Waypoint Follower 플러그인, 위치 추정/경로 계획 | 기존 Nav2 스택 활용, Waypoint 벡터로 이동 |
 
