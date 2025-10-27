@@ -98,44 +98,91 @@ sequenceDiagram
     deactivate DMC
 ```
 
-### 3. 목적지 입력 및 피안내자 인식 준비
+### 3-A. GUI 기반 목적지 입력 (새로운 설계)
 
 ```
 sequenceDiagram
     actor User as 사용자
-    participant GUI as Dobby GUI
+    participant GUI as Dobby Test GUI
     participant DMC as Dobby Main Controller
-    participant RCS as Robot Control Service
+    participant NAV as Navigation
 
-    GUI->>DMC: 지도 승인 요청 [ROS2]
+    Note over DMC: State: IDLE 또는 ROAMING
+
+    User->>GUI: 지도에서 목적지 터치 (예: "화장실")
+    activate GUI
+    GUI->>DMC: QueryLocationInfo("화장실") [ROS2 Service]
+    deactivate GUI
+
     activate DMC
-    DMC->>DMC: 내부 상태 갱신<br/>GUIDING(DESTINATION_SELECTION 단계)<br/>60초 타이머 시작
-    DMC-->>GUI: 승인 완료 & 지도 데이터 [ROS2]
+    DMC->>DMC: library_locations.yaml 검색
+    DMC-->>GUI: Response {found: true, pose: {x,y,theta}, description}
     deactivate DMC
 
-    alt 60초 내 목적지 선택
-        User->>GUI: 목적지 버튼 선택
-        activate GUI
-        GUI->>DMC: 목적지 저장 요청{destination} [ROS2]
-        deactivate GUI
+    activate GUI
+    GUI->>User: 확인 팝업 표시<br/>"화장실로 안내를 시작하시겠습니까?"
+    deactivate GUI
 
-        activate DMC
-        DMC->>DMC: 목적지 캐시<br/>GUIDING(PASSENGER_IDENTIFICATION 단계)
-        DMC->>RCS: 로봇 상태 업데이트 {state: GUIDING} [ROS2 Topic]
-        DMC-->>GUI: 목적지 저장 완료 [ROS2]
-        deactivate DMC
+    User->>GUI: "확인" 버튼 터치
+    activate GUI
+    GUI->>DMC: RequestGuidance("화장실", pose, "gui") [ROS2 Service]
+    deactivate GUI
 
-        GUI->>GUI: 피안내자 인식 화면 표시
-    else 60초 타이머 만료
-        activate DMC
-        DMC->>DMC: 타임아웃 발생<br/>GUIDING 작업 중단 결정
-        DMC->>RCS: guide_person result{status: aborted, reason: "destination_timeout"} [ROS2 Action Result]
-        DMC->>DMC: State: GUIDING → ROAMING/IDLE 또는 MOVING_TO_CHARGER
-        DMC-->>GUI: 시간 초과 안내 요청 [ROS2]
-        DMC->>RCS: 로봇 상태 업데이트 {state: ROAMING/IDLE} [ROS2 Topic]
-        deactivate DMC
-    end
+    activate DMC
+    DMC->>DMC: State: IDLE/ROAMING → WAITING_DEST_INPUT → GUIDING
+    DMC->>NAV: GuidePerson Action Goal {dest_location: pose}
+    DMC-->>GUI: Response {success: true, task_id, message}
+    deactivate DMC
+
+    GUI->>User: "안내 시작됨" 상태 표시
 ```
+
+### 3-B. 음성 기반 목적지 입력 (새로운 설계)
+
+```
+sequenceDiagram
+    actor User as 사용자
+    participant VRC as Voice Recognition Controller
+    participant DMC as Dobby Main Controller
+    participant NAV as Navigation
+    participant Speaker as 로봇 스피커
+
+    Note over DMC: State: LISTENING
+
+    User->>VRC: "화장실로 안내해줘"
+    activate VRC
+    VRC->>VRC: 음성 인식 → "화장실" 추출
+    VRC->>DMC: QueryLocationInfo("화장실") [ROS2 Service]
+    deactivate VRC
+
+    activate DMC
+    DMC->>DMC: library_locations.yaml 검색
+    DMC-->>VRC: Response {found: true, pose: {x,y,theta}, description}
+    deactivate DMC
+
+    activate VRC
+    VRC->>DMC: RequestGuidance("화장실", pose, "voice") [ROS2 Service]
+    deactivate VRC
+
+    activate DMC
+    DMC->>DMC: State: LISTENING → GUIDING
+    DMC->>NAV: GuidePerson Action Goal {dest_location: pose}
+    DMC-->>VRC: Response {success: true, task_id, message}
+    deactivate DMC
+
+    activate VRC
+    VRC->>Speaker: TTS: "화장실로 안내를 시작합니다"
+    deactivate VRC
+    Speaker-->>User: 음성 출력
+```
+
+### 3-C. (DEPRECATED) 구 설계: 60초 타이머 기반 목적지 선택
+
+**이 섹션은 구 설계로 제거되었습니다.**
+- **문제점**: DMC가 destination_session으로 60초 동안 대기하는 설계
+- **변경**: GUI/VRC가 QueryLocationInfo와 RequestGuidance로 직접 좌표 제공
+- **상태 변경**: SELECT_DEST 서브 상태 제거 → WAITING_DEST_INPUT 메인 상태 추가
+- **참고 문서**: `GuidanceFlowRefactor.md`, `DevelopmentPlan.md` Section 4.5.2
 
 ### 4. 피안내자 인식 및 추적 전환
 
@@ -208,8 +255,21 @@ sequenceDiagram
 
 ### 6. 정리
 
-- 음성 호출 단계에서 `set_listening_mode(True)`를 사용하여 StateDefinition의 LISTENING 상태와 20초 타이머를 준수한다.
-- 길안내 확정 시 `request_task` → `create_task` 흐름을 통해 SoftwareArchitecture의 노드/서비스 연결을 그대로 따른다.
-- GUIDING 내부 단계(목적지 입력 → 피안내자 인식 → 이동)는 StateDefinition의 Task State(GUIDING)를 기준으로 단계별로 기술하였다.
-- 타임아웃, 배터리 조건, 이탈 처리 등은 StateDefinition의 규칙에 맞춰 ROAMING/IDLE 또는 MOVING_TO_CHARGER로 복귀하도록 명시한다.
-- GUI 타이머 만료 시 ROS2 Action Result를 통해 `guide_person` 작업을 `aborted` 상태로 RCS에 전달해 작업 큐 일관성을 유지한다.
+- **음성 호출**: `set_listening_mode(True)`를 사용하여 LISTENING 상태(10)와 20초 타이머를 준수한다.
+- **목적지 입력 (새 설계)**:
+  - GUI/VRC가 `QueryLocationInfo` 서비스로 좌표 조회
+  - `RequestGuidance` 서비스로 DMC에 좌표 전달
+  - DMC는 즉시 GuidePerson Action Goal 생성 (destination_session 제거)
+  - **State 전환**: IDLE/LISTENING → **WAITING_DEST_INPUT(11)** → GUIDING(6)
+- **피안내자 인식**: GUIDING 내부 서브 상태로 SCAN_USER(110) → GUIDING_TO_DEST(111)
+- **타임아웃 제거**: 60초 목적지 선택 타이머 삭제됨 (구 설계 deprecated)
+- **상태 복귀**: 작업 완료 시 GUIDING → IDLE/ROAMING, 배터리 ≤40% 시 MOVING_TO_CHARGER
+- **에러 처리**: 이탈, 배터리 부족, 충돌 시 Action Result로 RCS에 전달
+
+**주요 변경사항 (v6.0 → v7.0)**:
+1. SELECT_DEST 서브 상태(109) 제거
+2. WAITING_DEST_INPUT 메인 상태(11) 추가
+3. ROAMING 상태 번호 11 → 12로 변경
+4. destination_session 로직 제거
+5. QueryLocationInfo, RequestGuidance 서비스 추가
+6. library_locations.yaml 단일 소스 사용

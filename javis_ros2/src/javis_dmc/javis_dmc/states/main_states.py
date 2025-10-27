@@ -124,6 +124,35 @@ class DmcStateMachine:
         self.set_main_state(target_state)
         self.sub_state = SubState.NONE
 
+    def enter_waiting_dest_input(self) -> bool:
+        '''WAITING_DEST_INPUT 상태로 전환한다 (v4.0).
+        
+        GUI QueryLocationInfo 호출 시 진입.
+        60초 타이머 후 타임아웃.
+        '''
+        if self.main_state in {
+            MainState.IDLE,
+            MainState.ROAMING,
+        }:
+            self._previous_main_state = self.main_state
+            self.main_state = MainState.WAITING_DEST_INPUT
+            self.sub_state = SubState.NONE
+            return True
+        return False
+
+    def exit_waiting_dest_input(self, fallback_state: Optional[MainState] = None) -> None:
+        '''WAITING_DEST_INPUT 상태를 종료하고 이전 상태로 복귀한다.'''
+        if self.main_state != MainState.WAITING_DEST_INPUT:
+            return
+
+        target_state = fallback_state or self._previous_main_state
+
+        if target_state is None:
+            target_state = MainState.IDLE
+
+        self.set_main_state(target_state)
+        self.sub_state = SubState.NONE
+
     def enter_emergency_stop(self) -> None:
         '''긴급 정지 상태로 진입한다.'''
         if self.main_state != MainState.EMERGENCY_STOP:

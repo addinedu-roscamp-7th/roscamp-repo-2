@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
+항상 한국어로 답변해줘. 
 ## Project Overview
 
 **JAVIS DMC (Dobby Main Controller)** is a ROS 2 Python package that serves as the main controller for the Dobby library assistant robot. This is part of the larger JAVIS (Library Automation System) project, which includes multiple Dobby robots and a Kreacher cafe robot for library services.

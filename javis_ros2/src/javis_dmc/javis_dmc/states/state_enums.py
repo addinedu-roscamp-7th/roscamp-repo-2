@@ -21,9 +21,9 @@ class MainState(IntEnum):
     CLEANING_DESK = 7
     SORTING_SHELVES = 8
     FORCE_MOVE_TO_CHARGER = 9
-    LISTENING = 10
-    ROAMING = 11
-    WAITING_FOR_INPUT = 12
+    LISTENING = 10  # 음성 명령 대기 중
+    WAITING_DEST_INPUT = 11  # GUI/VRC에서 목적지 입력 대기 중
+    ROAMING = 12  # 순찰 중
     EMERGENCY_STOP = 98
     MAIN_ERROR = 99
 
@@ -43,7 +43,7 @@ class SubState(IntEnum):
     MOVE_TO_PLACE_SHELF = 107
     PLACE_RETURN_BOOK = 108
 
-    SELECT_DEST = 109
+    # SELECT_DEST = 109  # DEPRECATED: 제거됨 (WAITING_DEST_INPUT 메인 상태로 대체)
     SCAN_USER = 110
     GUIDING_TO_DEST = 111
     FIND_USER = 112

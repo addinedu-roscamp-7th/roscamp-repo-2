@@ -10,7 +10,8 @@ uint8 CLEANING_DESK = 7
 uint8 SORTING_SHELVES = 8
 uint8 FORCE_MOVE_TO_CHARGER = 9
 uint8 LISTENING = 10
-uint8 ROAMING = 11
+uint8 WAITING_DEST_INPUT = 11  # GUI/VRC에서 목적지 입력 대기 중 (RequestGuidance 호출 전)
+uint8 ROAMING = 12
 uint8 EMERGENCY_STOP = 98
 uint8 MAIN_ERROR = 99
 
@@ -35,7 +36,7 @@ uint8 MOVE_TO_PLACE_SHELF = 107
 uint8 PLACE_RETURN_BOOK = 108
 
 # Guiding Task
-uint8 SELECT_DEST = 109
+# uint8 SELECT_DEST = 109  # DEPRECATED: 제거됨 (WAITING_DEST_INPUT 메인 상태로 대체)
 uint8 SCAN_USER = 110
 uint8 GUIDING_TO_DEST = 111
 uint8 FIND_USER = 112
