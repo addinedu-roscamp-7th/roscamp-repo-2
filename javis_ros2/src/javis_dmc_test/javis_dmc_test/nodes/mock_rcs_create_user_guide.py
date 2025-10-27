@@ -99,6 +99,7 @@ class MockCreateUserTaskServer(MockServerBase):
         
         self.get_logger().info('Mock RCS CreateUserGuide Service ready (5개 작업 타입 지원)')
         self.get_logger().info('  - guide_person, pickup_book, reshelving_book, clean_seat, rearrange_book')
+        self._task_metadata = {}
     
     def _handle_create_user_task(self, request, response):
         '''CreateUserGuide 서비스 핸들러
@@ -146,7 +147,7 @@ class MockCreateUserTaskServer(MockServerBase):
         
         # 작업 타입별 Goal 생성 및 전송
         action_client = self._action_clients[task_type]
-        goal = self._create_goal(task_type, request)
+        goal = self._create_goal(task_type, request, task_id)
         
         if goal is None:
             response.success = False
@@ -182,7 +183,7 @@ class MockCreateUserTaskServer(MockServerBase):
         
         return response
     
-    def _create_goal(self, task_type: str, request):
+    def _create_goal(self, task_type: str, request, task_id: str):
         '''작업 타입에 맞는 Action Goal 생성
         
         Args:
@@ -202,8 +203,8 @@ class MockCreateUserTaskServer(MockServerBase):
             dest_loc.theta = request.dest_location.theta
             goal.dest_location = dest_loc
             
-            goal.destination_name = request.destination_name
             goal.user_initiated = request.user_initiated
+            self._task_metadata[task_id] = request.destination_name
             return goal
         
         elif task_type == 'pickup_book':
@@ -297,10 +298,12 @@ class MockCreateUserTaskServer(MockServerBase):
         
         # 작업 타입별 결과 로깅
         if task_type == 'guide_person':
+            name = self._task_metadata.pop(task_id, '')
             self.get_logger().info(
                 f'GuidePerson 완료: '
                 f'task_id={task_id}, '
                 f'success={result.success}, '
+                f'destination={name or "unknown"}, '
                 f'distance={result.total_distance_m:.1f}m, '
                 f'time={result.total_time_sec:.1f}s, '
                 f'message={result.message}'
