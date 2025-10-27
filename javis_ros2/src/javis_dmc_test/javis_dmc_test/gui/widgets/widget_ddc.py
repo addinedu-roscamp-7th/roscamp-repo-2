@@ -14,7 +14,7 @@ class WidgetDDC(QWidget):
     
     # DDC Mock 노드 목록
     MOCK_NODES = [
-        ('mock_ddc_move_to_target', 'MoveToTarget Action'),
+        ('mock_ddc_navigate_to_pose', 'NavigateToPose Action'),
         ('mock_ddc_guide_navigation', 'GuideNavigation Action'),
         ('mock_ddc_control_command', 'DriveControlCommand Service'),
     ]
@@ -73,7 +73,7 @@ class WidgetDDC(QWidget):
         desc.setHtml('''
         <h3>DDC Mock 제어</h3>
         <ul>
-            <li><b>MoveToTarget:</b> 목표 위치로 주행 (진행률 0→100%)</li>
+            <li><b>NavigateToPose:</b> NAV2 표준 주행 (남은 거리/시간 피드백)</li>
             <li><b>GuideNavigation:</b> 사람 추종 주행 (길안내 모드)</li>
             <li><b>DriveControlCommand:</b> 주행 제어 (STOP/RESUME)</li>
         </ul>

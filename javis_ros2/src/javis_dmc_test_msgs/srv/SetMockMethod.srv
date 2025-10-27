@@ -2,7 +2,7 @@
 
 # 인터페이스 이름 (drive, arm, ai, gui, vrc)
 string interface
-# 메서드 이름 (move_to_target, pick_book, detect_book, 등)
+# 메서드 이름 (navigate_to_pose, pick_book, detect_book, 등)
 string method
 # Mock 활성화 여부
 bool enabled

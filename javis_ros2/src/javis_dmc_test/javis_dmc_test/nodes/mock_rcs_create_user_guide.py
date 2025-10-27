@@ -194,7 +194,14 @@ class MockCreateUserTaskServer(MockServerBase):
         '''
         if task_type == 'guide_person':
             goal = GuidePerson.Goal()
-            goal.dest_location = request.dest_location
+            
+            # Pose2D 복사본 생성
+            dest_loc = Pose2D()
+            dest_loc.x = request.dest_location.x
+            dest_loc.y = request.dest_location.y
+            dest_loc.theta = request.dest_location.theta
+            goal.dest_location = dest_loc
+            
             goal.destination_name = request.destination_name
             goal.user_initiated = request.user_initiated
             return goal

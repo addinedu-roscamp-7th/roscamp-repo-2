@@ -492,11 +492,11 @@ mermaid
     ├─ State: IDLE → PICKING_UP_BOOK
     └─ PickupExecutor 실행
          ├─ Sub State: MOVE_TO_PICKUP
-         ├─ DDC: move_to_target(책장 위치)
+         ├─ DDC: navigate_to_pose(책장 접근 위치)
          ├─ Sub State: PICKUP_BOOK
          ├─ DAC: pick_book(book_id, pose)
          ├─ Sub State: MOVE_TO_STORAGE
-         ├─ DDC: move_to_target(픽업대)
+         ├─ DDC: navigate_to_pose(픽업대 접근 위치)
          ├─ Sub State: STOWING_BOOK
          └─ DAC: place_book(storage_id, pose)
               ↓

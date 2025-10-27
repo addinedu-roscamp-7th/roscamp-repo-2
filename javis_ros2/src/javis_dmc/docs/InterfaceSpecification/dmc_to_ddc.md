@@ -8,32 +8,40 @@
 
 ## 📦 인터페이스 요약
 
-| From | To   | Protocol | 인터페이스 항목 | 메시지 형식                         |
-|------|------|----------|------------------|-------------------------------------|
-| DMC  | DDC  | Action   | 목적지 이동       | `dobby1/drive/move_to_target`       |
-| DMC  | DDC  | Action   | 안내 주행         | `dobby1/drive/guide_navigation`     |
-| DDC  | DMC  | Service  | 주행 제어 명령     | `dobby1/drive/control_command`      |
-| DDC  | RMS/RCS | Topic | 현재 위치 발행      | `dobby1/status/current_pose`        |
+| From | To   | Protocol | 인터페이스 항목 | 메시지 형식                                   |
+|------|------|----------|------------------|-----------------------------------------------|
+| DMC  | DDC  | Action   | 목적지 이동       | `dobby1/drive/navigate_to_pose` (NAV2 표준)   |
+| DMC  | DDC  | Action   | 안내 주행         | `dobby1/drive/guide_navigation`               |
+| DDC  | DMC  | Service  | 주행 제어 명령     | `dobby1/drive/control_command`                |
+| DDC  | RMS/RCS | Topic | 현재 위치 발행      | `dobby1/status/current_pose`                  |
 
 ---
 
 ## 🎯 Action 정의
 
-### 목적지 이동 – `MoveToTarget.action`
+### 목적지 이동 – `NavigateToPose.action` (nav2_msgs)
 
 ```action
 # Goal
-geometry_msgs/Pose target_pose              # 목적지 위치 및 자세
-string location_name                        # 위치 이름 (예: "Shelf_A1", "Return_Desk")
+geometry_msgs/PoseStamped pose      # 목적지 위치/자세 + frame_id
+string behavior_tree                # 사용할 BT (기본값: 빈 문자열 → 기본 트리)
 ---
 # Result
-bool success
-geometry_msgs/Pose final_pose               # 최종 도착 위치
+uint16 error_code                   # nav2 오류 코드 (0: NONE)
+string error_msg                    # 오류 상세
 ---
 # Feedback
-geometry_msgs/Pose current_pose
+geometry_msgs/PoseStamped current_pose
+builtin_interfaces/Duration navigation_time
+builtin_interfaces/Duration estimated_time_remaining
+int16 number_of_recoveries
 float32 distance_remaining
 ```
+
+> **비고:**  
+> - `pose.header.frame_id`는 기본적으로 `map`을 사용하며, `pose.header.stamp`는 Goal 생성 시각을 기록한다.  
+> - NAV2 기본 BT를 사용할 경우 `behavior_tree`를 빈 문자열로 둔다.  
+> - DMC 내부에서는 `Pose2D` 기반 좌표를 관리하되, NAV2에 전달하기 전에 `PoseStamped`로 변환한다.
 
 ### 안내 주행 – `GuideNavigation.action`
 

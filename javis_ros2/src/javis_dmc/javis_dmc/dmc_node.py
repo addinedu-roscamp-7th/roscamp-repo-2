@@ -1492,7 +1492,16 @@ class JavisDmcNode(Node):
             except Exception as exc:  # noqa: BLE001
                 self.get_logger().error(f'비동기 작업 처리 실패: {exc}')
                 return False
-            return bool(getattr(result, 'success', True))
+            success_attr = getattr(result, 'success', None)
+            if success_attr is not None:
+                return bool(success_attr)
+            error_code = getattr(result, 'error_code', None)
+            if error_code is not None:
+                try:
+                    return int(error_code) == 0
+                except Exception:  # noqa: BLE001
+                    return False
+            return True
 
         return True
 

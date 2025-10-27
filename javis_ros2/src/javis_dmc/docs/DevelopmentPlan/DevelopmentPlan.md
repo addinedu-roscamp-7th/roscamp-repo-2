@@ -81,7 +81,7 @@ dobby1/
 │   ├── clean_seat
 │   └── sorting_shelves
 ├── drive/
-│   ├── move_to_target (Action)
+│   ├── navigate_to_pose (Action)
 │   ├── guide_navigation (Action)
 │   └── control_command (Service)
 ├── arm/
@@ -275,7 +275,7 @@ javis_dmc_test_msgs/
 
 | 인터페이스 | 타입 | 네임스페이스 포함 토픽/서비스 | 주요 동작 | 연계 문서 |
 | :--- | :--- | :--- | :--- | :--- |
-| DriveInterface | ActionClient | `{robot}/drive/move_to_target`, `{robot}/drive/guide_navigation` | 이동 명령, 사람 추종 액션 전송 | `InterfaceSpecification/dmc_to_ddc.md` |
+| DriveInterface | ActionClient | `{robot}/drive/navigate_to_pose`, `{robot}/drive/guide_navigation` | 이동 명령, 사람 추종 액션 전송 | `InterfaceSpecification/dmc_to_ddc.md` |
 | DriveInterface | ServiceClient | `{robot}/drive/control_command` | 비상 정지, 재개 명령 | `InterfaceSpecification/dmc_to_ddc.md` |
 | GUIInterface | Subscription | `{robot}/gui/screen_event` | 목적지 선택/취소 등 GUI 입력 수신 | `SequenceDiagram/GuidingScenario.md` |
 | VoiceRecognitionInterface | Subscription | `{robot}/voice_recognition_controller/stt_result` | LISTENING 중 텍스트 이벤트 수신 | `SequenceDiagram/GuidingScenario.md` |
@@ -369,7 +369,7 @@ BaseInterface (ABC)
 └── _create_topic_name(topic) → str
     │
     ├── DriveInterface
-    │   ├── move_to_target(...)
+    │   ├── navigate_to_pose(...)
     │   ├── guide_navigation(...)
     │   ├── cancel_all_actions()
     │   └── control_command(...)

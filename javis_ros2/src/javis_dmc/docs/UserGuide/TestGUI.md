@@ -57,7 +57,7 @@ ros2 run javis_dmc test_gui_node --ros-args -p robot_namespace:=dobby1
    - Mock 환경에서 `guiding_smoke` 실행.
    - 각 Step이 SUCCESS로 기록되는지 로그 확인.
 3. **Mock 실패 주입**
-   - Mock 패널에서 `drive` / `move_to_target` / `ERROR` 입력 후 실패 설정.
+   - Mock 패널에서 `drive` / `navigate_to_pose` / `ERROR` 입력 후 실패 설정.
    - 시나리오 실행 시 팝업이 뜨고 로그가 기록되는지 확인.
 
 ## 9. 순찰 상태 모니터링

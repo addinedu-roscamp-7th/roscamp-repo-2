@@ -96,7 +96,7 @@ javis_dmc_test/             # 🧠 전체 테스트 시스템 로직
     │   ├── mock_rcs_create_user_guide.py
     │   │
     │   ├── # DDC Mock (3개)
-    │   ├── mock_ddc_move_to_target.py
+    │   ├── mock_ddc_navigate_to_pose.py
     │   ├── mock_ddc_guide_navigation.py
     │   ├── mock_ddc_control_command.py
     │   │
@@ -172,7 +172,7 @@ setup(
             
             # Phase 1: 필수 Mock 노드 (11개)
             'mock_rcs_create_user_guide = javis_dmc_test.nodes.mock_rcs_create_user_guide:main',
-            'mock_ddc_move_to_target = javis_dmc_test.nodes.mock_ddc_move_to_target:main',
+            'mock_ddc_navigate_to_pose = javis_dmc_test.nodes.mock_ddc_navigate_to_pose:main',
             'mock_ddc_guide_navigation = javis_dmc_test.nodes.mock_ddc_guide_navigation:main',
             'mock_ddc_control_command = javis_dmc_test.nodes.mock_ddc_control_command:main',
             'mock_dvs_change_tracking_mode = javis_dmc_test.nodes.mock_dvs_change_tracking_mode:main',
@@ -242,8 +242,8 @@ def generate_launch_description():
         # DDC Mock (3개)
         Node(
             package='javis_dmc_test',
-            executable='mock_ddc_move_to_target',
-            name='mock_ddc_move_to_target',
+            executable='mock_ddc_navigate_to_pose',
+            name='mock_ddc_navigate_to_pose',
             output='screen',
         ),
         Node(
@@ -304,7 +304,7 @@ def generate_launch_description():
 ```
 
 **중요**: 각 Mock 노드가 독립적으로 실행되어 개별 제어 및 모니터링이 가능합니다.
-- GUI에서 `ros2 param set /mock_ddc_move_to_target mode error` 명령으로 특정 Mock만 실패 모드로 전환 가능
+- GUI에서 `ros2 param set /mock_ddc_navigate_to_pose mode error` 명령으로 특정 Mock만 실패 모드로 전환 가능
 - Phase 2 노드들은 필요 시 추가
 
 #### 3.1.3 dmc_test_goals.yaml (Example Format)
@@ -381,7 +381,7 @@ Mock 노드는 두 종류로 나뉩니다:
 | 카테고리 | 노드 이름 | 타입 | 인터페이스 | 역할 | Phase |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **RCS** | `mock_rcs_create_user_guide` | Service | `/rcs/create_user_task` | Service Server (v4.0) | 1 |
-| **Drive** | `mock_ddc_move_to_target` | Action | `dobby1/drive/move_to_target` | Action Server | 1 |
+| **Drive** | `mock_ddc_navigate_to_pose` | Action | `dobby1/drive/navigate_to_pose` | Action Server | 1 |
 | **Drive** | `mock_ddc_guide_navigation` | Action | `dobby1/drive/guide_navigation` | Action Server | 1 |
 | **Drive** | `mock_ddc_control_command` | Service | `dobby1/drive/control_command` | Service Server | 1 |
 | **AI** | `mock_dvs_change_tracking_mode` | Service | `dobby1/ai/change_tracking_mode` | Service Server | 1 |
@@ -674,7 +674,7 @@ settings:
 [탭 4: Drive (DDC Mocks)]
 목적: DDC Mock 서버들의 mode를 제어 UI (각 Mock 노드별로 섹션 반복):
 ```
-dobby1/drive/move_to_target:
+dobby1/drive/navigate_to_pose:
 [ Label: STATUS: ACTIVE ] (MockStatus 토픽으로 자동 업데이트됨)
 [ Button: Set Active ] [ Button: Set Error ]
 

@@ -41,7 +41,7 @@ def generate_launch_description():
     
     # DDC Mock (3개)
     ddc_mocks = [
-        'mock_ddc_move_to_target',
+        'mock_ddc_navigate_to_pose',
         'mock_ddc_guide_navigation',
         'mock_ddc_control_command',
     ]

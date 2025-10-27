@@ -12,13 +12,13 @@ Phase 1 필수 Mock 노드들을 개별적으로 실행합니다.
 
 Phase 1 구성 (11개 노드):
 - Mock RCS (1개): CreateUserTask Service Server
-- Mock DDC (3개): GuideNavigation, MoveToTarget, ControlCommand
+- Mock DDC (3개): GuideNavigation, NavigateToPose, ControlCommand
 - Mock DVS (2개): ChangeTrackingMode, TrackingStatus
 - Mock GUI (2개): QueryLocationInfo, RequestGuidance
 - Mock VRC (2개): SetListeningMode, STTResult
 
 개별 제어 예시:
-    ros2 param set /mock_ddc_move_to_target mode error
+    ros2 param set /mock_ddc_navigate_to_pose mode error
     ros2 param set /mock_dvs_tracking_status mode on
 """
 
@@ -44,8 +44,8 @@ def generate_launch_description():
         # ========================================
         Node(
             package='javis_dmc_test',
-            executable='mock_ddc_move_to_target',
-            name='mock_ddc_move_to_target',
+            executable='mock_ddc_navigate_to_pose',
+            name='mock_ddc_navigate_to_pose',
             output='screen',
             parameters=[{'use_sim_time': False}],
         ),
@@ -118,4 +118,3 @@ def generate_launch_description():
             parameters=[{'use_sim_time': False, 'mode': 'off'}],
         ),
     ])
-
