@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>InfoDeskMain</class>
+ <widget class="QMainWindow" name="InfoDeskMain">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>631</width>
+    <height>653</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>InfoDeskMain</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QPushButton" name="book_search_btn">
+    <property name="geometry">
+     <rect>
+      <x>70</x>
+      <y>350</y>
+      <width>141</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: 2px solid #3498db;
+border-radius: 15px;
+padding: 10px;
+background-color: #ecf0f1;
+font-size: 14pt;
+</string>
+    </property>
+    <property name="text">
+     <string>도서 조회</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="loan_books_btn">
+    <property name="geometry">
+     <rect>
+      <x>420</x>
+      <y>350</y>
+      <width>141</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: 2px solid #3498db;
+border-radius: 15px;
+padding: 10px;
+background-color: #ecf0f1;
+font-size: 14pt;
+</string>
+    </property>
+    <property name="text">
+     <string>도서 대출</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="book_pickup_btn">
+    <property name="geometry">
+     <rect>
+      <x>70</x>
+      <y>490</y>
+      <width>141</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: 2px solid #3498db;
+border-radius: 15px;
+padding: 10px;
+background-color: #ecf0f1;
+font-size: 14pt;
+</string>
+    </property>
+    <property name="text">
+     <string>보관 도서 
+ 가져가기</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="seat_reservation_btn">
+    <property name="geometry">
+     <rect>
+      <x>420</x>
+      <y>490</y>
+      <width>141</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: 2px solid #3498db;
+border-radius: 15px;
+padding: 10px;
+background-color: #ecf0f1;
+font-size: 14pt;
+</string>
+    </property>
+    <property name="text">
+     <string>좌석 예약</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="title_lb">
+    <property name="geometry">
+     <rect>
+      <x>70</x>
+      <y>60</y>
+      <width>491</width>
+      <height>251</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: 2px solid #3498db;
+border-radius: 15px;
+padding: 10px;
+background-color: #ecf0f1;
+font-size: 14pt;
+</string>
+    </property>
+    <property name="text">
+     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:20pt; font-weight:700;&quot;&gt;스마트 도서관에 &lt;/span&gt;&lt;/p&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:20pt; font-weight:700;&quot;&gt;오신 것을 환영합니다.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    </property>
+    <property name="textFormat">
+     <enum>Qt::TextFormat::AutoText</enum>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

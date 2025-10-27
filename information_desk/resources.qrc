@@ -1,0 +1,4 @@
+<RCC>
+    <qresource prefix="/BookSearch/images"/>
+    <qresource prefix="/images"/>
+</RCC>
