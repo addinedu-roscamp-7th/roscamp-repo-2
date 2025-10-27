@@ -61,7 +61,7 @@ app = FastAPI(
     title=settings.API_TITLE,
     version=settings.API_VERSION,
     description="""
-    도비 음성 시스템 API
+    음성 시스템 API
 
     ## 사용 예시
 
@@ -116,7 +116,7 @@ app.include_router(pipeline.router, prefix=settings.API_PREFIX)
 async def root():
     """API 루트"""
     return {
-        "message": "도비 음성 시스템 API",
+        "message": "음성 시스템 API",
         "version": settings.API_VERSION,
         "docs": "/docs",
         "health": f"{settings.API_PREFIX}/health"
