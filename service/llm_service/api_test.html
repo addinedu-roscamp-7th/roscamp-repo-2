@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voice API Tester</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans', Arial; padding: 20px; max-width: 980px; margin: auto; }
+    h1 { margin-top: 0 }
+    fieldset { margin-bottom: 16px; }
+    label { display: block; margin: 6px 0 3px; }
+    .row { display:flex; gap:12px; align-items:center; }
+    textarea { width:100%; height: 200px; }
+    .resp { white-space: pre-wrap; background:#111; color:#dfe; padding:12px; border-radius:6px; min-height: 80px; }
+    .small { font-size: .9em; color:#666 }
+    button { padding:8px 12px; }
+  </style>
+</head>
+<body>
+  <h1>Dobi Voice API - Tester</h1>
+  <p class="small">서버가 <strong>http://localhost:8000</strong>에서 동작한다고 가정합니다.</p>
+
+  <fieldset>
+    <legend>서버 설정</legend>
+    <label>Base URL</label>
+    <input id="baseUrl" value="http://localhost:8000" style="width:100%" />
+    <label class="small">API Prefix: <code>/api/v1</code> (고정)</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>선택</legend>
+    <select id="endpoint" style="width:100%">
+      <option value="health">GET /api/v1/health</option>
+      <option value="stt_openai">POST /api/v1/stt/openai (openai-whisper 테스트)</option>
+      <option value="pipeline">POST /api/v1/pipeline (STT→NLU→TTS)</option>
+      <option value="tts">POST /api/v1/tts (TTS)</option>
+      <option value="nlu">POST /api/v1/nlu (NLU)</option>
+    </select>
+  </fieldset>
+
+  <fieldset id="fileField">
+    <legend>오디오 파일 (STT / Pipeline)</legend>
+    <input type="file" id="audioFile" accept="audio/*" />
+    <div class="small">TIP: wav (16k mono) 권장. 업로드 시 브라우저가 Content-Type을 설정합니다.</div>
+  </fieldset>
+
+  <fieldset id="formFields">
+    <legend>추가 입력</legend>
+    <label>language (STT / pipeline / openai)</label>
+    <input id="language" value="ko" />
+
+    <label>TTS 텍스트</label>
+    <input id="ttsText" value="안녕하세요. 테스트 음성입니다." style="width:100%" />
+
+    <label>텍스트</label>
+    <input id="nluText" value="안녕하세요" style="width:100%" />
+
+    <label>model_test</label>
+    <input id="voicemodel" value="small" />
+  </fieldset>
+
+  <div style="margin-bottom:12px; display:flex; gap:8px;">
+    <button id="sendBtn">요청 보내기</button>
+    <button id="downloadBtn" disabled>오디오 다운로드</button>
+    <button id="clearBtn">응답 초기화</button>
+  </div>
+
+  <h3>요청 / 응답</h3>
+  <div>
+    <strong>요청 정보</strong>
+    <div id="reqInfo" class="small"></div>
+  </div>
+  <div style="margin-top:8px">
+    <strong>응답</strong>
+    <div id="resp" class="resp">(여기에 서버 응답이 표시됩니다)</div>
+  </div>
+
+  <script>
+    const baseInput = document.getElementById('baseUrl');
+    const endpoint = document.getElementById('endpoint');
+    const audioFile = document.getElementById('audioFile');
+    const language = document.getElementById('language');
+    const ttsText = document.getElementById('ttsText');
+    const nluText = document.getElementById('nluText');
+    const voicemodel = document.getElementById('voicemodel');
+    const sendBtn = document.getElementById('sendBtn');
+    const respBox = document.getElementById('resp');
+    const reqInfo = document.getElementById('reqInfo');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    let lastAudioBlob = null;
+
+    function showReq(text) { reqInfo.textContent = text; }
+    function showResp(text) { respBox.textContent = text; }
+
+  function apiUrl(path) { return baseInput.value.replace(/\/$/, '') + path; }
+
+    async function callHealth() {
+      showReq('GET /api/v1/health');
+      const r = await fetch(apiUrl('/api/v1/health'));
+      const j = await r.json();
+      showResp(JSON.stringify(j, null, 2));
+    }
+
+    async function callSTT(useOpenAI=true) {
+      const file = audioFile.files[0];
+      if (!file) { alert('오디오 파일을 선택하세요'); return; }
+  // router defines POST to /api/v1/stt (not /stt/voice)
+  const path = '/api/v1/stt';
+      const form = new FormData();
+      form.append('audio_file', file, file.name);
+      form.append('language', language.value || 'ko');
+      form.append('model', voicemodel.value || ',');
+
+      showReq(`POST ${path} (multipart/form-data)\nfile=${file.name}\nlanguage=${language.value}\nmodel=${voicemodel.value}`);
+
+      const r = await fetch(apiUrl(path), { method: 'POST', body: form });
+      const text = await r.text();
+      try { showResp(JSON.stringify(JSON.parse(text), null, 2)); } catch(e) { showResp(text); }
+    }
+
+    async function callPipeline() {
+      const file = audioFile.files[0];
+      if (!file) { alert('오디오 파일을 선택하세요'); return; }
+      const form = new FormData();
+      form.append('audio_file', file, file.name);
+      form.append('return_audio', 'true');
+      form.append('voice', 'ko-KR-SunHiNeural');
+      form.append('language', language.value || 'ko');
+
+      showReq('POST /api/v1/pipeline (multipart/form-data)');
+      const r = await fetch(apiUrl('/api/v1/pipeline'), { method: 'POST', body: form });
+      const j = await r.json();
+      showResp(JSON.stringify(j, null, 2));
+
+      // handle audio_base64 if present
+      if (j.audio_base64) {
+        const bytes = atob(j.audio_base64);
+        const arr = new Uint8Array(bytes.length);
+        for (let i=0;i<bytes.length;i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], { type: 'audio/mpeg' });
+        lastAudioBlob = blob;
+        downloadBtn.disabled = false;
+      }
+    }
+
+    async function callTTS() {
+      const payload = { text: ttsText.value || '안녕하세요', voice: 'ko-KR-SunHiNeural', rate: '+0%', pitch: '+0Hz' };
+      showReq('POST /api/v1/tts\n' + JSON.stringify(payload));
+      const r = await fetch(apiUrl('/api/v1/tts'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (r.status === 200) {
+        const blob = await r.blob();
+        lastAudioBlob = blob;
+        downloadBtn.disabled = false;
+        showResp('TTS returned audio blob, size=' + blob.size + ' bytes');
+      } else {
+        const txt = await r.text(); showResp('Status:' + r.status + '\n' + txt);
+      }
+    }
+
+    async function callNLU() {
+      const payload = { text: nluText.value || '안녕하세요', context: null };
+      showReq('POST /api/v1/nlu\n' + JSON.stringify(payload));
+      const r = await fetch(apiUrl('/api/v1/nlu'), { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const j = await r.json(); showResp(JSON.stringify(j, null, 2));
+    }
+
+
+    sendBtn.addEventListener('click', async () => {
+      downloadBtn.disabled = true; lastAudioBlob = null;
+      try {
+        const ep = endpoint.value;
+        if (ep === 'health') await callHealth();
+        else if (ep === 'stt_ai') await callSTT(true);
+        else if (ep === 'pipeline') await callPipeline();
+        else if (ep === 'tts') await callTTS();
+        else if (ep === 'nlu') await callNLU();
+      } catch (e) {
+        showResp('ERROR: ' + e.message + '\n(콘솔에 자세한 정보가 표시됩니다)');
+        console.error(e);
+      }
+    });
+
+    clearBtn.addEventListener('click', () => { showReq(''); showResp(''); lastAudioBlob = null; downloadBtn.disabled = true; });
+
+    downloadBtn.addEventListener('click', () => {
+      if (!lastAudioBlob) return; const url = URL.createObjectURL(lastAudioBlob); const a = document.createElement('a'); a.href = url; a.download = 'output_audio.mp3'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 10000);
+    });
+
+    // show/hide file field depending on endpoint
+    function updateUI() {
+      const ep = endpoint.value;
+      // file required for openai-stt and pipeline
+      if (['stt_openai','pipeline'].includes(ep)) document.getElementById('fileField').style.display = 'block';
+      else document.getElementById('fileField').style.display = 'none';
+      // TTS uses ttsText, NLU uses nluText (form always visible)
+    }
+    endpoint.addEventListener('change', updateUI);
+    updateUI();
+  </script>
+
+  <hr />
+  <h4>로컬에서 실행하는 방법</h4>
+  <ol>
+    <li>이 파일을 프로젝트의 <code>ui/</code> 폴더에 저장했습니다: <code>ui/api_test.html</code></li>
+    <li>
+      <pre><code>
+python3 -m http.server 8080
+# 브라우저에서: http://localhost:8080/api_test.html</code></pre>
+    </li>
+    <li>페이지에서 Base URL을 <code>http://localhost:8000</code>로 설정한 다음 엔드포인트를 선택하고 요청하세요.</li>
+  </ol>
+
+</body>
+</html>
