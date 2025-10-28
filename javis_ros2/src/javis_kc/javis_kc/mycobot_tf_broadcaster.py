@@ -75,7 +75,7 @@ class MyCobotController(Node):
         
         try:
             self.mc = MyCobot('/dev/ttyJETCOBOT', 1000000)
-            self.mc.send_angles([0, 0, 0, -90, 0, 45], 50) # 초기 자세 설정
+            self.mc.send_angles([0, 0, 0, 0, -90, -45], 50) # 초기 자세 설정
             time.sleep(2)
             self.get_logger().info('myCobot is connected.')
         except Exception as e:

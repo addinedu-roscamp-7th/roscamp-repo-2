@@ -37,7 +37,7 @@ class PerformTaskActionServer(Node):
 
         tf_cmd = [
             "ros2", "run", "tf2_ros", "static_transform_publisher",
-            "0.4", "-0.245", "0.07", "-1.5707", "3.1415", "1.5707",
+            "0.375", "0.505", "0.275", "0.0", "3.1415", "1.5707",
             "base_link", "camera_link"
         ]
         subprocess.Popen(tf_cmd)
@@ -56,7 +56,8 @@ class PerformTaskActionServer(Node):
 
         self.mc = MyCobot280("/dev/ttyJETCOBOT", 1000000)
         self.mc.thread_lock = False
-        self.mc.send_angles([0, 0, 0, -90, 0, 45], 50)
+        self.mc.send_angles([0.0,0.0,0.0,-90.0,0.0,-45.0], 30)
+        self.mc.set_gripper_value(100, 50)
         self.get_logger().info('MyCobot 연결 완료')
         
         self.tf_buffer = Buffer()
@@ -67,7 +68,6 @@ class PerformTaskActionServer(Node):
         self.state = RobotState.WAITING_FOR_OBJECT
         self.target_coords = [0.0, 0.0, 0.0]
         self.approach_height = 225
-        self.pick_height_offset = 10
         
         self.get_logger().info('액션서버 시작. 목표를 기다립니다...')
 
@@ -110,6 +110,9 @@ class PerformTaskActionServer(Node):
                 transform_xyz = self.transform_point(Point(res.x, res.y, res.z), transform)
                 self.get_logger().info(f'변환된 좌표: x: {transform_xyz[0]}, y: {transform_xyz[1]}, z: {transform_xyz[2]}')
                 self.target_coords = [transform_xyz[0], transform_xyz[1], transform_xyz[2]]
+
+                self.mc.send_angles([-0.08, 2.81, -102.12, 6.76, -0.96, -40.16], 30)
+                time.sleep(2.0)
             except tf2_ros.TransformException as ex:
                 error_msg = f'TF 변환 실패: {ex}'
                 self.get_logger().error(error_msg)
@@ -162,12 +165,20 @@ class PerformTaskActionServer(Node):
             if not current_coords: return
 
             pick_coords = [
-                float(self.target_coords[0] * 1000), float(self.target_coords[1] * 1000),
-                float(self.target_coords[2] * 1000) + 100, # Z값 오프셋
+                float(self.target_coords[0] * 1000 - 70), float(self.target_coords[1] * 1000),
+                current_coords[2],
+                current_coords[3], current_coords[4], current_coords[5]
+            ]
+            self.mc.sync_send_coords(pick_coords, 40, 1)  # 속도, 타임아웃
+            time.sleep(3)
+            current_coords = self.mc.get_coords()
+            pick_coords = [
+                current_coords[0], current_coords[1],
+                float(self.target_coords[2] * 1000 + 30), # Z값 오프셋
                 current_coords[3], current_coords[4], current_coords[5]
             ]
             self.mc.sync_send_coords(pick_coords, 40, 1) # 속도, 타임아웃
-            time.sleep(2.5)
+            time.sleep(1.5)
             self.state = RobotState.GRIPPING
 
         elif self.state == RobotState.GRIPPING:
@@ -181,18 +192,14 @@ class PerformTaskActionServer(Node):
             current_coords = self.mc.get_coords()
             if not current_coords: return
 
-            raise_coords = [
-                current_coords[0], current_coords[1], self.approach_height,
-                current_coords[3], current_coords[4], current_coords[5]
-            ]
-            self.mc.send_coords(raise_coords, 30, 0)
-            time.sleep(2.5)
+            raise_angles = [-1.14, 10.89, -63.63, -40.25, -2.02, -45.87]
+            self.mc.send_angles(raise_angles, 30)
+            time.sleep(1.5)
             self.state = RobotState.RETURNING_HOME
 
         elif self.state == RobotState.RETURNING_HOME:
             self.get_logger().info("상태: [RETURNING_HOME]")
-            self.mc.send_angles([0, 0, 0, 0, 0, 0], 50)
-            self.mc.set_gripper_value(100, 50)
+            self.mc.send_angles([0.0,0.0,0.0,-90.0,0.0,-45.0], 30)
             time.sleep(2.5)
             # 이 상태는 루프를 종료시키는 역할이므로, 여기서 상태를 바꾸지 않음
 
