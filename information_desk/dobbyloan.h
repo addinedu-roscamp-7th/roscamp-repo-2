@@ -2,6 +2,7 @@
 #define DOBBYLOAN_H
 
 #include <QDialog>
+#include <qnetworkaccessmanager.h>
 
 namespace Ui {
 class DobbyLoan;
@@ -15,8 +16,11 @@ public:
     explicit DobbyLoan(QWidget *parent = nullptr);
     ~DobbyLoan();
 
+
 private:
     Ui::DobbyLoan *ui;
+    QNetworkAccessManager* manager;
+    void send_pickup();
 };
 
 #endif // DOBBYLOAN_H

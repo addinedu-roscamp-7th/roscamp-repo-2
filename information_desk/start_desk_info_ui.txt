@@ -1,0 +1,3 @@
+실행 방법
+cd roscamp-repo-2_dev/information_desk/app/
+./information_desk

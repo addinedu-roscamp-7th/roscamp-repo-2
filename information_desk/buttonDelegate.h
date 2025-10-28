@@ -19,7 +19,6 @@ public:
                      const QStyleOptionViewItem& option,
                      const QModelIndex& index) override;
 
-    void setBtnText(QString text);
 
 signals:
     void buttonClicked(int row);

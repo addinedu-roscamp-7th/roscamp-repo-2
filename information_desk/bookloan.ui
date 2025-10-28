@@ -17,9 +17,9 @@
    <property name="geometry">
     <rect>
      <x>90</x>
-     <y>50</y>
+     <y>10</y>
      <width>411</width>
-     <height>191</height>
+     <height>141</height>
     </rect>
    </property>
    <property name="font">
@@ -35,11 +35,11 @@
     <string>회원증을 스캔해주세요!</string>
    </property>
   </widget>
-  <widget class="QFrame" name="TextFram">
+  <widget class="QFrame" name="scanFrame">
    <property name="geometry">
     <rect>
-     <x>70</x>
-     <y>260</y>
+     <x>80</x>
+     <y>150</y>
      <width>421</width>
      <height>111</height>
     </rect>
@@ -57,10 +57,10 @@
    <widget class="QLabel" name="scanLabel">
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>30</y>
+      <x>20</x>
+      <y>10</y>
       <width>171</width>
-      <height>61</height>
+      <height>91</height>
      </rect>
     </property>
     <property name="font">
@@ -79,10 +79,10 @@
    <widget class="QLabel" name="scanStatusL">
     <property name="geometry">
      <rect>
-      <x>240</x>
-      <y>30</y>
-      <width>121</width>
-      <height>61</height>
+      <x>220</x>
+      <y>20</y>
+      <width>171</width>
+      <height>71</height>
      </rect>
     </property>
     <property name="font">
@@ -95,7 +95,7 @@
      <string notr="true">border: none;</string>
     </property>
     <property name="text">
-     <string> 스캔 상태</string>
+     <string>스캔 대기 중</string>
     </property>
    </widget>
   </widget>
@@ -121,6 +121,127 @@ padding: 10px 20px;</string>
    </property>
    <property name="text">
     <string>취소</string>
+   </property>
+  </widget>
+  <widget class="QFrame" name="bookinfoFrame">
+   <property name="geometry">
+    <rect>
+     <x>80</x>
+     <y>270</y>
+     <width>421</width>
+     <height>251</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">border: 2px solid #FFD700;
+ border-radius: 10px;</string>
+   </property>
+   <property name="frameShape">
+    <enum>QFrame::Shape::StyledPanel</enum>
+   </property>
+   <property name="frameShadow">
+    <enum>QFrame::Shadow::Raised</enum>
+   </property>
+   <widget class="QLabel" name="title">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>10</y>
+      <width>381</width>
+      <height>53</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>20</pointsize>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: none;</string>
+    </property>
+    <property name="text">
+     <string>제목:</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="author">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>50</y>
+      <width>381</width>
+      <height>72</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>20</pointsize>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: none;</string>
+    </property>
+    <property name="text">
+     <string>저자:</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="publisher">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>110</y>
+      <width>381</width>
+      <height>61</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>20</pointsize>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: none;</string>
+    </property>
+    <property name="text">
+     <string>출판사:</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="isbn">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>160</y>
+      <width>381</width>
+      <height>71</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>20</pointsize>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border: none;</string>
+    </property>
+    <property name="text">
+     <string>표준번호:</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QPushButton" name="testBtn">
+   <property name="geometry">
+    <rect>
+     <x>440</x>
+     <y>590</y>
+     <width>94</width>
+     <height>26</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>임시버튼</string>
    </property>
   </widget>
  </widget>

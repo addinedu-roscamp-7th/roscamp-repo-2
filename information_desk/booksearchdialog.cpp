@@ -1,6 +1,7 @@
-#include "booksearchdialog.h"
+#include "booksearchdialog.h" //도서 조회
 #include "ui_booksearchdialog.h"
-#include "bookinfolocation.h"
+#include "bookinfolocation.h" //도서 위치 정보
+#include "bookloan.h" //도서 대여
 #include <QStandardItem>
 #include <QVBoxLayout>
 #include "buttonDelegate.h"
@@ -16,6 +17,8 @@
 #include <QVBoxLayout>
 
 
+
+
 BookSearchDialog::BookSearchDialog(QWidget *parent)
     : QDialog(parent), ui(new Ui::BookSearchDialog), model(new QStandardItemModel(this)), searchText("")
 {
@@ -24,7 +27,7 @@ BookSearchDialog::BookSearchDialog(QWidget *parent)
     //검색창 설정
     ui->bookSearchWindow->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui->bookSearchWindow->setLineWrapMode(QTextEdit::NoWrap);
-    ui->pushButton->setFlat(true);
+    ui->backBtn->setFlat(true);
 
 
     //검색결과 창
@@ -37,12 +40,18 @@ BookSearchDialog::BookSearchDialog(QWidget *parent)
     localBookInfo = new QList<QList<QString>>;
 
     setupTable();
-    //loadData();
+    connect(ui->backBtn, &QPushButton::clicked, this, &BookSearchDialog::on_backBtn);
+
 }
 
 BookSearchDialog::~BookSearchDialog()
 {
     delete ui;
+}
+
+
+void BookSearchDialog::on_backBtn(){ //뒤로가기 버튼
+    this->close();
 }
 
 void BookSearchDialog::setupTable()
@@ -53,15 +62,14 @@ void BookSearchDialog::setupTable()
     ui->bookInfoTable->setSortingEnabled(true); // 정렬 가능
 
 
-    //위치 버튼
+    //위치 버튼 기능 구현
     ButtonDelegate* delegatLOC = new ButtonDelegate(this);
-    delegatLOC->setBtnText("보기");
     ui->bookInfoTable->setItemDelegateForColumn(4, delegatLOC);
     connect(delegatLOC, &ButtonDelegate::buttonClicked, this, [this](int row){
         int currentRow = row;
         QString isbn = model->item(row, 0)->text(); // 위치를 조회하기 위한 ISBN
 
-        QString urlString = QString("http://127.0.0.1:8000/infodesk/books/%1").arg(isbn);
+        QString urlString = QString("http://127.0.0.1:8000/infodesk/books/pickup").arg(isbn);
         QNetworkRequest request((QUrl(urlString)));
         request.setRawHeader("accept", "application/json");
 
@@ -92,8 +100,6 @@ void BookSearchDialog::setupTable()
                     qDebug() << "[" << bookInfo << "]";
 
                     detail.append(bookInfo);
-
-
                     dlg.setText(detail);   // 여기서 BookInfoLocation에 넣어줌
                     dlg.exec();
                 }
@@ -107,19 +113,21 @@ void BookSearchDialog::setupTable()
 
 
 
-    //대출 버튼
-    ButtonDelegate* delegate1LOAN = new ButtonDelegate(this);
+    //대출 버튼 기능 구현
+    ButtonDelegate* delegateLOAN = new ButtonDelegate(this);
+    ui->bookInfoTable->setItemDelegateForColumn(5, delegateLOAN); // 5번 col에 버튼 생성
+    connect(delegateLOAN, &ButtonDelegate::buttonClicked, this, [this](int row){
 
-    for (int row = 0; row < localBookInfo->size(); ++row) {
-        const QList<QString>& book = localBookInfo->at(row);
-        for (int col = 0; col < book.size(); ++col) {
-            delegate1LOAN->setBtnText(((*localBookInfo)[row])[col]);
+        QString status = model->item(row, 5)->text();
+        if(status == "대출"){                     // 대출 가능한 경우만 실행
+            BookLoan dlg(this);
+            dlg.set_book_info(localBookInfo);
+            dlg.setText(row);
+            dlg.setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+            dlg.exec();
+        } else {
+            qDebug() << "대출 불가 도서입니다!";
         }
-    }
-
-    ui->bookInfoTable->setItemDelegateForColumn(5, delegate1LOAN);
-    connect(delegate1LOAN, &ButtonDelegate::buttonClicked, this, [](int row){
-        qDebug() << "Button clicked on row:" << row;
     });
 }
 
@@ -130,12 +138,10 @@ void BookSearchDialog::on_searchBtn_clicked() // 검색 버튼
     QString encodeKeyword = QUrl::toPercentEncoding(searchText);
     QString urlString = QString("http://127.0.0.1:8000/infodesk/books?keyword=%1&page=1&per_page=5")
                             .arg(encodeKeyword);
-
     QUrl url(urlString);
 
     QNetworkRequest request(url);
     request.setRawHeader("accept", "application/json");
-
     QNetworkReply* reply = manager->get(request);
 
     // 응답 처리
@@ -155,7 +161,7 @@ void BookSearchDialog::on_searchBtn_clicked() // 검색 버튼
                     // 기존 테이블 초기화
                     model->removeRows(0, model->rowCount());
 
-                    // JSON → 테이블 반영
+                    // JSON → 테이블 반영 (테이블에 버튼을 그림)
                     for(const QJsonValue &val : array){
                         QJsonObject obj = val.toObject();
                         QList<QStandardItem*> rowItems;
@@ -163,7 +169,16 @@ void BookSearchDialog::on_searchBtn_clicked() // 검색 버튼
                         rowItems.append(new QStandardItem(obj["title"].toString()));
                         rowItems.append(new QStandardItem(obj["author"].toString()));
                         rowItems.append(new QStandardItem(obj["publisher"].toString()));
-                        rowItems.append(new QStandardItem(obj["status"].toString()));
+                        rowItems.append(new QStandardItem("보기")); // 위치 버튼
+
+                        QString status = obj["status"].toString(); //대출 버튼
+                        QString buttonLabel;
+                        if(status == "대출가능"){
+                            buttonLabel = "대출";}
+                        else
+                            buttonLabel = "불가";
+
+                        rowItems.append(new QStandardItem(buttonLabel));
                         model->appendRow(rowItems);
 
                         //도서 조회 정보 로컬 저장(대출 여부 확인을 위해서)
@@ -174,12 +189,7 @@ void BookSearchDialog::on_searchBtn_clicked() // 검색 버튼
                         localItems.append(obj["publisher"].toString());
                         localItems.append(obj["status"].toString());
                         localBookInfo->append(localItems);
-
                     }
-
-
-
-
                     ui->bookInfoTable->resizeColumnsToContents();
 
                 }
