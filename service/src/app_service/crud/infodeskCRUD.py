@@ -63,8 +63,10 @@ def create_rental(db:Session, db_rantal: Rental):
     return db_rantal
 
 #픽업대 상태 조회
-def get_box_status(db: Session, loc_name: str):
-    return db.query(Location).filter(Location.LocationName == loc_name).first()
+def get_box_status(db: Session):
+    return db.query(Location).filter(Location.LocationName.like(f"%{'도서 픽업대'}%"),
+                                    Location.CurrentStatus == "사용가능")\
+                                    .first()
 
 #회원 정보 확인용
 def get_member_info(db:Session, member_id: str):

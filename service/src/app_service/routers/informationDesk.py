@@ -154,7 +154,6 @@ def create_directLoan(
 def create_pickupLoan(
     memberID : str,
     barcode : str,
-    locname : str,
     db : Session = Depends(get_db)):
     try:
 
@@ -168,12 +167,10 @@ def create_pickupLoan(
         if not bookMat.Barcode:
             raise HTTPException(status_code=404, detail="해당 바코드의 도서를 찾을 수 없습니다.")
         
-        location = infodeskCRUD.get_box_status(db, locname)
+        locations = infodeskCRUD.get_box_status(db)
 
-        if location.CurrentStatus == "불가가능":
-            raise HTTPException(status_code=400, detail="해당 위치는 현재 이용할 수 없습니다.")
-        
-        
+        if not locations:
+            raise HTTPException(status_code=404, detail="해당 위치는 존재하지 않습니다.")
 
         copyid = bookMat.CopyID
         memberid = int(memberID)
@@ -198,7 +195,7 @@ def create_pickupLoan(
         return Loan(
             loanDate=loan_date,
             dueDate=due_date,
-            locationName=location.LocationName
+            locationName=locations.LocationName
             #preparationTime=, 이 부분은 아직 보류
         )
             
