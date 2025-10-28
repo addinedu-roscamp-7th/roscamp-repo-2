@@ -31,11 +31,13 @@ setup(
             'clean_seat = javis_rcs.clean_seat:main',
             'guide_person = javis_rcs.guide_person:main',
             'kreacher_perform_task = javis_rcs.kreacher_perform_task:main',
-            'robot_control_service.py = javis_rcs.robot_control_service:main',
+            'robot_control_service = javis_rcs.robot_control_service:main',
             'mock_rcs_node.py = javis_rcs.mock_rcs_node:main',
             'battery_test = javis_rcs.battery_status:main',
             'dobby_state_publisher = javis_rcs.dobby_state_publisher:main', # 이 라인을 추가
-            'gateway_http_to_service = javis_rcs.gateway_http_to_service:main'
+            'gateway_http_to_service = javis_rcs.gateway_http_to_service:main',
+            'kreacher_perform = javis_rcs.kreacher_perform:main',
+            'task_pub = javis_rcs.task_publish:main'
         ],
     },
 )

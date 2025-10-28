@@ -9,7 +9,7 @@ import sys
 class KreacherPerformTask(Node):
     """Kreacher의 PerformTask 액션을 요청하고 결과를 처리하는 클라이언트 노드입니다."""
     def __init__(self, namespace: str, member_id: int):
-        super().__init__('kreacher_perform_task_client', namespace=namespace)
+        super().__init__('kreacher_perform_task', namespace=namespace)
 
         # --- 파라미터 선언 ---
         self.declare_parameter('action_server_timeout', 10.0)
@@ -47,7 +47,7 @@ class KreacherPerformTask(Node):
     def feedback_callback(self, feedback):
         """액션 실행 중 서버로부터 피드백을 수신했을 때 호출됩니다."""
         fb = feedback.feedback
-        self.get_logger().info(f'feedback = 상태:{fb.status} 진행률: {fb.progress_percentage}%')
+        self.get_logger().info(f'feedback = 회원id:{fb.member_id} 진행률: {fb.progress_percentage}%')
 
     def goal_response_callback(self, future: Future):
         """서버가 목표를 수락했는지 여부를 처리합니다."""
@@ -77,11 +77,10 @@ def main(args=None):
     parser = argparse.ArgumentParser(description='Kreacher PerformTask 액션 클라이언트')
     parser.add_argument('member_id', type=int, help='작업을 요청할 멤버의 ID')
     # rclpy가 사용하는 ROS 관련 인자를 제외하고 파싱합니다.
-    parsed_args = parser.parse_args(args=rclpy.utilities.remove_ros_args(args=sys.argv)[1:])
 
     # Kreacher 서버의 네임스페이스를 명시적으로 전달합니다.
     namespace = 'kreacher/action'
-    perform_task_node = KreacherPerformTask(namespace=namespace, member_id=parsed_args.member_id)
+    perform_task_node = KreacherPerformTask(namespace=namespace, member_id=1)
 
     try:
         # 노드가 스스로 파괴(destroy_node)될 때까지 spin이 돌면서 콜백을 처리합니다.

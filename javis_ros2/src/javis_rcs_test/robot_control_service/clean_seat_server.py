@@ -63,7 +63,7 @@ class CleanSeatServer(Node):
 def main():
     rclpy.init()
 
-    node = CleanSeatServer(namespace='dobby1/main')
+    node = CleanSeatServer(namespace='dobby2/main')
 
     try:
         rclpy.spin(node)

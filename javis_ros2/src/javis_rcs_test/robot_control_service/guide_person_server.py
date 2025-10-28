@@ -5,8 +5,8 @@ from javis_interfaces.action import GuidePerson
 import time
 
 class GuidePersonServer(Node):
-    def __init__(self):
-        super().__init__('guide_person_server')
+    def __init__(self, namespace: str = ''):
+        super().__init__('guide_person_server', namespace=namespace)
         self._server = ActionServer(
             self,
             GuidePerson,
@@ -17,7 +17,7 @@ class GuidePersonServer(Node):
         )
 
     def goal_callback(self, goal_request: GuidePerson.Goal):
-        self.get_logger().info(f'길안내 요청: task_id:{goal_request.task_id}, 목적지 위치:{goal_request.dest_location}')
+        self.get_logger().info(f'길안내 요청: 목적지 위치:{goal_request.dest_location}')
 
         return GoalResponse.ACCEPT
 
@@ -35,7 +35,6 @@ class GuidePersonServer(Node):
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
                 result = GuidePerson.Result()
-                result.task_id = goal.task_id
                 result.success = False
                 result.error_code = "test code"
                 result.total_distance_m = 0.909
@@ -50,7 +49,6 @@ class GuidePersonServer(Node):
 
         goal_handle.succeed()
         result = GuidePerson.Result()
-        result.task_id = goal.task_id
         result.success = True
         result.error_code = 1
         result.total_distance_m = 9.09
@@ -64,7 +62,7 @@ def main():
 
     rclpy.init()
 
-    node = GuidePersonServer()
+    node = GuidePersonServer(namespace='dobby2/main')
 
     try:
         rclpy.spin(node)

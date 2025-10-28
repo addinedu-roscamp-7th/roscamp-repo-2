@@ -17,6 +17,7 @@ rclpy.init()
 _ros_node = Node('http_ros_gateway') # 게이트웨이 노드 이름
 _client = _ros_node.create_client(MyJson, 'robot_task') # OrchestratorNode의 서비스 이름으로 변경
 
+
 def wait_for_service():
     _ros_node.get_logger().info('Waiting for /robot_task service...')
     while not _client.wait_for_service(timeout_sec=1.0):
@@ -43,31 +44,22 @@ def _send_task_to_orchestrator(task_data):
 
 @app.route('/robot/pickup', methods=['POST'])
 def handle_pickup_request():
-    """
-    '/robot/pickup' HTTP POST 요청을 처리하여 'pickup_book' 작업을 OrchestratorNode에 전달합니다.
-    요청 JSON 예시: {"book_name": "ROS2 Programming Guide", "location": "Shelf A, Section 3"}
-    """
+  
     try:
         req_data = request.get_json(force=True, silent=False)
         if not req_data:
             return jsonify({'ok': False, 'message': 'Request body must be JSON.'}), 400
-        
-        task_name = req_data.get('task_name', 'pickup_book')
-        book_id = req_data.get('book_id', "default_task_name")
-        book_info = req_data.get('book_info', {})
-        location = req_data.get('location', {})
-        storage_info = req_data.get('storage_info', {})
-        shelf_info = req_data.get('shelf_info', {})
 
-        if not book_id or not location:
-            return jsonify({'ok': False, 'message': 'Missing required fields: book_name, location'}), 400
+        book_id = req_data.get('book_id')
+        if book_id is None: 
+            return jsonify({'ok': False, 'message': 'Missing required field: book'}), 400
 
+        # clean_seat에 필요한 다른 파라미터들은 req_data에서 직접 가져와 task_data에 포함
+        # OrchestratorNode의 execute_task에서 기본값 처리가 되므로, 없으면 안 보내도 됨
         task_data = {
-            "task_name": task_name,
-            "book_info": book_info,
-            "storage_info": storage_info,
-            "shelf_info": shelf_info
-
+            "task_name": "pickup_book",
+            "book_id": book_id,
+            **{k: v for k, v in req_data.items() if k not in ['task_name', 'book_id']} # seat_id 외 다른 필드 포함
         }
         
         response_from_ros = _send_task_to_orchestrator(task_data)
@@ -105,6 +97,87 @@ def handle_clean_seat_request():
 
     except Exception as e:
         _ros_node.get_logger().error(f"Error processing /robot/seats request: {e}")
+        return jsonify({'ok': False, 'message': f'Internal server error: {e}'}), 500
+    
+@app.route('/robot/reshelving', methods=['POST'])
+def handle_reshelving_request():
+  
+    try:
+        req_data = request.get_json(force=True, silent=False)
+        if not req_data:
+            return jsonify({'ok': False, 'message': 'Request body must be JSON.'}), 400
+
+        return_desk_id = req_data.get('return_desk_id')
+        if return_desk_id is None: 
+            return jsonify({'ok': False, 'message': 'Missing required field: book'}), 400
+
+        # clean_seat에 필요한 다른 파라미터들은 req_data에서 직접 가져와 task_data에 포함
+        # OrchestratorNode의 execute_task에서 기본값 처리가 되므로, 없으면 안 보내도 됨
+        task_data = {
+            "task_name": "reshelving_book",
+            "return_desk_id": return_desk_id,
+            **{k: v for k, v in req_data.items() if k not in ['task_name', 'return_desk_id']} # seat_id 외 다른 필드 포함
+        }
+        
+        response_from_ros = _send_task_to_orchestrator(task_data)
+        return jsonify(response_from_ros), 200 if response_from_ros['ok'] else 500
+
+    except Exception as e:
+        _ros_node.get_logger().error(f"Error processing /robot/reshelving request: {e}")
+        return jsonify({'ok': False, 'message': f'Internal server error: {e}'}), 500
+    
+@app.route('/robot/guide', methods=['POST'])
+def handle_guide_person_request():
+  
+    try:
+        req_data = request.get_json(force=True, silent=False)
+        if not req_data:
+            return jsonify({'ok': False, 'message': 'Request body must be JSON.'}), 400
+
+        dest_location = req_data.get('dest_location')
+        if dest_location is None: 
+            return jsonify({'ok': False, 'message': 'Missing required field: book'}), 400
+
+        # clean_seat에 필요한 다른 파라미터들은 req_data에서 직접 가져와 task_data에 포함
+        # OrchestratorNode의 execute_task에서 기본값 처리가 되므로, 없으면 안 보내도 됨
+        task_data = {
+            "task_name": "guide_person",
+            "dest_location": dest_location,
+            **{k: v for k, v in req_data.items() if k not in ['task_name', 'dest_location']} # seat_id 외 다른 필드 포함
+        }
+        
+        response_from_ros = _send_task_to_orchestrator(task_data)
+        return jsonify(response_from_ros), 200 if response_from_ros['ok'] else 500
+
+    except Exception as e:
+        _ros_node.get_logger().error(f"Error processing /robot/guide request: {e}")
+        return jsonify({'ok': False, 'message': f'Internal server error: {e}'}), 500
+    
+@app.route('/robot/kreacher', methods=['POST'])
+def handle_kreacher_request():
+  
+    try:
+        req_data = request.get_json(force=True, silent=False)
+        if not req_data:
+            return jsonify({'ok': False, 'message': 'Request body must be JSON.'}), 400
+
+        member_id = req_data.get('member_id')
+        if member_id is None: 
+            return jsonify({'ok': False, 'message': 'Missing required field: member_id'}), 400
+
+        # clean_seat에 필요한 다른 파라미터들은 req_data에서 직접 가져와 task_data에 포함
+        # OrchestratorNode의 execute_task에서 기본값 처리가 되므로, 없으면 안 보내도 됨
+        task_data = {
+            "task_name": "kreacher",
+            "member_id": member_id,
+            **{k: v for k, v in req_data.items() if k not in ['task_name', 'member_id']} # seat_id 외 다른 필드 포함
+        }
+        
+        response_from_ros = _send_task_to_orchestrator(task_data)
+        return jsonify(response_from_ros), 200 if response_from_ros['ok'] else 500
+
+    except Exception as e:
+        _ros_node.get_logger().error(f"Error processing /robot/kreacher request: {e}")
         return jsonify({'ok': False, 'message': f'Internal server error: {e}'}), 500
 
 @app.route('/test', methods=['POST']) # 기존 /test 엔드포인트는 그대로 유지하거나 필요에 따라 삭제/수정

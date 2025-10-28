@@ -1,52 +1,30 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from javis_interfaces.action import PickupBook
+from javis_interfaces.action import PickupBook as PB
 from rclpy.task import Future
-from geometry_msgs.msg import Pose2D
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose2D, Point, Quaternion, Pose
 from flask import Flask, request, jsonify, current_app
 import threading
 import requests # HTTP 요청을 보내기 위해 추가
+import sys
 
 app = Flask(__name__) # Flask 앱 인스턴스 생성
 
-class PickupClient(Node):
+class PickupBook(Node):
     """
     Flask 서버를 통해 PickupBook 액션을 요청받고,
     Dobby에게 작업을 지시한 후 결과를 외부 서버로 알리는 노드.
     """
     def __init__(self, namespace: str):
-        super().__init__('pickup_client', namespace=namespace)
+        super().__init__('pickup_book', namespace=namespace)
 
-        # --- 파라미터 선언 ---
-        self.declare_parameter('flask_port', 8001)
-        self.declare_parameter('action_server_timeout', 10.0)
-        self.declare_parameter('completion_report_url', 'http://localhost:8001/app/books')
-
-        # --- 파라미터 값 가져오기 ---
-        flask_port = self.get_parameter('flask_port').get_parameter_value().integer_value
-        self.action_server_timeout = self.get_parameter('action_server_timeout').get_parameter_value().double_value
-        self.completion_report_url = self.get_parameter('completion_report_url').get_parameter_value().string_value
-
-        # 액션 클라이언트는 노드 생성 시 전달된 네임스페이스를 자동으로 상속받습니다.
-        # 따라서 별도의 네임스페이스 지정 없이 생성합니다.
-        self.dobby_client = ActionClient(self, PickupBook, 'pickup_book')
-
-        # --- Flask 서버 스레드 실행 ---
-        self.flask_thread = threading.Thread(target=self._run_flask_server, args=(flask_port,))
-        self.flask_thread.daemon = True
-        self.flask_thread.start()
-        self.get_logger().info(f"Flask server started on port {flask_port}")
-        self.get_logger().info(f"Pickup action client is targeting namespace: '{namespace}'")
+        self._client = ActionClient(self, PB, 'pickup_book')
+        self.task_done_future: Future | None = None
     
-    def _run_flask_server(self, port):
-        """Flask 서버를 실행하는 내부 메서드."""
-        # Flask 앱 컨텍스트에 ROS 노드 인스턴스를 저장합니다.
-        app.config['ros_node'] = self
-        app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
     
-    def pickup_send_goal(self,
+    
+    def send_goal(self,
                         book_id: str,
                         storage_id: int,
                         book_pick_pose: Pose,
@@ -54,38 +32,25 @@ class PickupClient(Node):
                         storage_slot_pose: Pose,
                         shelf_approach_location: Pose2D,
                         ) -> Future :
-        """
-        PickupBook 액션 목표(goal)를 DMC에 전송합니다.
-
-        Args:
-            book_id: 픽업할 책의 ID.
-            storage_id: 보관함 ID.
-            book_pick_pose: 책을 집을 때의 팔의 포즈.
-            storage_approach_location: 보관함 접근 위치.
-            storage_slot_pose: 보관함 슬롯 포즈.
-            shelf_approach_location: 책장 접근 위치.
-
-        Returns:
-            서버로 목표를 비동기 전송하는 Future 객체.
-        """
-        pickup_goal_msg = PickupBook.Goal()
-        pickup_goal_msg.book_id = book_id
-        pickup_goal_msg.shelf_approach_location = shelf_approach_location
-        pickup_goal_msg.book_pick_pose = book_pick_pose
-        pickup_goal_msg.storage_id = storage_id
-        pickup_goal_msg.storage_approach_location = storage_approach_location
-        pickup_goal_msg.storage_slot_pose = storage_slot_pose
+      
+        goal_msg= PB.Goal()
+        goal_msg.book_id = book_id
+        goal_msg.shelf_approach_location = shelf_approach_location
+        goal_msg.book_pick_pose = book_pick_pose
+        goal_msg.storage_id = storage_id
+        goal_msg.storage_approach_location = storage_approach_location
+        goal_msg.storage_slot_pose = storage_slot_pose
 
         self.get_logger().info("Dobby(DMC) 액션 서버를 기다리는 중...")
-        if not self.dobby_client.wait_for_server(timeout_sec=self.action_server_timeout):
+        if not self._client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error('Dobby(DMC) 액션 서버가 응답하지 않습니다.')
-            return None
+            raise RuntimeError("Action server not available within timeout.")
 
-        return self.dobby_client.send_goal_async(
-            pickup_goal_msg, feedback_callback=self.dobby_pickup_callback
+        return self._client.send_goal_async(
+            goal_msg, feedback_callback=self.pickup_callback
         )
     
-    def dobby_pickup_callback(self, feedback):
+    def pickup_callback(self, feedback):
         """액션 피드백을 수신했을 때 호출되는 콜백 함수."""
         fb = feedback.feedback
         self.get_logger().info(f'dobby pickup feedback: {fb.progress_percent}%')
@@ -102,86 +67,87 @@ class PickupClient(Node):
         result_future.add_done_callback(self.result_callback)
 
     def result_callback(self, future: Future):
-        """액션의 최종 결과를 처리하고 외부 서버로 보고하는 콜백 함수."""
         result = future.result().result
-        self.get_logger().info(f'Pickup result received: success={result.success}, message="{result.message}"')
-        
-        # 작업 완료 후 book_id를 GET 방식으로 전송
-        if result.success:
-            try:
-                # book_id를 쿼리 파라미터로 전송
-                response = requests.get(self.completion_report_url, params={'book_id': result.book_id})
-                response.raise_for_status() # 2xx 응답이 아니면 예외 발생
-                self.get_logger().info(
-                    f"Successfully sent completion for book_id '{result.book_id}' to {self.completion_report_url}. "
-                    f"Response: {response.text}"
-                )
-            except requests.exceptions.RequestException as e:
-                self.get_logger().error(f"Failed to send completion for book_id '{result.book_id}': {e}")
+        self.get_logger().info(f'작업 완료 결과: {result.message}')
+        if self.task_done_future is not None and not self.task_done_future.done():
+            self.task_done_future.set_result({'success': result.success, 'message': result.message})
 
+    def run_task(self, book_id: str, **kwargs) -> Future:
+        """
+        지정된 seat_id에 대한 clean_seat 작업 실행.
+        작업 완료 시 결과를 되돌려줄 Future를 반환합니다.
+        외부(예: Orchestrator)에서 spin_until_future_complete로 기다리면 됩니다.
+        """
+        # ✅ Node에는 create_future가 없으므로, rclpy.task.Future로 직접 생성
+        self.task_done_future = Future()
 
-# Flask 라우트를 클래스 외부에서 정의합니다.
-@app.route('/robot/pickup', methods=['POST'])
-def pickup_handler():
-    # app.config에서 ROS 노드 인스턴스를 가져옵니다.
-    node = current_app.config['ros_node']
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'status': 'error', 'message': 'Invalid JSON'}), 400
+        # kwargs로부터 Pose2D / Pose 생성
+        book_id = str(book_id)
+        storage_id = int(kwargs.get('storage_id'))
+        shelf_approach_location = self._make_pose2d(kwargs.get('shelf_approafch_location', {}))
+        book_pick_pose = self._make_pose(kwargs.get('book_pick_pose', {}))
+        storage_approach_location = self._make_pose2d(kwargs.get('storage_approach_locaiton', {}))
+        storage_slot_pose = self._make_pose(kwargs.get('storage_slot_pose', {}))
 
-        node.get_logger().info(f'Received JSON data: {data}')
+        # Goal 전송 후, goal 응답 완료 콜백 체인 연결
+        goal_future = self.send_goal(book_id=book_id,storage_id=storage_id, shelf_approach_location=shelf_approach_location, book_pick_pose=book_pick_pose, storage_approach_location=storage_approach_location, storage_slot_pose=storage_slot_pose)
+        goal_future.add_done_callback(self.goal_response_callback)
 
-        # --- JSON 데이터 파싱 ---
-        book_id = data.get('book_id', "default_task_name")
-        book_info = data.get('book_info', {})
-        location = data.get('location', {})
-        storage_info = data.get('storage_info', {})
-        storage_id = storage_info.get('storage_id', 0)
-        shelf_info = data.get('shelf_info', {})
-        shelf_location = shelf_info.get('shelf_location', {})
-        shelf_approach_location = Pose2D(x=shelf_location.get('x', 0.0), y=shelf_location.get('y', 0.0), theta=shelf_location.get('facing', 0.0))
-        book_pick_pose = Pose(x=book_info.get('x', 0.0), y=book_info.get('y', 0.0), z=book_info.get('z', 0.0))
-        storage_approach_location = Pose2D(x=storage_info.get('location_x', 0.0), y=storage_info.get('location_y', 0.0), theta=storage_info.get('location_facing', 0.0))
-        storage_slot_pose = Pose(x=storage_info.get('pose_x', 0.0), y=storage_info.get('pose_y', 0.0), z=storage_info.get('pose_z', 0.0))
-        node.get_logger().info(f'Parsed pickup parameters: book_id={book_id}, storage_id={storage_id}')
-        # --- ROS 액션 목표 전송 ---
-        pickup_goal_future = node.pickup_send_goal(
-            book_id=book_id,
-            storage_id=storage_id,
-            book_pick_pose=book_pick_pose,
-            storage_approach_location=storage_approach_location,
-            storage_slot_pose=storage_slot_pose,
-            shelf_approach_location=shelf_approach_location
+        return self.task_done_future
+    
+    def _make_pose2d(self, d: dict) -> Pose2D:
+        p = Pose2D()
+        p.x = float(d.get('x', 0.0))
+        p.y = float(d.get('y', 0.0))
+        p.theta = float(d.get('theta', 0.0))
+        return p
+
+    def _make_pose(self, d: dict) -> Pose:
+        """
+        d = {
+          'position': {'x':..., 'y':..., 'z':...},
+          'orientation': {'x':..., 'y':..., 'z':..., 'w':...}
+        }
+        각각 없으면 기본값 사용
+        """
+        pose = Pose()
+        pos = d.get('position', {})
+        ori = d.get('orientation', {})
+
+        pose.position = Point(
+            x=float(pos.get('x', 0.0)),
+            y=float(pos.get('y', 0.0)),
+            z=float(pos.get('z', 0.0)),
         )
-        
-        if pickup_goal_future is None:
-            return jsonify({'status': 'error', 'message': 'Failed to send goal to action server.'}), 503
-
-        # 목표 전송 후, 응답을 비동기적으로 처리하기 위해 콜백을 추가합니다.
-        pickup_goal_future.add_done_callback(node.goal_response_callback)
-
-        # 여기서 액션 결과를 기다리지 않고 바로 응답합니다.
-        # 실제 작업 결과는 콜백을 통해 비동기적으로 처리됩니다.
-        return jsonify({'status': 'success', 'message': 'Pickup goal sent.'})
-
-    except Exception as e:
-        node.get_logger().error(f'Error processing /robot/pickup request: {e}')
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        pose.orientation = Quaternion(
+            x=float(ori.get('x', 0.0)),
+            y=float(ori.get('y', 0.0)),
+            z=float(ori.get('z', 0.0)),
+            w=float(ori.get('w', 1.0)),
+        )
+        return pose
     
 
 
-def main():
-    rclpy.init()
+def main(args=None):
+    rclpy.init(args=args)
 
-    # 노드를 생성할 때 네임스페이스를 명시적으로 전달합니다.
-    # 서버가 'dobby1/main' 네임스페이스에서 실행되므로 클라이언트도 동일하게 설정합니다.
-    namespace = 'dobby1/main'
-    pickup_node = PickupClient(namespace=namespace)
+    if len(sys.argv) < 3:
+        print("Usage: ros2 run javis_rcs pickup_book <robot_namespace> <book_id>")
+        return
+
+    robot_namespace = sys.argv[1]
+    book_id = sys.argv[2]
+
+    # ✅ __init__ 시그니처 수정에 맞게 사용
+    node = PickupBook(namespace=f'{robot_namespace}/main')
+
     try:
-        rclpy.spin(pickup_node)
+        node.get_logger().info(f"Starting pickup_book task for book_id: {book_id}")
+        rclpy.spin(node)
     except KeyboardInterrupt:
-        pickup_node.get_logger().info('Keyboard interrupt, shutting down.')
+        node.get_logger().info("PickupBook 노드가 종료됩니다.")
+
     finally:
-        pickup_node.destroy_node()
+        node.destroy_node()
         rclpy.shutdown()

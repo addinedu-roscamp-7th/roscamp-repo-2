@@ -10,16 +10,17 @@ def generate_launch_description():
     # 관리할 로봇의 네임스페이스 목록입니다.
     # robot_control_service.py 파일의 기본값과 동일하게 설정합니다.
     # 실행 시 변경 가능: ros2 launch javis_rcs rcs.launch.py robot_namespaces:="['dobby1', 'dobby2', 'dobby3']"
-    robot_namespaces_list = ['dobby1', 'dobby2']
+    robot_namespaces_list = ['dobby1', 'dobby2', 'kreacher']
 
     return LaunchDescription([
         Node(
             package='javis_rcs',
-            executable='robot_control_service.py',
+            executable='robot_control_service',
             name='robot_control_service',
             output='screen',
             parameters=[{
                 'robot_namespaces': robot_namespaces_list
             }]
         ),
+       
     ])
