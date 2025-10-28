@@ -1,0 +1,8 @@
+std_msgs/Header header
+string tracking_id
+bool person_detected
+geometry_msgs/Pose person_pose
+float32 distance_to_person
+float32 confidence
+bool is_lost
+float32 time_since_last_seen
