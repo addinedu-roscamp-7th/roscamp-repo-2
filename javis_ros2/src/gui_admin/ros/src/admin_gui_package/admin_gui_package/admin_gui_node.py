@@ -1,13 +1,13 @@
 import rclpy
 from rclpy.node import Node
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QMainWindow, QApplication, QTableWidget, QTableWidgetItem, QPushButton
+from PyQt5.QtWidgets import QMainWindow, QApplication, QTableWidget, QTableWidgetItem, QPushButton, QVBoxLayout, QWidget
 from PyQt5 import uic
 import sys
 import signal
 import os
 from ament_index_python.packages import get_package_share_directory
-from javis_interfaces.msg import DobbyState
+from javis_interfaces.msg import DobbyState, Scheduling
 from javis_interfaces.msg import BatteryStatus
 class AdminGUINode(Node, QMainWindow):
     def __init__(self):
@@ -90,6 +90,17 @@ class AdminGUINode(Node, QMainWindow):
             # 행 전체 선택 모드
             self.robot_status_table.setSelectionBehavior(QTableWidget.SelectRows)
 
+        # 스케줄링 탭에 테이블 위젯 추가
+        self.scheduling_tab = self.findChild(QWidget, 'tab_scheduling')
+        if self.scheduling_tab:
+            self.scheduling_table = QTableWidget()
+            scheduling_layout = QVBoxLayout(self.scheduling_tab)
+            scheduling_layout.addWidget(self.scheduling_table)
+            self.scheduling_table.setColumnCount(6)
+            self.scheduling_table.setHorizontalHeaderLabels(['No', 'Robot Name', 'Task ID', 'Priority', 'Status', 'Creation Time'])
+            self.scheduling_table.horizontalHeader().setStretchLastSection(True)
+            self.scheduling_table.setEditTriggers(QTableWidget.NoEditTriggers)
+
         # 초기에는 버튼 비활성화
         self.standby_button.setEnabled(False)
         self.autonomous_button.setEnabled(False)
@@ -130,6 +141,16 @@ class AdminGUINode(Node, QMainWindow):
             self.robot_subscriptions.append(battery_sub)
             self.get_logger().info(f"Subscribing to {battery_topic_name}")
 
+            # 3. 각 로봇의 스케줄링 토픽 구독
+            scheduling_topic_name = f'/{robot_id}/status/task_scheduling'
+            scheduling_sub = self.create_subscription(
+                Scheduling,
+                scheduling_topic_name,
+                self.scheduling_callback, # 모든 로봇의 스케줄링을 하나의 콜백으로 처리
+                10)
+            self.robot_subscriptions.append(scheduling_sub)
+            self.get_logger().info(f"Subscribing to {scheduling_topic_name}")
+
     def ros_spin_once(self):
         rclpy.spin_once(self, timeout_sec=0)
 
@@ -163,6 +184,35 @@ class AdminGUINode(Node, QMainWindow):
 
         row = self.robot_row_map[robot_id]
         self.robot_status_table.setItem(row, 2, QTableWidgetItem(f"{msg.charge_percentage:.1f}%"))
+
+    def scheduling_callback(self, msg):
+        """Scheduling 메시지를 받아 스케줄링 테이블을 업데이트하거나 새로 추가합니다."""
+        if not self.scheduling_table:
+            return
+
+        # msg.no와 동일한 'No'를 가진 행이 있는지 검색
+        found_row = -1
+        for row in range(self.scheduling_table.rowCount()):
+            no_item = self.scheduling_table.item(row, 0)
+            if no_item and no_item.text() == str(msg.no):
+                found_row = row
+                break
+
+        if found_row != -1:
+            # 기존 행이 있으면 해당 행의 위치를 사용
+            row_position = found_row
+        else:
+            # 기존 행이 없으면 새로운 행을 추가
+            row_position = self.scheduling_table.rowCount()
+            self.scheduling_table.insertRow(row_position)
+
+        # 행 데이터 설정 (추가 또는 업데이트)
+        self.scheduling_table.setItem(row_position, 0, QTableWidgetItem(str(msg.no)))
+        self.scheduling_table.setItem(row_position, 1, QTableWidgetItem(msg.robot_name))
+        self.scheduling_table.setItem(row_position, 2, QTableWidgetItem(str(msg.task_id)))
+        self.scheduling_table.setItem(row_position, 3, QTableWidgetItem(str(msg.priority)))
+        self.scheduling_table.setItem(row_position, 4, QTableWidgetItem(str(msg.status)))
+        self.scheduling_table.setItem(row_position, 5, QTableWidgetItem(msg.task_create_time))
 
     def on_robot_selection_changed(self):
         selected_items = self.robot_status_table.selectedItems()

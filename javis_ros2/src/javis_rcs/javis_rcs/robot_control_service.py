@@ -19,6 +19,7 @@ from .reshelving_book import ReshelvingBook as ReshelvingBookNode
 from .kreacher_perform import KreacherPerform as KreacherNode, get_kreacher_state
 
 class OrchestratorNode(Node):
+    no = 0
     """
     RCS(Robot Control Service)의 핵심 노드.
     여러 로봇의 상태를 모니터링하고, 작업을 할당하는 오케스트레이터 역할을 수행합니다.
@@ -126,16 +127,18 @@ class OrchestratorNode(Node):
 
             # Scheduling 메시지를 생성하고 발행합니다.
             scheduling_msg = Scheduling()
+            self.no += 1
             # task_data에서 값을 가져오거나, 없으면 기본값을 사용합니다.
-            scheduling_msg.no = task_to_assign.get('no', 0) 
+            scheduling_msg.no = self.no 
             scheduling_msg.robot_name = available_robot
-            scheduling_msg.task_id = task_to_assign.get('task_id', 0)
+            scheduling_msg.task_id = task_to_assign.get('task_name', '')
             scheduling_msg.priority = task_to_assign.get('priority', 0)
             scheduling_msg.status = 1  # 1: 작업 할당됨 (Assigned) 상태로 가정
-            scheduling_msg.task_create_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            scheduling_msg.task_create_time = self.date_str
 
             self.task_scheduling_pub.publish(scheduling_msg)
-            self.get_logger().info(f"Published scheduling message for task_id: {scheduling_msg.task_id} to robot: {scheduling_msg.robot_name}")
+            self.get_logger().info(f"Published scheduling message for task_id: {scheduling_msg.task_id} to robot: {scheduling_msg.robot_name}, no : {scheduling_msg.no}, priority : {scheduling_msg.priority}")
 
 
             self.execute_task(available_robot, task_to_assign)
@@ -220,6 +223,16 @@ class OrchestratorNode(Node):
 
             result = task_future.result()
             self.get_logger().info(f"Pickup book task for '{robot_namespace}' completed. Success : {result['success']}, Msg: '{result['message']}'")
+            if result['success']:
+                scheduling_msg = Scheduling()
+                scheduling_msg.no = self.no 
+                scheduling_msg.robot_name = robot_namespace 
+                scheduling_msg.task_id = task_data.get('task_name', '') # result에서 가져오는 대신 task_data에서 가져옵니다.
+                scheduling_msg.priority = 0
+                scheduling_msg.status = 2  # 2: 작업 완료 (Completed)
+                scheduling_msg.task_create_time = self.date_str
+                self.task_scheduling_pub.publish(scheduling_msg)
+
 
         except Exception as e:
             self.get_logger().error(f"An error occurred during pickup_book task for '{robot_namespace}': {e}")
