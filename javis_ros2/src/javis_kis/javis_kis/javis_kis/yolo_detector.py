@@ -99,7 +99,7 @@ class YoloDetector(Node):
             self.get_logger().error(f'cv_bridge 변환 실패: {e}')
             return
 
-        results = self.yolo_model(cv_image, conf=0.85, verbose=False) 
+        results = self.yolo_model(cv_image, conf=0.6, verbose=False) 
         annotated_img = results[0].plot()
 
         image_height, image_width, _ = cv_image.shape
