@@ -96,8 +96,8 @@ class AdminGUINode(Node, QMainWindow):
             self.scheduling_table = QTableWidget()
             scheduling_layout = QVBoxLayout(self.scheduling_tab)
             scheduling_layout.addWidget(self.scheduling_table)
-            self.scheduling_table.setColumnCount(6)
-            self.scheduling_table.setHorizontalHeaderLabels(['No', 'Robot Name', 'Task ID', 'Priority', 'Status', 'Creation Time'])
+            self.scheduling_table.setColumnCount(7)
+            self.scheduling_table.setHorizontalHeaderLabels(['No', 'Robot Name', 'Task ID', 'Priority', 'Status','Message', 'Creation Time'])
             self.scheduling_table.horizontalHeader().setStretchLastSection(True)
             self.scheduling_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
@@ -205,14 +205,26 @@ class AdminGUINode(Node, QMainWindow):
             # 기존 행이 없으면 새로운 행을 추가
             row_position = self.scheduling_table.rowCount()
             self.scheduling_table.insertRow(row_position)
+        self.status_str = ''
+        if msg.status == 1:
+            self.status_str = "할당됨"
+        elif msg.status == 2:
+            self.status_str = "완료됨"
+        elif msg.status == 3:
+            self.status_str = "실패"
+        elif msg.status == 4:
+            self.status_str = "진행중"
+        elif msg.status == 5:
+            self.status_str = "대기중"
 
         # 행 데이터 설정 (추가 또는 업데이트)
         self.scheduling_table.setItem(row_position, 0, QTableWidgetItem(str(msg.no)))
         self.scheduling_table.setItem(row_position, 1, QTableWidgetItem(msg.robot_name))
         self.scheduling_table.setItem(row_position, 2, QTableWidgetItem(str(msg.task_id)))
         self.scheduling_table.setItem(row_position, 3, QTableWidgetItem(str(msg.priority)))
-        self.scheduling_table.setItem(row_position, 4, QTableWidgetItem(str(msg.status)))
-        self.scheduling_table.setItem(row_position, 5, QTableWidgetItem(msg.task_create_time))
+        self.scheduling_table.setItem(row_position, 4, QTableWidgetItem(self.status_str))
+        self.scheduling_table.setItem(row_position, 5, QTableWidgetItem(str(msg.message)))
+        self.scheduling_table.setItem(row_position, 6, QTableWidgetItem(msg.task_create_time))
 
     def on_robot_selection_changed(self):
         selected_items = self.robot_status_table.selectedItems()

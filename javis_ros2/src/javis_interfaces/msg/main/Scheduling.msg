@@ -4,3 +4,4 @@ string task_id
 int32 priority
 int32 status
 string task_create_time
+string message

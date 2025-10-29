@@ -25,7 +25,7 @@ class OrchestratorNode(Node):
     여러 로봇의 상태를 모니터링하고, 작업을 할당하는 오케스트레이터 역할을 수행합니다.
     """
     def __init__(self):
-        super().__init__('robot_control_service')
+        super().__init__('robot_control_service_wait')
 
         self.declare_parameter('robot_namespaces', ['dobby1', 'dobby2', 'kreacher'])
         self.robot_namespaces = self.get_parameter('robot_namespaces').get_parameter_value().string_array_value
@@ -76,7 +76,7 @@ class OrchestratorNode(Node):
         try:
             task_data = json.loads(request.payload)
             self.get_logger().info(f"New task received: {task_data.get('task_name', 'Unknown')}")
-
+            
             self.task_queue.append(task_data)
             
             response.ok = True
@@ -105,29 +105,31 @@ class OrchestratorNode(Node):
         if not self.task_queue:
             return
        
-        task_to_assign = self.task_queue[0]
-        task_name = task_to_assign.get('task_name')
+        # 큐의 맨 앞 작업을 확인 (아직 꺼내지는 않음)
+        next_task = self.task_queue[0]
+        task_name = next_task.get('task_name')
         available_robot = None
 
         # 작업 종류에 따라 적합한 로봇을 찾습니다.
         if task_name == 'kreacher':
-            # 'kreacher' 작업은 kreacher의 상태를 직접 확인합니다.
+            # 'kreacher' 작업은 kreacher의 상태를 확인합니다.
             if get_kreacher_state():
                 available_robot = 'kreacher'
         else:
-            # 그 외 작업(dobby 작업)은 유휴 상태의 dobby 로봇을 찾습니다.
+            # 그 외 작업(dobby 작업)은 IDLE 상태의 dobby 로봇을 찾습니다.
             for ns, status in self.robot_states.items():
-                if ns != 'kreacher' and status['state'] == DobbyState.IDLE:
+                # 'dobby'로 시작하고, 상태가 IDLE인 로봇을 찾습니다.
+                if ns.startswith('dobby') and status.get('state') == DobbyState.IDLE:
                     available_robot = ns
                     break
         
         if available_robot:
-            task_to_assign = self.task_queue.popleft()
+            # 할당할 로봇을 찾았으면 큐에서 작업을 꺼냅니다.
+            task_to_assign = self.task_queue.popleft() 
             self.get_logger().info(f"Assigning task '{task_to_assign.get('task_name')}' to robot '{available_robot}'")
 
             # Scheduling 메시지를 생성하고 발행합니다.
             scheduling_msg = Scheduling()
-            self.no += 1
             # task_data에서 값을 가져오거나, 없으면 기본값을 사용합니다.
             scheduling_msg.no = self.no 
             scheduling_msg.robot_name = available_robot
@@ -144,8 +146,9 @@ class OrchestratorNode(Node):
 
             self.execute_task(available_robot, task_to_assign)
         else:
-            self.get_logger().debug("No available robots at the moment. Task remains in queue.")
-    
+            # 유휴 로봇이 없으면 작업을 큐에 남겨두고 로그를 남깁니다.
+            self.get_logger().debug(f"No available robots for task '{task_name}'. Task remains in queue.")
+            
 
     def execute_task(self, robot_namespace, task_data):
         """선택된 로봇에게 실제 작업을 지시합니다."""
@@ -296,7 +299,7 @@ class OrchestratorNode(Node):
                 scheduling_msg.robot_name = robot_namespace 
                 scheduling_msg.task_id = task_data.get('task_name', '') # result에서 가져오는 대신 task_data에서 가져옵니다.
                 scheduling_msg.priority = 0
-                scheduling_msg.status = 3  # 2: 작업 완료 (Completed)
+                scheduling_msg.status = 3  # 3: 작업 실패 (Failed)
                 scheduling_msg.task_create_time = self.date_str
                 scheduling_msg.message=result['message']
                 self.task_scheduling_pub.publish(scheduling_msg)
@@ -340,7 +343,7 @@ class OrchestratorNode(Node):
                 scheduling_msg.robot_name = robot_namespace 
                 scheduling_msg.task_id = task_data.get('task_name', '') # result에서 가져오는 대신 task_data에서 가져옵니다.
                 scheduling_msg.priority = 0
-                scheduling_msg.status = 3  # 2: 작업 완료 (Completed)
+                scheduling_msg.status = 3  # 3: 작업 실패 (Failed)
                 scheduling_msg.task_create_time = self.date_str
                 scheduling_msg.message=result['message']
                 self.task_scheduling_pub.publish(scheduling_msg)
@@ -383,7 +386,7 @@ class OrchestratorNode(Node):
                 scheduling_msg.robot_name = robot_namespace 
                 scheduling_msg.task_id = task_data.get('task_name', '') # result에서 가져오는 대신 task_data에서 가져옵니다.
                 scheduling_msg.priority = 0
-                scheduling_msg.status = 3  # 2: 작업 완료 (Completed)
+                scheduling_msg.status = 3  # 3: 작업 실패 (Failed)
                 scheduling_msg.task_create_time = self.date_str
                 scheduling_msg.message=result['message']
                 self.task_scheduling_pub.publish(scheduling_msg)
@@ -425,7 +428,7 @@ class OrchestratorNode(Node):
                 scheduling_msg.robot_name = robot_namespace 
                 scheduling_msg.task_id = task_data.get('task_name', '') # result에서 가져오는 대신 task_data에서 가져옵니다.
                 scheduling_msg.priority = 0
-                scheduling_msg.status = 3  # 2: 작업 완료 (Completed)
+                scheduling_msg.status = 3  # 3: 작업 실패 (Failed)
                 scheduling_msg.task_create_time = self.date_str
                 scheduling_msg.message=result['message']
                 self.task_scheduling_pub.publish(scheduling_msg)
