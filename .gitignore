@@ -229,7 +229,7 @@ CMakeCache.txt
 .DS_Store
 *.swp
 *.swo
-
+*.user
 
 
 
