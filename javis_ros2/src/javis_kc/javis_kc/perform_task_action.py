@@ -165,7 +165,7 @@ class PerformTaskActionServer(Node):
             if not current_coords: return
 
             pick_coords = [
-                float(self.target_coords[0] * 1000 - 70), float(self.target_coords[1] * 1000),
+                float(self.target_coords[0] * 1000 - 70), float(self.target_coords[1] * 1000 -15),
                 current_coords[2],
                 current_coords[3], current_coords[4], current_coords[5]
             ]
@@ -185,6 +185,7 @@ class PerformTaskActionServer(Node):
             self.get_logger().info("상태: [GRIPPING]")
             self.mc.set_gripper_value(0, 50)
             time.sleep(1.5)
+
             self.state = RobotState.RAISING_AFTER_PICK
 
         elif self.state == RobotState.RAISING_AFTER_PICK:
@@ -195,11 +196,14 @@ class PerformTaskActionServer(Node):
             raise_angles = [-1.14, 10.89, -63.63, -40.25, -2.02, -45.87]
             self.mc.send_angles(raise_angles, 30)
             time.sleep(1.5)
+
+            reverse_cup = [-1.14, 10.89, -63.63, -40.25, 178.0, -45.87]
+            self.mc.send_angles(reverse_cup, 30)
             self.state = RobotState.RETURNING_HOME
 
         elif self.state == RobotState.RETURNING_HOME:
             self.get_logger().info("상태: [RETURNING_HOME]")
-            self.mc.send_angles([0.0,0.0,0.0,-90.0,0.0,-45.0], 30)
+            self.mc.send_angles([0.0,0.0,0.0,-90.0, 0.0,-45.0], 30)
             time.sleep(2.5)
             # 이 상태는 루프를 종료시키는 역할이므로, 여기서 상태를 바꾸지 않음
 
