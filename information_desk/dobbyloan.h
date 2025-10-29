@@ -17,6 +17,9 @@ public:
     ~DobbyLoan();
 
 
+private slots:
+    void on_initWindowbtnClick();
+
 private:
     Ui::DobbyLoan *ui;
     QNetworkAccessManager* manager;
