@@ -1,6 +1,0 @@
-<RCC>
-    <qresource prefix="/BookSearch">
-        <file>images/Back_btn_full.png</file>
-        <file>images/Back_btn_emt.png</file>
-    </qresource>
-</RCC>

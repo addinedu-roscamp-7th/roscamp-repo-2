@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 project(information_desk LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets LinguistTools Network)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets LinguistTools Network)
 
 qt_standard_project_setup()
 
@@ -13,7 +13,7 @@ qt_add_executable(information_desk
     infodeskmain.ui
     booksearchdialog.h  booksearchdialog.ui
     booksearchdialog.cpp
-    images/resources.qrc
+
     buttonDelegate.h
     buttonDelegate.cpp
     bookinfolocation.h bookinfolocation.cpp bookinfolocation.ui
@@ -21,12 +21,9 @@ qt_add_executable(information_desk
     dobbyloan.h dobbyloan.cpp dobbyloan.ui
 
 )
-qt_add_resources(information_desk
-    "images/resources.qrc"
-)
 
 qt_add_translations(
-    TARGETS information_desk
+    information_desk
     TS_FILES information_desk_ko_KR.ts
 )
 
@@ -45,9 +42,9 @@ install(TARGETS information_desk
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-qt_generate_deploy_app_script(
-    TARGET information_desk
-    OUTPUT_SCRIPT deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
-)
-install(SCRIPT ${deploy_script})
+#qt_generate_deploy_app_script(
+#    TARGET information_desk
+#    OUTPUT_SCRIPT deploy_script
+#    NO_UNSUPPORTED_PLATFORM_ERROR
+#)
+#install(SCRIPT ${deploy_script})

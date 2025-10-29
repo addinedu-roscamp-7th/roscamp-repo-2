@@ -230,6 +230,13 @@ CMakeCache.txt
 *.swp
 *.swo
 *.user
-
-
+# 번역/배포
+*.qm
+deploy/
+# 빌드 산출물
+build/
+*.o
+*.so
+*.a
+*.dll
 
