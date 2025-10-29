@@ -37,7 +37,7 @@ class PerformTaskActionServer(Node):
 
         tf_cmd = [
             "ros2", "run", "tf2_ros", "static_transform_publisher",
-            "0.375", "0.505", "0.275", "0.0", "3.1415", "1.5707",
+            "0.31", "0.505", "0.275", "0.0", "3.1415", "1.5707",
             "base_link", "camera_link"
         ]
         subprocess.Popen(tf_cmd)
@@ -111,7 +111,7 @@ class PerformTaskActionServer(Node):
                 self.get_logger().info(f'변환된 좌표: x: {transform_xyz[0]}, y: {transform_xyz[1]}, z: {transform_xyz[2]}')
                 self.target_coords = [transform_xyz[0], transform_xyz[1], transform_xyz[2]]
 
-                self.mc.send_angles([-0.08, 2.81, -102.12, 6.76, -0.96, -40.16], 30)
+                self.mc.send_angles([0.43, 3.86, -73.3, -21.62, -1.58, -46.66], 30)
                 time.sleep(2.0)
             except tf2_ros.TransformException as ex:
                 error_msg = f'TF 변환 실패: {ex}'
@@ -165,7 +165,7 @@ class PerformTaskActionServer(Node):
             if not current_coords: return
 
             pick_coords = [
-                float(self.target_coords[0] * 1000 - 70), float(self.target_coords[1] * 1000 -15),
+                float(self.target_coords[0] * 1000 - 80), float(self.target_coords[1] * 1000 -40),
                 current_coords[2],
                 current_coords[3], current_coords[4], current_coords[5]
             ]
@@ -195,15 +195,39 @@ class PerformTaskActionServer(Node):
 
             raise_angles = [-1.14, 10.89, -63.63, -40.25, -2.02, -45.87]
             self.mc.send_angles(raise_angles, 30)
-            time.sleep(1.5)
+            time.sleep(5.0)
 
-            reverse_cup = [-1.14, 10.89, -63.63, -40.25, 178.0, -45.87]
+            reverse_cup = [-1.14, 10.89, -63.63, 140.0, -2.02, -45.87]
             self.mc.send_angles(reverse_cup, 30)
+            time.sleep(5.0)
+            ready_to_place = [91.14, -81.73, 92.54, 82.44, -0.08, -42.62]
+            self.mc.send_angles(ready_to_place, 30)
+            time.sleep(5.5)
+            close_to_dispense = [47.72, -71.19, 118.82, 51.94, -4.48, -7.64]
+            self.mc.send_angles(close_to_dispense, 30)
+            time.sleep(9.5)
+            finish_to_dispense = [85.07, -93.33, 130.42, 52.99, 1.4, -36.91]
+            self.mc.send_angles(finish_to_dispense, 30)
+            time.sleep(5.0)
+            finish_to_dispense1 = [87.36, -1.31, 6.85, 79.54, 0.96, -39.63]
+            self.mc.send_angles(finish_to_dispense1, 30)
+            time.sleep(5.0)
+            finish_to_dispense2 = [-88.41, -0.79, -1.14, 81.91, -4.39, -45.0]
+            self.mc.send_angles(finish_to_dispense2, 30)
+            time.sleep(5.0)
+            finish_to_dispense3 = [-92.19, 135.0, -83.84, 45.7, -4.74, -43.41]
+            self.mc.send_angles(finish_to_dispense3, 20)
+            time.sleep(5.0)
+            self.mc.set_gripper_value(100, 50)
+            time.sleep(5.0)
+            finish_to_dispense4 = [-89.38, 109.07, -95.97, 74.61, -2.81, -45.79]
+            self.mc.send_angles(finish_to_dispense4, 30)
+            time.sleep(3.0)
             self.state = RobotState.RETURNING_HOME
 
         elif self.state == RobotState.RETURNING_HOME:
             self.get_logger().info("상태: [RETURNING_HOME]")
-            self.mc.send_angles([0.0,0.0,0.0,-90.0, 0.0,-45.0], 30)
+            self.mc.send_angles([1.23, 4.13, 0.61, 83.58, -0.43, -43.15], 30)
             time.sleep(2.5)
             # 이 상태는 루프를 종료시키는 역할이므로, 여기서 상태를 바꾸지 않음
 
