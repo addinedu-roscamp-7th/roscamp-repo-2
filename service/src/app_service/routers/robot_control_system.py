@@ -3,7 +3,10 @@ from schemas.robot_control_system import *
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from crud import robot_control_system_CURD
-from models.Location import Location
+
+import requests
+from crud import robot_control_system_CURD as rcsc
+from schemas import robot_control_system as rcs
 
 router = APIRouter(prefix="/app", tags=["robot"])
 
@@ -14,6 +17,17 @@ def get_db():
     finally:
         db.close()
 
+#도서 픽업 작업 생성 요청
+def book_pickup_request(request: rcs.BooksPickupTask):  # 도서 픽업 작업 생성 요청
+    url = "http://192.168.0.131:8001/robot/pickup"  # RCS 서버 주소
+
+    # 요청 보내기
+    try:
+        resp = requests.post(url, json=request.model_dump())
+        print("Status code:", resp.status_code)
+        print("Response:", resp.text)
+    except requests.RequestException as e:
+        print("Request failed:", e)
 
 # 도서 정보 요청
 @router.get("/books/{ISBN}", response_model=BooksInfoResponse)

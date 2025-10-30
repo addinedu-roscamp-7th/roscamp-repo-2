@@ -1,11 +1,40 @@
 from pydantic import BaseModel
 from typing import List
-from enum import Enum
 from datetime import datetime
 
 #요청 데이터 
 
 #도서 픽업 작업 생성 요청
+class BookLoc(BaseModel):
+    x: float
+    y: float
+    z: float
+class StoragePickLoc(BaseModel):
+    x: float
+    y: float
+    z: float
+class StorageLoc(BaseModel):
+    x: float
+    y: float
+    theta: float
+class ShelfLoc(BaseModel):
+    x: float
+    y: float
+    theta: float
+
+
+class BooksPickupTask(BaseModel):
+    taskName: str
+    book_id:str
+    storage_id: int
+    book_pick_pose: BookLoc #책장의 책 위치
+    storage_approach_location: StorageLoc #픽업대 이동
+    storage_slot_pose: BookLoc #도비 보관함
+    shelf_approach_location: ShelfLoc #책장 이동
+
+
+
+#도서 정보 요청
 class BookInfo(BaseModel):
     title: str
     author: str
@@ -18,16 +47,7 @@ class Loc(BaseModel): #좌석 정리 요청 , 좌석 정리 요청, 길 안내 �
     coordinateX: float
     coordinateY: float
 
-class StorageInfo(BaseModel):
-    location: str
-    coordinateX: float
-    coordinateY: float
 
-class BooksPickupTask(BaseModel):
-    taskName: str
-    bookInfo: List[BookInfo]
-    location: List[Loc]
-    storageInfo: List[StorageInfo]
 
 #보관함 정보 업데이트
 class MemberInfo(BaseModel):

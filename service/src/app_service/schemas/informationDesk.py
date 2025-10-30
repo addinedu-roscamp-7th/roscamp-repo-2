@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from enum import Enum
 from datetime import datetime
 
@@ -52,10 +52,10 @@ class BookLocation(BaseModel):
     message: str | None = None
 
 class Loan(BaseModel):
-    loanDate: datetime
-    dueDate: datetime
-    locationName: str | None = None #픽업 대출 경우 사용
-    preparationTime: str | None = None #픽업 대출 경우 사용
+    loanDate: Optional[datetime] = None
+    dueDate: Optional[datetime] = None
+    locationName: Optional[str] | None = None #픽업 대출 경우 사용
+    preparationTime: Optional[str] | None = None #픽업 대출 경우 사용
 
 class ReserveResponse(BaseModel):
     reserveState: str

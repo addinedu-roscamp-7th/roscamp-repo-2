@@ -1,10 +1,13 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, responses as rs
 from database import SessionLocal
 from sqlalchemy.orm import Session
 from schemas.informationDesk import *
+from schemas import robot_control_system as rcs
 from crud import infodeskCRUD
 from datetime import date, timedelta
 from models.Rental import Rental
+from routers import robot_control_system as rcsr
+from crud import robot_control_system_CURD as rcsc
 router = APIRouter(prefix="/infodesk", tags=["Infodesk"])
 
 
@@ -115,9 +118,9 @@ def get_book_location(isbn: str, db:Session = Depends(get_db)):
 @router.post("/books/direct", response_model=Loan)
 def create_directLoan(
     memberID : str,
-    barcode : str,
+    _barcode : str,
     db : Session = Depends(get_db)):
-    bookMat = infodeskCRUD.get_copy_book(db, barcode)
+    bookMat = infodeskCRUD.get_copy_book(db, _barcode)
 
     if not bookMat.Barcode:
         raise HTTPException(status_code=404, detail="해당 바코드의 도서를 찾을 수 없습니다.")
@@ -162,16 +165,20 @@ def create_pickupLoan(
         if not member.MemberID:
             raise HTTPException(status_code=400, detail="해당 회원은 존재하지 않습니다.")
 
-        bookMat = infodeskCRUD.get_copy_book(db, barcode)
+        bookMat = infodeskCRUD.get_copy_book(db, barcode) #예약할 도서 재고
 
         if not bookMat.Barcode:
             raise HTTPException(status_code=404, detail="해당 바코드의 도서를 찾을 수 없습니다.")
         
-        locations = infodeskCRUD.get_box_status(db)
+        locations = infodeskCRUD.get_box_status(db) #픽업대 위치
 
         if not locations:
-            raise HTTPException(status_code=404, detail="해당 위치는 존재하지 않습니다.")
-
+            return Loan(
+            loanDate=None,
+            dueDate=None,
+            locationName="자리없음")
+    
+        #Rental 정보 생성
         copyid = bookMat.CopyID
         memberid = int(memberID)
         loan_date = date.today()
@@ -190,8 +197,32 @@ def create_pickupLoan(
             LateFee = late_fee
         )
 
-        infodeskCRUD.create_rental(db, rentalDate)
-
+        infodeskCRUD.create_rental(db, rentalDate)# 예약정보 생성
+        infodeskCRUD.update_location(db, locations.LOC_ID) #도서 상태 업데이트
+        
+        #로봇 서버에 도서 픽업 작업 생성 요청 부분
+        shelf_loc = rcsc.get_shelf_loc(db, bookMat.LOC_ID)
+        if not shelf_loc:
+            raise HTTPException(status_code=404, detail="존재하지 않은 도서 위치입니다.")
+        send_to_pickup_task = rcs.BooksPickupTask(
+            taskName="pickup_book",
+            book_id=barcode, 
+            storage_id=locations.LOC_ID,
+            book_pick_pose=rcs.BookLoc(x=0.0, y=0.0, z=0.0).model_dump(),
+            storage_approach_location=rcs.StorageLoc(
+                x=locations.CoordinateX,
+                y=locations.CoordinateY,
+                theta=locations.CoordinateZ
+            ).model_dump(),
+            storage_slot_pose=rcs.StoragePickLoc(x=0.0, y=0.0, z=0.0).model_dump(),
+            shelf_approach_location=rcs.ShelfLoc(
+                x=shelf_loc.CoordinateX,
+                y=shelf_loc.CoordinateY,
+                theta=shelf_loc.CoordinateZ
+            ).model_dump()
+        )
+        
+        rcsr.book_pickup_request(send_to_pickup_task)#로봇 서버에 요청
         return Loan(
             loanDate=loan_date,
             dueDate=due_date,
@@ -203,5 +234,9 @@ def create_pickupLoan(
     except HTTPException as e:
         return {"error":e.detail}
     
+
+
+
+
    
     

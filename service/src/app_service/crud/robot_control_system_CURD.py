@@ -1,10 +1,15 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from models.Member import Member
 from models.BookInfo import BookInfo
 from models.Book_MAT import Book_MAT
 from models.Location import Location
 from datetime import datetime
+
+#도서픽업 작업 생성 
+def get_shelf_loc(db:Session, loc_id):
+    reslut = db.query(Location).filter(Location.LOC_ID == loc_id).first()
+    if not reslut:
+        return None
+    return reslut
 
 
 # 책 정보 조회
