@@ -43,14 +43,17 @@ class PerformTaskActionServer(Node):
         ]
         subprocess.Popen(tf_cmd)
 
-        tf_gripper_tip = [
-            "ros2", "run", "tf2_ros", "static_transform_publisher",
-            "0.0566", "-0.0566", "0.005", "-0.7854", "0.0", "0.0",
-            "end_effector_link", "gripper_tip_link"
-        ]
-        subprocess.Popen(tf_gripper_tip)
+        # ==================================================================
+        # ===== 요청사항 반영: static_transform_publisher 호출 제거 =====
+        # tf_gripper_tip = [
+        #     "ros2", "run", "tf2_ros", "static_transform_publisher",
+        #     "0.0566", "-0.0566", "0.005", "-0.7854", "0.0", "0.0",
+        #     "end_effector_link", "gripper_tip_link"
+        # ]
+        # subprocess.Popen(tf_gripper_tip)
+        self.get_logger().info('정적 TF 발행기(카메라) 시작. Gripper Tip은 동적으로 계산됩니다.')
+        # ==================================================================
 
-        self.get_logger().info('myCobot 동적 TF 발행')
 
         self._action_server = ActionServer(
             self,
@@ -77,7 +80,7 @@ class PerformTaskActionServer(Node):
         # 목표 좌표 (gripper_tip_link 기준, base_link 좌표계)
         self.target_coords = [0.0, 0.0, 0.0]
         # 물체에 접근할 때의 Z축 높이 (mm)
-        self.approach_height_mm = 225.0
+        self.approach_height_mm = 260.0
         # 물체를 잡을 때 사용할 엔드 이펙터의 목표 자세 (RPY, degrees)
         self.pick_orientation_rpy = [-179.0, 0.0, -45.0]
         
@@ -122,9 +125,6 @@ class PerformTaskActionServer(Node):
                 self.get_logger().info(f'변환된 gripper_tip 목표 좌표: x: {transform_xyz[0]}, y: {transform_xyz[1]}, z: {transform_xyz[2]}')
                 self.target_coords = [transform_xyz[0], transform_xyz[1], transform_xyz[2]]
 
-                # ==================================================================
-                # ===== 요청사항 반영: end_effector_link 좌표 계산 및 send_coords 사용 =====
-                # ==================================================================
                 self.get_logger().info("계산 시작: gripper_tip 목표 지점 도달을 위한 end_effector 좌표 계산")
                 
                 # 1. Gripper가 객체 바로 위(접근 높이)에 위치할 좌표 계산
@@ -145,7 +145,6 @@ class PerformTaskActionServer(Node):
                 # 3. 계산된 좌표로 로봇 팔 이동 (기존 send_angles 대체)
                 self.mc.send_coords(approach_coords_ee, 30)
                 time.sleep(3.0)
-                # ==================================================================
 
             except tf2_ros.TransformException as ex:
                 error_msg = f'TF 변환 실패: {ex}'
@@ -181,7 +180,11 @@ class PerformTaskActionServer(Node):
 
     def _rpy_deg_to_rotation_matrix(self, rpy_deg):
         """RPY 각도(degree)를 회전 행렬(numpy array)로 변환합니다."""
-        roll, pitch, yaw = map(math.radians, rpy_deg)
+        return self._rpy_rad_to_rotation_matrix(list(map(math.radians, rpy_deg)))
+
+    def _rpy_rad_to_rotation_matrix(self, rpy_rad):
+        """RPY 각도(radian)를 회전 행렬(numpy array)로 변환합니다."""
+        roll, pitch, yaw = rpy_rad[0], rpy_rad[1], rpy_rad[2]
         
         Rx = np.array([[1, 0, 0],
                        [0, math.cos(roll), -math.sin(roll)],
@@ -218,7 +221,7 @@ class PerformTaskActionServer(Node):
         # myCobot의 send_coords 형식(mm, deg)으로 변환하여 반환
         return [
             P_end_effector[0] * 1000.0,
-            P_end_effector[1] * 1000.0 -40.0,
+            P_end_effector[1] * 1000.0 - 50.0,
             P_end_effector[2] * 1000.0,
             float(end_effector_target_rpy_deg[0]),
             float(end_effector_target_rpy_deg[1]),
@@ -242,7 +245,7 @@ class PerformTaskActionServer(Node):
             final_gripper_tip_pos = [
                 self.target_coords[0],
                 self.target_coords[1],
-                self.target_coords[2] + 0.030  # 30mm 오프셋 (미터 단위)
+                self.target_coords[2] + 0.020  # 30mm 오프셋 (미터 단위)
             ]
             
             # 최종 잡기 위치에 도달하기 위한 end_effector 좌표 계산
@@ -317,6 +320,36 @@ class PerformTaskActionServer(Node):
             cr * cp * sy - sr * sp * cy,
             cr * cp * cy + sr * sp * sy
         ]
+    
+    def rotation_matrix_to_quaternion(self, R):
+        """회전 행렬을 ROS 쿼터니언 [x, y, z, w]으로 변환합니다."""
+        tr = np.trace(R)
+        if tr > 0:
+            S = math.sqrt(tr + 1.0) * 2
+            qw = 0.25 * S
+            qx = (R[2, 1] - R[1, 2]) / S
+            qy = (R[0, 2] - R[2, 0]) / S
+            qz = (R[1, 0] - R[0, 1]) / S
+        elif (R[0, 0] > R[1, 1]) and (R[0, 0] > R[2, 2]):
+            S = math.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2
+            qw = (R[2, 1] - R[1, 2]) / S
+            qx = 0.25 * S
+            qy = (R[0, 1] + R[1, 0]) / S
+            qz = (R[0, 2] + R[2, 0]) / S
+        elif R[1, 1] > R[2, 2]:
+            S = math.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2
+            qw = (R[0, 2] - R[2, 0]) / S
+            qx = (R[0, 1] + R[1, 0]) / S
+            qy = 0.25 * S
+            qz = (R[1, 2] + R[2, 1]) / S
+        else:
+            S = math.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2
+            qw = (R[1, 0] - R[0, 1]) / S
+            qx = (R[0, 2] + R[2, 0]) / S
+            qy = (R[1, 2] + R[2, 1]) / S
+            qz = 0.25 * S
+        return [qx, qy, qz, qw]
+
 
     def quaternion_to_rotation_matrix(self, q):
         x, y, z, w = q.x, q.y, q.z, q.w
@@ -337,21 +370,55 @@ class PerformTaskActionServer(Node):
         return R @ p + t
 
     def broadcast_timer_callback(self):
+        """요청사항 반영: end_effector와 gripper_tip의 TF를 동적으로 계산하고 발행합니다."""
+        # 1. 로봇에서 현재 end_effector_link 좌표 가져오기
         coords = self.mc.get_coords()
         if not coords: return
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'base_link'
-        t.child_frame_id = 'end_effector_link'
-        t.transform.translation.x = coords[0] / 1000.0
-        t.transform.translation.y = coords[1] / 1000.0
-        t.transform.translation.z = coords[2] / 1000.0
-        q = self.rpy_to_quaternion(coords[3], coords[4], coords[5])
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
-        self.tf_broadcaster.sendTransform(t)
+
+        current_time = self.get_clock().now().to_msg()
+
+        # 2. 'end_effector_link'의 TF 발행 (기존과 동일)
+        t_ee = TransformStamped()
+        t_ee.header.stamp = current_time
+        t_ee.header.frame_id = 'base_link'
+        t_ee.child_frame_id = 'end_effector_link'
+        t_ee.transform.translation.x = coords[0] / 1000.0
+        t_ee.transform.translation.y = coords[1] / 1000.0
+        t_ee.transform.translation.z = coords[2] / 1000.0
+        q_ee = self.rpy_to_quaternion(coords[3], coords[4], coords[5])
+        t_ee.transform.rotation.x, t_ee.transform.rotation.y, t_ee.transform.rotation.z, t_ee.transform.rotation.w = q_ee
+        self.tf_broadcaster.sendTransform(t_ee)
+
+        # 3. 'gripper_tip_link'의 TF를 동적으로 계산하여 발행
+        # 수식: T(base->gripper) = T(base->ee) * T(ee->gripper)
+
+        # 3.1. T(ee->gripper) 정의: end_effector_link 기준 gripper_tip_link의 정적 변환
+        t_gripper_in_ee = np.array([0.06, -0.06, 0.005]) # x, y, z (m)
+        rpy_gripper_in_ee_rad = [0.0, 0.0, -0.7854] # roll, pitch, yaw (rad)
+        R_gripper_in_ee = self._rpy_rad_to_rotation_matrix(rpy_gripper_in_ee_rad)
+
+        # 3.2. T(base->ee) 정의: base_link 기준 end_effector_link의 실시간 변환
+        t_ee_in_base = np.array([t_ee.transform.translation.x, t_ee.transform.translation.y, t_ee.transform.translation.z])
+        R_ee_in_base = self._rpy_deg_to_rotation_matrix([coords[3], coords[4], coords[5]])
+
+        # 3.3. T(base->gripper) 계산
+        # 최종 위치 = t(base->ee) + R(base->ee) * t(ee->gripper)
+        t_gripper_in_base = t_ee_in_base + R_ee_in_base @ t_gripper_in_ee
+        # 최종 자세 = R(base->ee) * R(ee->gripper)
+        R_gripper_in_base = R_ee_in_base @ R_gripper_in_ee
+        
+        q_gripper = self.rotation_matrix_to_quaternion(R_gripper_in_base)
+
+        # 3.4. 계산된 gripper_tip_link TF 발행
+        t_gripper = TransformStamped()
+        t_gripper.header.stamp = current_time
+        t_gripper.header.frame_id = 'base_link'
+        t_gripper.child_frame_id = 'gripper_tip_link'
+        t_gripper.transform.translation.x = t_gripper_in_base[0]
+        t_gripper.transform.translation.y = t_gripper_in_base[1]
+        t_gripper.transform.translation.z = t_gripper_in_base[2]
+        t_gripper.transform.rotation.x, t_gripper.transform.rotation.y, t_gripper.transform.rotation.z, t_gripper.transform.rotation.w = q_gripper
+        self.tf_broadcaster.sendTransform(t_gripper)
 
 
 def main(args=None):
