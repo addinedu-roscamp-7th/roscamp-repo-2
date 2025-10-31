@@ -80,7 +80,7 @@ class PerformTaskActionServer(Node):
         # 목표 좌표 (gripper_tip_link 기준, base_link 좌표계)
         self.target_coords = [0.0, 0.0, 0.0]
         # 물체에 접근할 때의 Z축 높이 (mm)
-        self.approach_height_mm = 260.0
+        self.approach_height_mm = 225.0
         # 물체를 잡을 때 사용할 엔드 이펙터의 목표 자세 (RPY, degrees)
         self.pick_orientation_rpy = [-179.0, 0.0, -45.0]
         
@@ -206,7 +206,7 @@ class PerformTaskActionServer(Node):
         myCobot에 전달할 end_effector의 좌표(mm, deg)를 계산합니다.
         """
         # end_effector_link 기준 gripper_tip_link의 상대 위치 (m)
-        offset_in_ee_frame = np.array([0.0566, -0.0566, 0.005])
+        offset_in_ee_frame = np.array([0.06, -0.06, 0.005])
 
         # 목표 end_effector 자세에 대한 회전 행렬 계산
         R_base_to_ee = self._rpy_deg_to_rotation_matrix(end_effector_target_rpy_deg)
@@ -370,14 +370,12 @@ class PerformTaskActionServer(Node):
         return R @ p + t
 
     def broadcast_timer_callback(self):
-        """요청사항 반영: end_effector와 gripper_tip의 TF를 동적으로 계산하고 발행합니다."""
-        # 1. 로봇에서 현재 end_effector_link 좌표 가져오기
+        #로봇에서 현재 end_effector_link 좌표 가져오기
         coords = self.mc.get_coords()
         if not coords: return
 
         current_time = self.get_clock().now().to_msg()
 
-        # 2. 'end_effector_link'의 TF 발행 (기존과 동일)
         t_ee = TransformStamped()
         t_ee.header.stamp = current_time
         t_ee.header.frame_id = 'base_link'
