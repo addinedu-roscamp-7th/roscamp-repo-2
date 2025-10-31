@@ -1,4 +1,6 @@
+import json
 from fastapi import APIRouter, Depends, Query,HTTPException
+from models.StorageBox import StorageBox
 from schemas.robot_control_system import *
 from sqlalchemy.orm import Session
 from database import SessionLocal
@@ -77,7 +79,7 @@ def getBooksInfo(ISBN: str, db: Session = Depends(get_db)):
 # 대여에 있는 DueDate와 도서자료의 LastScan Time을 비교해야함.
 # 마지막 스캔일이 반납일 보다 지났으면 반납을 연체  9/1 9/10  9/11 
 # 마지막 스캔일이 반납일 보다 지나지 않았으면 반납 완료  9/1 9/10 9/8
-# ###
+
 @router.patch('/books/update',response_model=BooksInfoResponse)
 def updateBooksInfo(Barcode: str, lastscan: datetime, db:Session = Depends(get_db)):
     
@@ -122,6 +124,39 @@ def updateBooksInfo(Barcode: str, lastscan: datetime, db:Session = Depends(get_d
 
 
 # 보관함 정보 업데이트
-# @router.post('/storage', response_model=ResponseApp)
-# def updateBokInfo(RequestData: BoxInfoUpdate, db: Session = Depends(get_db)):
-# DB 관련 테이블 없어서 상의해야함.
+@router.post('/storage', response_model=ResponseApp)
+def updateBokInfo(request: BoxInfoUpdate, db: Session = Depends(get_db)):
+    books = request.bookInfo
+    member = request.memberInfo
+    storage = request.storage
+
+    loc_id = rcsc.get_locid(storage, db)
+
+    if not loc_id:
+        return ResponseApp(
+        message="보관함 정보 생성 실패"
+    )
+
+
+    new_box = StorageBox(
+        MemberID =member[0].memberID, 
+        LOC_ID = loc_id.LOC_ID, 
+        Status = "예약됨", 
+        Books = json.dumps([book.model_dump() for book in books])
+    )
+    rcsc.create_storage_box(new_box, db)
+    return ResponseApp(
+        message="보관함 정보 생성"
+    )
+
+#메뉴 제조 요청
+def menu_preparation_request(request: rcs.MenuRequest):  # 도서 픽업 작업 생성 요청
+    url = "http://192.168.0.131:8001/robot/order"  # RCS 서버 주소
+
+    # 요청 보내기
+    try:
+        resp = requests.post(url, json=request.model_dump())
+        print("Status code:", resp.status_code)
+        print("Response:", resp.text)
+    except requests.RequestException as e:
+        print("Request failed:", e)

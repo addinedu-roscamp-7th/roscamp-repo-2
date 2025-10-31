@@ -229,8 +229,6 @@ def create_pickupLoan(
             locationName=locations.LocationName
             #preparationTime=, 이 부분은 아직 보류
         )
-            
-        
     except HTTPException as e:
         return {"error":e.detail}
     

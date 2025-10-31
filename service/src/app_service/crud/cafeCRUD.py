@@ -25,3 +25,9 @@ def update_order_status(orderID: int,status: str,db:Session):
     db.commit()
     db.refresh(_status)
     return _status
+
+def get_orders(orderID: int, db:Session):
+    order = db.query(BeverageOrder).filter(BeverageOrder.OrderID == orderID).all()
+    if not order:
+        return None
+    return order

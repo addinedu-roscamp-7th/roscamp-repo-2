@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from models import StorageBox
 from models.BookInfo import BookInfo
 from models.Book_MAT import Book_MAT
 from models.Location import Location
@@ -38,4 +39,24 @@ def update_books_info(barcode: str, lastscan: datetime ,db:Session):
 
     return bookmat
 
-#보관함 정보 업데이트 (새로운 픽업 데이터 넣기)
+
+#보관함 정보 업데이트
+
+def get_book_id(title: str, author: str, db: Session):
+    isbn = db.query(BookInfo).filter(BookInfo.Title == title,
+                                     BookInfo.Author == author).first()
+    if not isbn:
+        return None
+    return isbn
+
+def get_locid(loc_name: str, db:Session):
+    loc = db.query(Location).filter(Location.LocationName == loc_name).first()
+    if not loc:
+        return None
+    return loc 
+
+def create_storage_box(storage: StorageBox, db:Session):
+    db.add(storage)
+    db.commit()
+    db.refresh(storage)
+    return storage

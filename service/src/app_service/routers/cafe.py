@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 from crud import cafeCRUD
 from models.BeverageOrder import BeverageOrder
+from routers.robot_control_system import menu_preparation_request
 
 router = APIRouter(prefix="/cafe", tags=["Cafe Orders"])
 
@@ -42,7 +43,10 @@ def create_order(order: Order, db: Session = Depends(get_db)):
         cafeCRUD.create_order(db, beverage)
        
         beverageorder = cafeCRUD.get_beverageOrder(db)
-   
+
+        #메뉴 제조 요청
+
+        menu_preparation_request(order)
         return OrderList(
             orderID= beverageorder.OrderID,
             orderStatus= beverageorder.OrderStatus
