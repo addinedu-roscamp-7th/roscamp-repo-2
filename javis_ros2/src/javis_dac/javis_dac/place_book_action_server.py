@@ -23,7 +23,7 @@ class PlaceBookActionServer(Node):
         self._action_server = ActionServer(
             self,
             PlaceBook,
-            'pinky1/arm/place_book',
+            'dobby1/arm/place_book',
             self.execute_callback
         )
 

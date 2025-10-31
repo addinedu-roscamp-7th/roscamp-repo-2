@@ -24,7 +24,7 @@ class PickBookActionServer(Node):
         self._action_server = ActionServer(
             self,
             PickBook,
-            'pinky1/arm/pick_book',
+            'dobby1/arm/pick_book',
             self.execute_callback
         )
 
