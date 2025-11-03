@@ -3,7 +3,7 @@ from rclpy.node import Node
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QTableWidget, QTableWidgetItem, 
                              QPushButton, QVBoxLayout, QWidget, QGraphicsView, 
-                             QGraphicsScene, QSplitter, QHBoxLayout)
+                             QGraphicsScene, QSplitter, QHBoxLayout, QGraphicsItemGroup, QGraphicsSimpleTextItem)
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QTransform, QPainterPath
 from PyQt5 import uic
 import sys
@@ -342,6 +342,12 @@ class AdminGUINode(Node, QMainWindow):
             self.map_display.update_robot_pose('amcl', msg.pose.pose)
             self.last_amcl_pose_update_time = current_time
 
+    def waypoints_callback(self, msg):
+        # 지도가 로드되었는지 먼저 확인합니다.
+        if not self.map_display.map_info:
+            return
+        self.map_display.update_waypoints(msg)
+
 
 def main(args=None):
     rclpy.init(args=args) 
@@ -378,6 +384,7 @@ class MapDisplayWidget(QGraphicsView):
 
         self.map_item = None
         self.path_item = None
+        self.waypoints_item = None # 웨이포인트 아이템 그룹
         self.robot_items = {} # robot_id: QGraphicsItem
 
         self.map_info = None
@@ -454,6 +461,42 @@ class MapDisplayWidget(QGraphicsView):
 
         pen = QPen(QColor("blue"), 0.05) # 경로 두께를 지도 스케일에 맞게 조절
         self.path_item = self.scene.addPath(path, pen)
+
+    def update_waypoints(self, path_msg: Path):
+        if self.waypoints_item:
+            self.scene.removeItem(self.waypoints_item)
+            self.waypoints_item = None
+
+        if not self.map_info or not path_msg.poses:
+            return
+
+        # QGraphicsItemGroup을 사용하여 모든 웨이포인트 그래픽을 그룹화합니다.
+        self.waypoints_item = QGraphicsItemGroup()
+        self.scene.addItem(self.waypoints_item)
+
+        pen = QPen(QColor("blue"), 0.05) # 웨이포인트 원의 테두리 펜
+
+        for i, pose_stamped in enumerate(path_msg.poses):
+            pos = pose_stamped.pose.position
+            px, py = self.world_to_scene(pos.x, pos.y)
+
+            # 웨이포인트를 원으로 표시
+            radius = 0.2 # 원의 반지름 (미터 단위)
+            ellipse = self.scene.addEllipse(px - radius, py - radius, radius * 2, radius * 2, pen, QColor(0, 0, 255, 100))
+            
+            # 웨이포인트 번호 표시
+            text = QGraphicsSimpleTextItem(str(i))
+            text.setBrush(QColor("white"))
+            font = text.font()
+            font.setPointSize(10) # 폰트 크기
+            text.setFont(font)
+            # 텍스트 위치를 원의 중심으로 조정
+            text_rect = text.boundingRect()
+            text.setPos(px - text_rect.width() / 2, py - text_rect.height() / 2)
+            
+            # 생성된 그래픽 아이템들을 그룹에 추가
+            self.waypoints_item.addToGroup(ellipse)
+            self.waypoints_item.addToGroup(text)
 
     def update_robot_pose(self, robot_id, pose):
         # 로봇 위치도 경로와 동일한 좌표 변환을 적용해야 합니다.
