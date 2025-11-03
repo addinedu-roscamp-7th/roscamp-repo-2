@@ -2,25 +2,14 @@ import rclpy
 from rclpy.action import ActionServer
 from rclpy.node import Node
 from javis_interfaces.action import PickBook
-from javis_dac.mc_singleton import MyCobotManager
-import time
-
-
-# =========================================================
-# ⚙️ 기본 설정
-# =========================================================
-
-HOME_POSE  = [180, 0, 250, -180, 0, -45]   # 초기 자세 (Z=250)
-LOWER_POSE = [180, 0, 170, -180, 0, -45]   # 하강 자세 (Z=170)
-SPEED = 25
+from javis_dac.align_vision_manager import AlignVisionManager
+import asyncio
 
 
 class PickBookActionServer(Node):
     def __init__(self):
         super().__init__('pick_book_action')
-        self.get_logger().info("✅ PickBook Action Server initializing...")
 
-        # ✅ Action 서버 초기화
         self._action_server = ActionServer(
             self,
             PickBook,
@@ -28,96 +17,143 @@ class PickBookActionServer(Node):
             self.execute_callback
         )
 
-        # 🤖 MyCobot 싱글톤 초기화
-        try:
-            self.mc = MyCobotManager.get_instance()
-            time.sleep(2.0)
-            self.get_logger().info("✅ PickBook Action Server Ready (Fixed Z-pose mode)")
-        except Exception as e:
-            self.get_logger().error(f"❌ MyCobot 초기화 실패: {e}")
-            raise
-
-    # -----------------------------------------------------
-    # 📡 보조 함수: 좌표 전송 + 현재 위치 로깅
-    # -----------------------------------------------------
-    def move_and_log(self, coords, speed, desc=""):
-        """로봇 이동 후 현재 좌표 로그"""
-        self.mc.send_coords(coords, speed, 1)
-        time.sleep(0.3)  # 전송 안정 대기
-
-        current = self.mc.get_coords()
-        if current:
-            self.get_logger().info(
-                f"🤖 {desc} 이동 완료 → "
-                f"[X={current[0]:.1f}, Y={current[1]:.1f}, Z={current[2]:.1f}, "
-                f"Rx={current[3]:.1f}, Ry={current[4]:.1f}, Rz={current[5]:.1f}]"
-            )
-        else:
-            self.get_logger().warn(f"⚠️ {desc} 이동 후 좌표를 읽지 못했습니다.")
+        self.align = AlignVisionManager.get_instance()
+        self.get_logger().info("✅ PickBookActionServer initialized.")
 
     # =========================================================
-    # 🦾 액션 실행 콜백
+    # 🔹 전체 시퀀스를 하나의 비동기 루프에서 순차 실행
     # =========================================================
     def execute_callback(self, goal_handle):
-        book_id = goal_handle.request.book_id
+        goal = goal_handle.request
         feedback = PickBook.Feedback()
-
-        def publish(status: str, desc: str):
-            feedback.current_action = f"[{status}] {desc}"
-            goal_handle.publish_feedback(feedback)
-            self.get_logger().info(feedback.current_action)
-
-        self.get_logger().info(f"📚 PickBook goal received → Book ID: {book_id}")
+        result = PickBook.Result()
+        self.get_logger().info(f"📚 PickBook goal received → Book ID: {goal.book_id}")
 
         try:
-            # 1️⃣ 초기화
-            publish("INIT", "Moving to home position...")
-            self.move_and_log(HOME_POSE, SPEED, "홈 포즈")
-
-            # 2️⃣ 하강
-            publish("LOWERING", f"Moving down to Z={LOWER_POSE[2]}mm...")
-            self.move_and_log(LOWER_POSE, SPEED, "하강")
-
-            # 3️⃣ 픽업 시뮬레이션
-            publish("PICKING", "Simulating book pickup...")
-            time.sleep(1.5)
-            current = self.mc.get_coords()
-            if current:
-                self.get_logger().info(f"📖 픽업 위치: {current}")
-
-            # 4️⃣ 상승
-            publish("RAISING", f"Returning to Z={HOME_POSE[2]}mm...")
-            self.move_and_log(HOME_POSE, SPEED, "상승")
-
-            # ✅ 성공
-            goal_handle.succeed()
-            result = PickBook.Result()
-            result.success = True
-            result.book_id = book_id
-            result.message = "✅ Fixed-pose pick sequence completed successfully."
-            self.get_logger().info(result.message)
-            return result
-
+            # 하나의 루프 생성 → 순차 실행
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(
+                self._run_pick_sequence(goal_handle, feedback, result)
+            )
+            loop.close()
         except Exception as e:
+            msg = f"❌ PickBook failed: {e}"
+            self.get_logger().error(msg)
+            feedback.current_action = msg
+            goal_handle.publish_feedback(feedback)
             goal_handle.abort()
-            result = PickBook.Result()
             result.success = False
-            result.book_id = book_id
-            result.message = f"❌ PickBook failed: {e}"
-            self.get_logger().error(result.message)
-            return result
+            result.message = str(e)
+        return result
+
+    # =========================================================
+    # 🧩 순차 실행 시퀀스 (비동기)
+    # =========================================================
+    async def _run_pick_sequence(self, goal_handle, feedback, result):
+        goal = goal_handle.request
+        
+        found_target = int(goal.book_id)
+        
+        base = [200, 0, 230., -180., 0., -45.]
+        
+        await self.align.safe_move(base, speed=40)
+        
+        feedback.current_action = "[STEP 1] 8방향 탐색 중..."
+        goal_handle.publish_feedback(feedback)
+
+        for dx, dy in [(0,0), (30,0), (-30,0), (0,30), (0,-30)]:
+            detected_id = await self.align.scan_for_marker(base, target_id=found_target, dx=dx, dy=dy)
+
+            if detected_id is None:
+                continue  # 아무것도 감지 안 됨 → 다음 위치 탐색
+
+            if detected_id == found_target:
+                print("🎯 목표 마커 찾음 → 탐색 종료")
+                break
+            else:
+                print(f"⚙️ anchor({detected_id}) 기준으로 대략 정렬 시도")
+                await self.align.approx_align_marker(detected_id)
+                break
+        
+        # --- 2️⃣ Y축 탐색 (단, 목표 마커 미발견 시에만 실행) ---
+        if found_target != detected_id:
+            feedback.current_action = "[STEP 2] Y축 탐색 시작..."
+            goal_handle.publish_feedback(feedback)
+
+            approx_pose = self.align.mc.get_coords()
+
+            for x_offset in [-20, 0, -30]:
+                print(f"📍 Y축 탐색 시작 (x_offset={x_offset})")
+                ok = await self.align.y_search_at_x(approx_pose, x_offset, found_target)
+                if ok:
+                    print(f"✅ 목표 마커(ID=3) Y축 탐색 성공 (x_offset={x_offset})")
+                    break
+
+            if not found_target:
+                raise RuntimeError("❌ Y축 탐색 실패 — 목표 마커 발견 안 됨")
+        else:
+            print("⏩ 목표 마커 감지됨 → Y축 탐색 생략")
+        
+        # 2️⃣ 중심 정렬 (step-by-step 반복)
+        feedback.current_action = "[STEP 2] Center aligning marker..."
+        goal_handle.publish_feedback(feedback)
+
+        pose = None
+        
+        align_mode = ""
+        if found_target <10:
+            align_mode = "top"
+        else:
+            align_mode = "center"
+            
+        for i in range(50):  # 최대 50 스텝까지만 시도
+            done, val = await self.align.center_align_marker_step(found_target, self.align.CENTER_TOL, mode=align_mode)
+
+            if done:
+                self.get_logger().info(f"✅ 중심 정렬 완료 ({i+1} steps)")
+                pose = val
+                break
+
+            if val is None:
+                self.get_logger().warn(f"⚠️ 중심 정렬 중단 (변화 없음 또는 인식 실패, step={i+1})")
+                break
+
+            # 각 스텝마다 피드백 전송 (실시간 모니터링용)
+            feedback.current_action = f"[STEP 2] Aligning... (step {i+1})"
+            goal_handle.publish_feedback(feedback)
+
+        if pose is None:
+            raise RuntimeError("❌ Center alignment failed or stagnant detected")
 
 
-# =========================================================
-# 🚀 메인 실행부
-# =========================================================
+        # 3️⃣ Yaw 정렬
+        feedback.current_action = "[STEP 3] Aligning yaw..."
+        goal_handle.publish_feedback(feedback)
+        self.align.align_yaw(found_target)
+
+        # 4️⃣ 책장 → 도비 이동
+        feedback.current_action = "[STEP 4] Moving book (Shelf → Dobby)..."
+        goal_handle.publish_feedback(feedback)
+        shelf_pose = self.align.mc.get_coords()
+        await self.align.transfer_book("SHELF_TO_DOBBY", shelf_pose)
+
+        # ✅ 완료
+        feedback.current_action = "[DONE] PickBook complete!"
+        goal_handle.publish_feedback(feedback)
+        goal_handle.succeed()
+        result.success = True
+        result.message = "PickBook complete."
+        self.get_logger().info("✅ PickBook sequence complete.")
+
+
 def main(args=None):
     rclpy.init(args=args)
     node = PickBookActionServer()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info("🛑 Action server stopped by user.")
+        node.get_logger().info("🛑 Stopped by user.")
     finally:
         node.destroy_node()
         rclpy.shutdown()
