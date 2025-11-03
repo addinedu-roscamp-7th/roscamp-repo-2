@@ -68,7 +68,7 @@ class PickupBook(Node):
 
     def result_callback(self, future: Future):
         result = future.result().result
-        self.get_logger().info(f'작업 완료 결과: {result.message}')
+        self.get_logger().info(f'작업 완료 결과: {result.message},{result.total_distance_m}')
         if self.task_done_future is not None and not self.task_done_future.done():
             self.task_done_future.set_result({'success': result.success, 'message': result.message})
 
