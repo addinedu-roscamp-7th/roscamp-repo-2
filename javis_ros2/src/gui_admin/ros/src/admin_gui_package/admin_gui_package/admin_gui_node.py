@@ -1,7 +1,10 @@
 import rclpy
 from rclpy.node import Node
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QMainWindow, QApplication, QTableWidget, QTableWidgetItem, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtWidgets import (QMainWindow, QApplication, QTableWidget, QTableWidgetItem, 
+                             QPushButton, QVBoxLayout, QWidget, QGraphicsView, 
+                             QGraphicsScene, QSplitter, QHBoxLayout)
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QTransform, QPainterPath
 from PyQt5 import uic
 import sys
 import signal
@@ -9,7 +12,13 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from javis_interfaces.msg import DobbyState, Scheduling
 from javis_interfaces.msg import BatteryStatus
+from nav_msgs.msg import Path, OccupancyGrid
+from geometry_msgs.msg import PoseStamped
+import numpy as np
+
 class AdminGUINode(Node, QMainWindow):
+    """Admin GUI Node to monitor and control robots."""
+
     def __init__(self):
         Node.__init__(self, 'admin_gui_node')
         QMainWindow.__init__(self)
@@ -24,10 +33,15 @@ class AdminGUINode(Node, QMainWindow):
 
         self.setWindowTitle("ROS2 Robot Monitoring GUI")
 
-        self.robot_status_table = self.findChild(QTableWidget, 'robotStatusTable')
+        # 모니터링 탭의 위젯들을 찾습니다.
+        self.monitoring_tab = self.findChild(QWidget, 'tab_monitoring')
+        self.robot_status_table = self.findChild(QTableWidget, 'robotStatusTable') 
         self.standby_button = self.findChild(QPushButton, 'standbyModeButton')
         self.autonomous_button = self.findChild(QPushButton, 'autonomousModeButton')
         
+        # 지도 표시 위젯 생성
+        self.map_display = MapDisplayWidget(self)
+
         # 로봇 ID와 테이블 행을 매핑하기 위한 딕셔너리
         self.robot_row_map = {}
         # 구독자 객체를 저장할 딕셔너리
@@ -79,6 +93,21 @@ class AdminGUINode(Node, QMainWindow):
         self.get_logger().info('Admin GUI Node setup complete.')
 
     def init_gui_widgets(self):
+        # UI 파일에 정의된 mapGraphicsView를 찾습니다.
+        map_view_placeholder = self.findChild(QGraphicsView, 'mapGraphicsView')
+        if map_view_placeholder:
+            # 부모 위젯과 레이아웃을 찾습니다.
+            parent_widget = map_view_placeholder.parentWidget()
+            layout = parent_widget.layout()
+            if layout:
+                # 기존 QGraphicsView를 레이아웃에서 제거합니다.
+                layout.removeWidget(map_view_placeholder)
+                map_view_placeholder.deleteLater() # 기존 위젯은 메모리에서 삭제
+                # 우리가 만든 MapDisplayWidget을 그 자리에 추가합니다.
+                layout.addWidget(self.map_display)
+        else:
+            self.get_logger().warn("Could not find 'mapGraphicsView' in the UI file.")
+        
         if self.robot_status_table:
             # 테이블 헤더 설정
             self.robot_status_table.setColumnCount(5)
@@ -106,6 +135,11 @@ class AdminGUINode(Node, QMainWindow):
         self.autonomous_button.setEnabled(False)
 
         self.selected_robot_id = None
+        
+        # 경로 업데이트 시간 제어를 위한 변수
+        self.last_path_update_time = self.get_clock().now()
+        # amcl_pose 업데이트 시간 제어를 위한 변수
+        self.last_amcl_pose_update_time = self.get_clock().now()
 
     def connect_signals(self):
         if self.standby_button:
@@ -150,6 +184,37 @@ class AdminGUINode(Node, QMainWindow):
                 10)
             self.robot_subscriptions.append(scheduling_sub)
             self.get_logger().info(f"Subscribing to {scheduling_topic_name}")
+
+            # 5. 각 로봇의 위치 토픽 구독
+            pose_topic_name = f'/{robot_id}/pose'
+            pose_sub = self.create_subscription(
+                PoseStamped,
+                pose_topic_name,
+                lambda msg, rid=robot_id: self.pose_callback(msg, rid),
+                10)
+            self.robot_subscriptions.append(pose_sub)
+
+        # 4. 단일 '/plan' 토픽 구독
+        path_topic_name = '/plan'
+        path_sub = self.create_subscription(
+            Path,
+            path_topic_name,
+            self.path_callback,
+            10)
+        self.robot_subscriptions.append(path_sub)
+        self.get_logger().info(f"Subscribing to {path_topic_name}")
+
+        # 6. /amcl_pose 토픽 구독
+        # /amcl_pose는 PoseWithCovarianceStamped 메시지 타입을 사용합니다.
+        from geometry_msgs.msg import PoseWithCovarianceStamped
+        amcl_pose_topic_name = '/amcl_pose'
+        amcl_pose_sub = self.create_subscription(
+            PoseWithCovarianceStamped,
+            amcl_pose_topic_name,
+            self.amcl_pose_callback,
+            10)
+        self.robot_subscriptions.append(amcl_pose_sub)
+        self.get_logger().info(f"Subscribing to {amcl_pose_topic_name}")
 
     def ros_spin_once(self):
         rclpy.spin_once(self, timeout_sec=0)
@@ -255,6 +320,29 @@ class AdminGUINode(Node, QMainWindow):
         else:
             self.get_logger().warn("모드 명령을 내릴 로봇을 먼저 테이블에서 선택하세요.")
 
+    def path_callback(self, msg):
+        # 지도가 로드되었는지 먼저 확인합니다.
+        if not self.map_display.map_info:
+            return
+        # 1초에 한 번만 경로를 업데이트하도록 조절합니다.
+        current_time = self.get_clock().now()
+        if (current_time - self.last_path_update_time).nanoseconds > 1e9: # 1초 (1*10^9 나노초)
+            self.map_display.update_path(msg)
+            self.last_path_update_time = current_time
+
+    def pose_callback(self, msg, robot_id):
+        self.map_display.update_robot_pose(robot_id, msg.pose)
+
+    def amcl_pose_callback(self, msg):
+        """/amcl_pose 토픽을 처리하여 'amcl' ID로 로봇 위치를 업데이트합니다."""
+        # 1초에 한 번만 위치를 업데이트하도록 조절합니다.
+        current_time = self.get_clock().now()
+        if (current_time - self.last_amcl_pose_update_time).nanoseconds > 1e9: # 1초 (1*10^9 나노초)
+            # PoseWithCovarianceStamped 메시지에서 Pose 정보를 추출합니다.
+            self.map_display.update_robot_pose('amcl', msg.pose.pose)
+            self.last_amcl_pose_update_time = current_time
+
+
 def main(args=None):
     rclpy.init(args=args) 
 
@@ -274,3 +362,121 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+class MapDisplayWidget(QGraphicsView):
+    """지도, 로봇 위치, 경로를 표시하는 위젯"""
+    def __init__(self, parent_node: Node):
+        super().__init__()
+        self.node = parent_node
+        self.scene = QGraphicsScene()
+        self.setScene(self.scene)
+        self.setRenderHint(QPainter.Antialiasing)
+        
+        # 사용자가 지도를 드래그하여 이동할 수 있도록 설정
+        self.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+
+        self.map_item = None
+        self.path_item = None
+        self.robot_items = {} # robot_id: QGraphicsItem
+
+        self.map_info = None
+        self.initial_map_loaded = False # 지도가 처음 로드되었는지 확인하는 플래그
+
+        # 지도 토픽 구독
+        self.map_sub = self.node.create_subscription(
+            OccupancyGrid, '/map', self.map_callback, 10)
+
+    def world_to_scene(self, world_x, world_y):
+        """월드 좌표를 QGraphicsScene 좌표로 변환합니다."""
+        if not self.map_info:
+            return world_x, world_y
+
+        origin = self.map_info.origin.position
+        resolution = self.map_info.resolution
+        map_height_m = self.map_info.height * resolution
+
+        # QImage 생성 시 Y축을 뒤집었으므로, 경로를 그릴 때도 동일한 변환을 적용해야 합니다.
+        # Scene의 Y = Map 원점 Y + (Map 높이(m) - (월드 Y - Map 원점 Y))
+        scene_y = origin.y + map_height_m - (world_y - origin.y)
+        return world_x, scene_y
+
+    def map_callback(self, msg: OccupancyGrid):
+        self.map_info = msg.info
+        width = self.map_info.width
+        height = self.map_info.height
+        resolution = self.map_info.resolution
+
+        # OccupancyGrid 데이터를 QImage로 변환
+        image = QImage(width, height, QImage.Format_ARGB32)
+        for y in range(height):
+            for x in range(width):
+                idx = y * width + x
+                occupancy = msg.data[idx]
+                if occupancy == -1: # Unknown
+                    color = QColor(200, 200, 200)
+                elif occupancy == 100: # Occupied
+                    color = QColor(0, 0, 0)
+                else: # Free
+                    color = QColor(255, 255, 255)                
+                image.setPixelColor(x, height - 1 - y, color) # Y축 반전
+
+        pixmap = QPixmap.fromImage(image)
+        if not self.map_item:
+            self.map_item = self.scene.addPixmap(pixmap)
+            self.map_item.setTransform(QTransform().scale(resolution, resolution))
+            self.map_item.setPos(self.map_info.origin.position.x, self.map_info.origin.position.y)
+
+            if not self.initial_map_loaded:
+                self.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
+                self.initial_map_loaded = True
+        else:
+            self.map_item.setPixmap(pixmap)
+        
+
+    def update_path(self, path_msg: Path):
+        if self.path_item:
+            self.scene.removeItem(self.path_item)
+        
+        if not self.map_info or not path_msg.poses:
+            return
+
+        path = QPainterPath()
+
+        start_point = path_msg.poses[0].pose.position
+        sx, sy = self.world_to_scene(start_point.x, start_point.y)
+        path.moveTo(sx, sy)
+
+        for pose_stamped in path_msg.poses[1:]:
+            pos = pose_stamped.pose.position
+            px, py = self.world_to_scene(pos.x, pos.y)
+            path.lineTo(px, py)
+
+        pen = QPen(QColor("blue"), 0.05) # 경로 두께를 지도 스케일에 맞게 조절
+        self.path_item = self.scene.addPath(path, pen)
+
+    def update_robot_pose(self, robot_id, pose):
+        # 로봇 위치도 경로와 동일한 좌표 변환을 적용해야 합니다.
+        if not self.map_info:
+            return
+
+        # 기존에 그려진 아이템이 있으면 삭제
+        if robot_id in self.robot_items:
+            self.scene.removeItem(self.robot_items[robot_id])
+
+        # 월드 좌표를 Scene 좌표로 변환
+        sx, sy = self.world_to_scene(pose.position.x, pose.position.y)
+
+        # 로봇을 원으로 표시 (크기는 지도 스케일에 맞게 조절)
+        pen = QPen(QColor("red"), 0.05)
+        self.robot_items[robot_id] = self.scene.addEllipse(sx - 0.2, sy - 0.2, 0.4, 0.4, pen, QColor("red"))
+
+    def wheelEvent(self, event):
+        """마우스 휠을 사용하여 지도를 확대/축소합니다."""
+        zoom_in_factor = 1.25
+        zoom_out_factor = 1 / zoom_in_factor
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        if event.angleDelta().y() > 0:
+            self.scale(zoom_in_factor, zoom_in_factor)
+        else:
+            self.scale(zoom_out_factor, zoom_out_factor)
