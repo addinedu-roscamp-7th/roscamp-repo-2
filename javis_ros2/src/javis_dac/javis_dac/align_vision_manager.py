@@ -37,8 +37,8 @@ class AlignVisionManager:
         self.Z_FIXED = 250.0
         self.X_SAFE_MIN, self.X_SAFE_MAX = 160, 200
         self.Y_SAFE_MIN, self.Y_SAFE_MAX = -140, 140
-        self.FORWARD_X_MM = 45.0
-        self.FORWARD_Y_MM = -10
+        self.FORWARD_X_MM = 50.0
+        self.FORWARD_Y_MM = -6
         self.PICK_Z_HALF = 180.0
         self.PICK_Z_DOWN = 150.0
         
