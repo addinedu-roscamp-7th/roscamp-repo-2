@@ -40,7 +40,7 @@ class tracking_publisher(Node):
         msg.time_since_last_seen = 0.1
 
         self.publisher.publish(msg)
-        self.get_logger().info(f'"{msg.tracking_id}" 데이터 Publish')
+        self.get_logger().info(f'"{msg.tracking_id}" 데이터 Publish', throttle_duration_sec=1.0)
 
 
 

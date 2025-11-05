@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'aruco_detect = javis_ais.aruco_detect:main',
             'javis_ai_service = javis_ais.javis_ai_service:main',
             'tracking_publish = javis_ais.tracking_publish:main',
             'trackmode_change_client = javis_ais.trackmode_change_client:main',
