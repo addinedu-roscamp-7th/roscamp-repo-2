@@ -5,7 +5,7 @@ class MyCobotManager:
     _instance = None
     _lock = threading.Lock()
 
-    PORT = "/dev/ttyUSB0"
+    PORT = "/dev/ttyJETCOBOT"
     BAUD = 1_000_000
 
     def __init__(self):

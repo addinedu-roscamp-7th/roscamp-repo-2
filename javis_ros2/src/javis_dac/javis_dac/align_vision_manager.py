@@ -37,11 +37,29 @@ class AlignVisionManager:
         self.Z_FIXED = 250.0
         self.X_SAFE_MIN, self.X_SAFE_MAX = 160, 200
         self.Y_SAFE_MIN, self.Y_SAFE_MAX = -140, 140
-        self.FORWARD_X_MM = 50.0
-        self.FORWARD_Y_MM = -15
-        self.PICK_Z_HALF = 200.0
-        self.PICK_Z_DOWN = 140.0
+        self.FORWARD_X_MM = 45.0
+        self.FORWARD_Y_MM = -10
+        self.PICK_Z_HALF = 180.0
+        self.PICK_Z_DOWN = 150.0
+        
+        self.detected_markers = []
 
+        # 슬롯 상태 (True = 채워짐 / False = 비어있음)
+        self.slot_status = {
+            1: None,
+            2: None,
+            3: None,
+        }
+
+        
+        self.book_to_shelf = {
+            1: 22,
+            2: 23,
+            3: 24,
+            4: 22,
+            5: 25,
+        }
+        
         self.K = np.array([[1200.0, 0.0, 640.0],
                            [0.0, 1200.0, 360.0],
                            [0.0, 0.0, 1.0]], np.float32)
@@ -75,6 +93,80 @@ class AlignVisionManager:
             self.detect_func = lambda gray: self.aru.detectMarkers(gray, self.dict, parameters=self.params)
 
         print("✅ AlignVisionManager initialized successfully.")
+        
+    def find_empty_slot(self):
+        """비어있는 슬롯 찾기"""
+        for slot_id, book_id in self.slot_status.items():
+            if book_id is None:
+                return slot_id
+        return None  # 모든 슬롯이 찼을 때
+
+    def add_book(self, slot_id, book_id):
+        """책을 슬롯에 배치"""
+        if self.slot_status[slot_id] is not None:
+            print(f"⚠️ Slot {slot_id} 이미 책 {self.slot_status[slot_id]} 이 있습니다!")
+            return
+        self.slot_status[slot_id] = book_id
+        print(f"📚 책 {book_id} 을(를) Slot {slot_id} 에 놓았습니다.")
+    
+    def get_slot_by_book(self, book_id):
+        """책 번호로 해당 책이 들어있는 슬롯을 찾는다"""
+        for slot_id, current_book in self.slot_status.items():
+            if current_book == book_id:
+                return slot_id
+        return None  # 찾지 못한 경우   
+    
+    def remove_book(self, slot_id):
+        """슬롯에서 책 꺼내기"""
+
+        if self.slot_status[slot_id] is None:
+            print(f"⚠️ Slot {slot_id} 은 이미 비어 있습니다.")
+            return
+        book_id = self.slot_status[slot_id]
+        self.slot_status[slot_id] = None
+        print(f"📦 책 {book_id} 을(를) Slot {slot_id} 에서 꺼냈습니다.")
+    
+    
+    def get_shelf_by_book(self, book_id):
+        """책 번호로 책장이 몇 번인지 조회"""
+        return self.book_to_shelf.get(book_id, None)
+    
+    def get_book_by_shelf(self, shelf_id):
+        """책장으로 책번호가 몇 번인지 조회"""
+        return self.book_to_shelf.get(shelf_id, None)
+    
+    def reset_detected_markers(self):
+
+        self.detected_markers = []
+        print("🧹 detected_markers 리스트가 초기화되었습니다.")
+
+    def get_marker_info(self, marker_id: int):
+        for marker in self.detected_markers:
+            if marker["id"] == marker_id:
+                print(f"🔍 검색 결과 → ID={marker_id}")
+                print(f"  pixel={marker['pixel']}, dist_pix={marker['dist_pix']:.1f}, pose={marker['pose']}")
+                return marker
+
+        print(f"❌ ID={marker_id} 마커 정보 없음")
+        return None
+
+
+    def get_all_detected_markers(self, sort_by="id"):
+
+        if not hasattr(self, "detected_markers") or not self.detected_markers:
+            print("⚠️ 감지된 마커 정보가 없습니다.")
+            return []
+
+        valid_keys = {"id", "timestamp", "dist_pix"}
+        if sort_by not in valid_keys:
+            print(f"⚠️ 알 수 없는 sort_by='{sort_by}' → 'id' 기준으로 정렬합니다.")
+            sort_by = "id"
+
+        sorted_list = sorted(self.detected_markers, key=lambda x: x.get(sort_by, 0))
+        print(f"📦 총 {len(sorted_list)}개 마커 정보 반환:")
+        for m in sorted_list:
+            print(f"  - ID={m['id']}, dist_pix={m['dist_pix']:.1f}, pose={m['pose']}")
+        return sorted_list
 
     # =========================================================
     # 📷 카메라
@@ -189,8 +281,7 @@ class AlignVisionManager:
 
     async def y_search_at_x(self, base, x_offset, target_id):
         x, y, z, rx, ry, rz = base
-        Y_STEP, Y_RANGE = 25, 100
-
+        Y_STEP, Y_RANGE = 50, 100
         print(f"\n🚦 [Y-SCAN] X offset={x_offset} → Y range {(-Y_RANGE)}~{Y_RANGE} step={Y_STEP}")
 
         for dy in range(-Y_RANGE, Y_RANGE + 1, Y_STEP):
@@ -206,69 +297,96 @@ class AlignVisionManager:
 
             gray = self.preprocess_frame(frame)
             corners, ids, _ = self.detect_func(gray)
-
             if ids is None or len(ids) == 0:
                 continue
 
             detected = [int(i) for i in ids.flatten()]
             print(f"✅ 감지된 마커 IDs: {detected}")
 
-            if target_id in detected:
-                print(f"🎯 목표 마커 {target_id} 발견 (Y offset={dy}, X offset={x_offset})")
-                return True
-        print("❌ 목표 마커 탐색 실패 (Y축 종료)")
-        return False
+            for marker_id in detected:
+                # 🎯 중심 오프셋 계산 (픽셀 기준)
+                result = self.compute_marker_offset(frame, marker_id)
+                if result is None:
+                    continue
 
+                dx, dy_px, dist_pix, (cx, cy), target_center = result
+                marker_info = {
+                    "id": marker_id,
+                    "pose": target.copy(),
+                    "dist_pix": float(dist_pix),
+                    "timestamp": time.time()
+                }
+
+                # 중복 검사: 같은 ID 있으면 더 가까운 쪽으로 교체
+                existing = next((m for m in self.detected_markers if m["id"] == marker_id), None)
+                if existing:
+                    if marker_info["dist_pix"] < existing["dist_pix"]:
+                        print(f"🔁 ID={marker_id} 갱신 (기존 {existing['dist_pix']:.1f}px → 새 {marker_info['dist_pix']:.1f}px)")
+                        self.detected_markers = [m for m in self.detected_markers if m["id"] != marker_id]
+                        self.detected_markers.append(marker_info)
+                else:
+                    self.detected_markers.append(marker_info)
+                    print(f"📦 추가: {marker_info}")
+
+                # 🎯 목표 마커면 여기서 바로 저장 후 종료
+                if marker_id == target_id:
+                    print(f"🎯 목표 마커 {target_id} 발견 (Y offset={dy}, X offset={x_offset})")
+                    print(f"💾 [Final] 목표 마커 ID={target_id} 정보 저장 완료")
+                    return True  # ✅ 즉시 탐색 종료
 
 
     # =========================================================
-    # 🔁 안전 이동 (await 기반, 이동 변화 감지 포함)
+    # 🔁 안전 이동 (await 기반, 실제 이동 변화 감지 포함)
     # =========================================================
-    async def safe_move(self, target, speed=25, tol=2.0, timeout=8.0, min_move=1.0):
+    async def safe_move(self, target, speed=25, tol=2.0, timeout=8.0, move_tol=2.0):
         """
         send_coords 후 이동 완료될 때까지 비동기 대기.
         이동 전/후 좌표 변화를 감지해 실제로 움직였는지 판단함.
+        - 이동 전/후 거리(diff)가 move_tol(mm) 미만이면 '이동 실패'로 간주.
         """
-        # 🏁 이동 명령 전 좌표 기록
-        start_coords = self.mc.get_coords()
-        if start_coords is None:
-            print("⚠️ [safe_move] 초기 좌표 읽기 실패")
+        print(f"\n➡️ [safe_move] 이동 명령: {target} (speed={speed})")
+
+        # 🏁 이동 전 좌표 기록
+        start_pose = self.mc.get_coords()
+        if start_pose is None:
+            print("⚠️ [safe_move] 초기 좌표 읽기 실패 (None 반환)")
             return False
 
+        # 명령 전송
         self.mc.send_coords(target, speed, 1)
         start_time = time.time()
-        last_coords = start_coords
 
+        # 이동 완료 대기 루프
         while time.time() - start_time < timeout:
-            coords = self.mc.get_coords()
-            if coords is None:
-                await asyncio.sleep(0.1)
-                continue
+            moving = self.mc.is_moving()
+            if moving == 0:  # 모션 종료 감지
+                break
+            await asyncio.sleep(0.3)
 
-            # 1️⃣ 목표 근접 여부 검사
-            diff_target = np.linalg.norm(np.array(coords[:3]) - np.array(target[:3]))
-            if diff_target < tol:
-                print(f"✅ [safe_move] 목표 근처 도착 (diff={diff_target:.2f})")
-                return True
+        # 이동 후 좌표 확인
+        end_pose = self.mc.get_coords()
+        if end_pose is None:
+            print("⚠️ [safe_move] 이동 후 좌표 읽기 실패")
+            return False
 
-            # 2️⃣ 실제 이동 여부 검사
-            diff_move = np.linalg.norm(np.array(coords[:3]) - np.array(last_coords[:3]))
-            if diff_move > min_move:
-                last_coords = coords  # 움직였으면 갱신
-            else:
-                print(f"⚠️ [safe_move] 좌표 변화 없음 ({diff_move:.2f}mm) → 대기 중...")
+        # 이동 거리 계산
+        diff = np.linalg.norm(np.array(end_pose[:3]) - np.array(start_pose[:3]))
+        print(f"📏 [safe_move] 실제 이동 거리: {diff:.2f} mm")
 
-            await asyncio.sleep(0.2)
+        if diff < move_tol:
+            print(f"❌ [safe_move] 이동 변화 미미 ({diff:.2f}mm) → 실패 간주")
+            return False
 
-        # 타임아웃 시, 최종 비교
-        end_coords = self.mc.get_coords()
-        total_move = np.linalg.norm(np.array(end_coords[:3]) - np.array(start_coords[:3]))
-        if total_move > min_move:
-            print(f"⚠️ [safe_move] 타임아웃이지만 이동 감지됨 ({total_move:.2f}mm)")
-            return True
+        # 목표 근접 확인
+        diff_target = np.linalg.norm(np.array(end_pose[:3]) - np.array(target[:3]))
+        if diff_target < tol:
+            print(f"✅ [safe_move] 목표 근처 도착 (diff={diff_target:.2f}mm)")
+        else:
+            print(f"⚠️ [safe_move] 목표까지 거리 남음: {diff_target:.2f}mm")
 
-        print(f"❌ [safe_move] Timeout — 이동 없음 ({total_move:.2f}mm)")
-        return False
+        print("✅ [safe_move] 이동 완료 (좌표 변화 정상)")
+        return True
+
 
     # =========================================================
     # 🎯 대략 정렬
@@ -285,7 +403,7 @@ class AlignVisionManager:
                 print("⚠️ [approx_align_marker] 프레임 없음 — 재시도")
                 continue
 
-            result = self.compute_marker_offset(frame, marker_id, "center")
+            result = self.compute_marker_offset(frame, marker_id)
             if result is None:
                 print(f"⚠️ 마커 {marker_id} 인식 실패 — 재시도")
                 continue
@@ -324,42 +442,48 @@ class AlignVisionManager:
             time.sleep(self.SETTLE_WAIT)
 
     # =========================================================
-    # 📐 중심 계산
+    # 📐 화면 중심과 아르코마커간 거리 계산
     # =========================================================
-    def compute_marker_offset(self, frame, marker_id, mode="center"):
+    def compute_marker_offset(self, frame, marker_id):
+        if marker_id >= 20:
+            mode = "center"   # 책장
+        else:
+            mode = "top"      # 책
+        
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = self.detect_func(gray)
+
         if ids is None or marker_id not in ids.flatten():
             return None
         idx = list(ids.flatten()).index(marker_id)
-        corner = corners[idx][0]
-        cx = np.mean(corner[:, 0])
-        cy = np.mean(corner[:, 1])
-        h, w = gray.shape[:2]
-        target = (w / 2, h / 2)
-        dx = cx - target[0]
-        dy = cy - target[1]
-        dist_pix = math.sqrt(dx ** 2 + dy ** 2)
-        return dx, dy, dist_pix, (cx, cy), target
+        pts = corners[idx][0]
+        target = np.mean([pts[0], pts[1]], axis=0) if mode == "top" else np.mean(pts, axis=0)
+        target = target.astype(int)
+        h, w = frame.shape[:2]
+        cx, cy = w // 2, h // 2
+        dx, dy = target[0] - cx, target[1] - cy
+        dist_pix = np.hypot(dx, dy)
+        return dx, dy, dist_pix, (cx, cy), tuple(target)
 
     # =========================================================
     # 🎯 중심 정렬 (1스텝 단위, safe_move + 정체 감지 포함)
     # =========================================================
-    async def center_align_marker_step(self, marker_id, center_tol, mode):
+    async def center_align_marker_step(self, marker_info, center_tol):
        
-        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] mode: {mode} — Center aligning marker step (ID={marker_id})")
+        coords = self.mc.get_coords()
+        await self.safe_move(coords, speed=self.SPEED)
        
-        for _ in range(3):
-            self.cap.grab()
+        print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Center aligning marker step (ID={marker_info["id"]})")
+       
         frame = self.get_latest_frame(caller="center_align_marker")
         
         if frame is None:
             print("⚠️ 프레임 없음 — skip")
             return None, None
 
-        result = self.compute_marker_offset(frame, marker_id, mode)
+        result = self.compute_marker_offset(frame, marker_info["id"])
         if result is None:
-            print(f"⚠️ 마커 {marker_id} 인식 실패")
+            print(f"⚠️ 마커 {marker_info["id"]} 인식 실패")
             return None, None
 
         dx, dy, dist_pix, (cx, cy), target = result
@@ -405,9 +529,6 @@ class AlignVisionManager:
 
         return False, dist_pix
 
-
-
-
     # =========================================================
     # 🧭 Yaw 정렬
     # =========================================================
@@ -436,13 +557,14 @@ class AlignVisionManager:
         R, _ = cv2.Rodrigues(rvec)
         yaw = np.degrees(np.arctan2(R[1, 0], R[0, 0]))
         print(f"📐 감지된 Yaw: {yaw:.2f}°")
-
+        
         angles = self.mc.get_angles()
         if angles is None:
             print("❌ 관절 각도 읽기 실패")
             return False
-
+        
         angles[5] += yaw
+        
         self.mc.send_angles(angles, self.SPEED)
         print(f"🧭 Yaw {yaw:.2f}° 보정 중...")
         time.sleep(self.SETTLE_WAIT + 0.5)
@@ -477,7 +599,7 @@ class AlignVisionManager:
     # =========================================================
     # 📦 도비 ↔ 책장 통합 이동 함수 (프로젝트 맞춤형)
     # =========================================================
-    async def transfer_book(self, mode, shelf_pose):
+    async def transfer_book(self, mode, shelf_pose, arco_id):
         """
         도비 저장소 <-> 책장 간 전송 시퀀스
         mode: "DOBBY_TO_SHELF" or "SHELF_TO_DOBBY"
@@ -487,16 +609,45 @@ class AlignVisionManager:
 
         home = [200, 0, 230., -180., 0., -45.]
 
-        pose0 = [18.8, -26.36, -18.45, -45.61, 0.26, -26.36]
-        pose1 = [-166, -11.42, -58.09, -15.9, 1.4, -31.2]
-        pose2 = [-166, -50.8, -60.09, 20.3, 5.53, -32.6]
-        pose3 = [-166, -62.75, -58.44, 30.76, 3.51, -30.41]
-        poses = [pose0, pose1, pose2, pose3]
+        # 슬롯별 단계별 관절 포즈
+        SLOT_POSES = {
+            1: [
+                [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
+                [-140.71, -34.01, -17.66, -38.58, 3.95, -9.93],
+                [-149.06, -45.35, -48.16, 7.29, 5.62, -12.56],
+                [-149.32, -58.35, -64.51, 36.73, 5.44, -12.56],
+            ],
+            2: [
+                [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
+                [-165.67, -11.33, -58.0, -15.64, 1.58, -31.28],
+                [-164.79, -45.0, -49.83, 5.71, 6.15, -28.47],
+                [-165.05, -57.56, -65.91, 35.33, 5.62, -28.47],
+            ],
+            3: [
+                [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
+                [166.64, -44.12, -1.05, -46.23, 4.92, -59.15],
+                [167.08, -72.68, 0.35, -14.76, 6.5, -54.14],
+                [166.81, -87.8, 1.14, -2.72, 6.32, -54.84]
+            ],
+        }
 
+        
+        
         # =========================================================
         # 🟦 도비 → 책장
         # =========================================================
         if mode == "DOBBY_TO_SHELF":
+            
+            book_id = self.get_book_by_shelf(self, arco_id)
+            
+            carrier_slot_id = self.get_slot_by_book(book_id)
+            
+            if carrier_slot_id is None:
+                print(f"❌ 책 ID={book_id} 에 해당하는 슬롯을 찾을 수 없습니다!")
+                return False
+            
+            poses = SLOT_POSES.get(carrier_slot_id)
+            
             print("🚗 [도비 → 책장] 전송 시퀀스 시작")
             
             self.mc.set_gripper_value(100, 50)
@@ -525,7 +676,7 @@ class AlignVisionManager:
             print("📍 책 위치로 이동 중...")
 
             approach = self.mc.get_coords()
-            approach[0] += self.FORWARD_X_MM
+            approach[0] += self.FORWARD_X_MM - 3.5
             approach[1] += self.FORWARD_Y_MM
             approach[2] = self.PICK_Z_HALF
             await self.safe_move(approach, speed=25)
@@ -538,66 +689,101 @@ class AlignVisionManager:
             print("📗 책 배치 완료")
 
             await self.safe_move(shelf_pose, speed=30)
+            
+            self.remove_book(carrier_slot_id, book_id)
+            
             print("✅ 도비→책장 완료")
 
         # =========================================================
         # 🟥 책장 → 도비
         # =========================================================
         elif mode == "SHELF_TO_DOBBY":
-            print("📕 [책장 → 도비] 시퀀스 시작")
+            print("\n==============================")
+            print(f"📦 [SHELF_TO_DOBBY] 시작 — arco_id={arco_id}")
+            print("==============================")
+
+            carrier_slot_id = self.find_empty_slot()
+            print(f"🔍 선택된 빈 슬롯: {carrier_slot_id}")
+
+            if carrier_slot_id is None:
+                print("❌ 비어있는 슬롯이 없습니다!")
+                return False
             
+            poses = SLOT_POSES.get(carrier_slot_id)
+            if poses is None:
+                print(f"⚠️ SLOT_POSES[{carrier_slot_id}] 없음 — 시퀀스 종료")
+                return False
+            
+            print(f"📕 [책장 → 도비] 시퀀스 시작 (slot={carrier_slot_id})")
+
             self.mc.set_gripper_value(100, 50)
-            print("🤏 그리퍼 열림")
-            
+            print("🤏 그리퍼 열림 (책 잡기 전)")
+
+            print(f"➡️ 1️⃣ 책장 위치로 이동: shelf_pose={shelf_pose}")
             await self.safe_move(shelf_pose, speed=30)
             time.sleep(self.SETTLE_WAIT)
-            print("📍 책 위치로 이동 중...")
+            print("📍 책 위치로 접근 중...")
 
             approach = self.mc.get_coords()
-            approach[0] += self.FORWARD_X_MM + 2
+            print(f"📸 현재 좌표 (approach 전): {approach}")
+            approach[0] += self.FORWARD_X_MM
             approach[1] += self.FORWARD_Y_MM
             approach[2] = self.PICK_Z_HALF
+            print(f"➡️ 접근 좌표 (FORWARD 적용): {approach}")
             await self.safe_move(approach, speed=25)
 
             final_down = self.mc.get_coords()
             final_down[2] = self.PICK_Z_DOWN
+            print(f"⬇️ 최종 하강 좌표: {final_down}")
             await self.safe_move(final_down, speed=25)
 
             self.mc.set_gripper_value(0, 50)
-            print("📕 책 집기 완료")
+            print("📕 책 집기 완료 (그리퍼 닫힘)")
 
             lift = self.mc.get_coords()
-            lift[2] = self.PICK_Z_HALF + 2
-            self.safe_move(lift, speed=25)
+            lift[2] = self.PICK_Z_HALF
+            print(f"⬆️ 리프트 좌표: {lift}")
+            await self.safe_move(lift, speed=25)
 
-            # 6️⃣ 도비 복귀 단계별 이동
+            time.sleep(1.0)
+            print("🦾 도비 슬롯 복귀 시작 (단계별 이동)")
 
-            await self.send_angles_sync(poses[0], 50)
+            print("  ▶ 1단계 → poses[0]")
+            await self.send_angles_sync(poses[0], 10)
 
+            print("  ▶ 2단계 → poses[1]")
             await self.send_angles_sync(poses[1], 50)
 
+            print("  ▶ 3단계 → poses[2]")
             await self.send_angles_sync(poses[2], 30)
 
+            print("  ▶ 4단계 → poses[3]")
             await self.send_angles_sync(poses[3], 30)
-                
+
             self.mc.set_gripper_value(100, 50)
-            
+            print("🤏 그리퍼 열림 (책 내려놓기 전)")
+
             time.sleep(1.0)
-            
+
+            print("  ◀ 복귀 경로 되돌리기 시작")
             await self.send_angles_sync(poses[2], 30)
-            
             await self.send_angles_sync(poses[1], 30)
-            
             await self.send_angles_sync(poses[0], 30)
-            
+            print("✅ 도비 슬롯 복귀 완료")
+
+            self.add_book(carrier_slot_id, arco_id)
+            print(f"📚 Slot {carrier_slot_id} 에 책 {arco_id} 등록 완료")
+            print("📦 도비 내부 슬롯 상태:", self.slot_status)
 
         else:
             print(f"❌ 잘못된 mode 값: {mode}")
             return False
 
         # 홈 복귀
+        print("🏠 홈 포즈 복귀 중...")
         await self.safe_move(home, speed=30)
-        print("🏠 홈 복귀 완료")
+        print("🏁 홈 복귀 완료 (Transfer 종료)")
+        print("==============================\n")
         return True
 
 
