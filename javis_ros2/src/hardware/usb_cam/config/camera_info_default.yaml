@@ -1,0 +1,26 @@
+image_width: 640
+image_height: 480
+camera_name: dobbycam
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [475.42043,   0.     , 318.25786,
+           0.     , 476.55896, 257.87224,
+           0.     ,   0.     ,   1.     ]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.006456, -0.046534, -0.000181, 0.002512, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [469.20477,   0.     , 319.9416 ,   0.     ,
+           0.     , 474.26006, 258.09665,   0.     ,
+           0.     ,   0.     ,   1.     ,   0.     ]

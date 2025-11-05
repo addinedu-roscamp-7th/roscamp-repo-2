@@ -1,0 +1,1 @@
+SUBSYSTEM=="video4linux", ATTRS{idProduct}=="4831", ATTRS{idVendor}=="17ef", KERNEL=="video[02468]", MODE="0666", GROUP="video", SYMLINK+="front_cam"
