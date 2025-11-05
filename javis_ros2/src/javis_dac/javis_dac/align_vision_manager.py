@@ -144,7 +144,6 @@ class AlignVisionManager:
         for marker in self.detected_markers:
             if marker["id"] == marker_id:
                 print(f"🔍 검색 결과 → ID={marker_id}")
-                print(f"  pixel={marker['pixel']}, dist_pix={marker['dist_pix']:.1f}, pose={marker['pose']}")
                 return marker
 
         print(f"❌ ID={marker_id} 마커 정보 없음")
