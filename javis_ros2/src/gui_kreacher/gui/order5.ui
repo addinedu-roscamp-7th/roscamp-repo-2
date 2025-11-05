@@ -6,20 +6,52 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>640</width>
-    <height>480</height>
+    <width>800</width>
+    <height>600</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Kreacher's Cafe - 주문 완료</string>
+  </property>
+  <property name="styleSheet">
+   <string>QMainWindow {
+    background-color: #F5E6D3;
+   }
+   QPushButton {
+    background-color: #8B4513;
+    color: white;
+    border-radius: 10px;
+    font-size: 14pt;
+    padding: 5px;
+   }
+   QPushButton:hover {
+    background-color: #A0522D;
+   }
+   QTextEdit {
+    background: transparent;
+    border: none;
+   }</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QTextEdit" name="textEdit">
+   <widget class="QPushButton" name="orderButton">
     <property name="geometry">
      <rect>
-      <x>230</x>
-      <y>110</y>
-      <width>181</width>
+      <x>300</x>
+      <y>380</y>
+      <width>200</width>
+      <height>80</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>🛒 새로 주문하기</string>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="textEdit_3">
+    <property name="geometry">
+     <rect>
+      <x>250</x>
+      <y>50</y>
+      <width>301</width>
       <height>70</height>
      </rect>
     </property>
@@ -28,21 +60,24 @@
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Ubuntu Sans'; font-size:11pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;주문 번호 001 제작완료&lt;/p&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;1번 픽업대&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'Helvetica'; font-size:24pt; font-weight:600; color:#4a2511;&quot;&gt;주문 완료&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="pushButton">
+   <widget class="QTextEdit" name="textEdit">
     <property name="geometry">
      <rect>
-      <x>240</x>
-      <y>280</y>
-      <width>161</width>
-      <height>81</height>
+      <x>200</x>
+      <y>150</y>
+      <width>401</width>
+      <height>181</height>
      </rect>
     </property>
-    <property name="text">
-     <string>주문하기</string>
+    <property name="html">
+     <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Ubuntu Sans'; font-size:11pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'Helvetica'; font-size:18pt; color:#4a2511;&quot;&gt;주문번호: 001&lt;br /&gt;1번 픽업대에서 음료를 받아가세요.&lt;br /&gt;&lt;br /&gt;다음 주문은 아래 버튼을 눌러주세요.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
     </property>
    </widget>
   </widget>
@@ -51,7 +86,7 @@ p, li { white-space: pre-wrap; }
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>640</width>
+     <width>800</width>
      <height>24</height>
     </rect>
    </property>

@@ -6,34 +6,82 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>640</width>
-    <height>480</height>
+    <width>800</width>
+    <height>600</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Kreacher's Cafe</string>
+  </property>
+  <property name="styleSheet">
+   <string>QMainWindow {
+    background-color: #F5E6D3;
+   }
+   QPushButton {
+    background-color: #8B4513;
+    color: white;
+    border-radius: 10px;
+    font-size: 16pt;
+    font-weight: bold;
+   }
+   QPushButton:hover {
+    background-color: #A0522D;
+   }
+   QTextEdit {
+    background: transparent;
+    border: none;
+   }</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QPushButton" name="pushButton">
     <property name="geometry">
      <rect>
-      <x>230</x>
-      <y>290</y>
-      <width>171</width>
-      <height>101</height>
+      <x>300</x>
+      <y>400</y>
+      <width>200</width>
+      <height>80</height>
      </rect>
     </property>
     <property name="text">
      <string>주문하기</string>
     </property>
    </widget>
-   <widget class="QTextEdit" name="textEdit">
+   <widget class="QLabel" name="todaySpecial">
     <property name="geometry">
      <rect>
-      <x>230</x>
-      <y>70</y>
-      <width>181</width>
-      <height>41</height>
+      <x>250</x>
+      <y>250</y>
+      <width>300</width>
+      <height>100</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string>
+      QLabel {
+       background-color: rgba(139, 69, 19, 0.1);
+       border-radius: 15px;
+       padding: 10px;
+       color: #4A2511;
+       font-size: 14pt;
+      }
+     </string>
+    </property>
+    <property name="text">
+     <string>🌟 오늘의 추천 메뉴 🌟
+아이스아메리카노
+1,500원</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="textEdit_2">
+    <property name="geometry">
+     <rect>
+      <x>120</x>
+      <y>90</y>
+      <width>541</width>
+      <height>111</height>
      </rect>
     </property>
     <property name="html">
@@ -41,7 +89,8 @@
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Ubuntu Sans'; font-size:11pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:18pt;&quot;&gt;Kreacher's cafe&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'Helvetica'; font-size:32pt; font-weight:600; color:#4a2511;&quot;&gt;         Kreacher's Cafe&lt;/span&gt;&lt;/p&gt;
+&lt;p align=&quot;center&quot; style=&quot; margin-top:10px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'Helvetica'; font-size:14pt; color:#6b4423;&quot;&gt;마법같은 맛과 향의 특별한 공간&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
     </property>
    </widget>
   </widget>
@@ -50,7 +99,7 @@ p, li { white-space: pre-wrap; }
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>640</width>
+     <width>800</width>
      <height>24</height>
     </rect>
    </property>

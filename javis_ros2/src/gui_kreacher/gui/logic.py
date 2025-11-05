@@ -22,43 +22,33 @@ class CafeApp(QMainWindow):
         
     def show_order_page(self):
         uic.loadUi('order.ui', self)
-        self.pushButton.clicked.connect(self.order_boongboong)
-        self.pushButton_2.clicked.connect(self.order_americano)
-        self.pushButton_3.clicked.connect(self.go_home)
-        
-    def order_boongboong(self):
-        self.statusbar.showMessage("붕붕 드링크는 매진되었습니다!", 3000)
+        # 붕붕드링크 버튼은 비활성화 상태이므로 연결하지 않음
+        self.americanoBtn.clicked.connect(self.order_americano)  # 아메리카노 버튼
+        self.homeButton.clicked.connect(self.go_home)  # 홈으로 버튼
         
     def order_americano(self):
         self.drink_type = None
         uic.loadUi('order2.ui', self)
-        self.pushButton_2.clicked.connect(self.select_ice)
-        self.pushButton.clicked.connect(self.select_hot)
-        self.pushButton_5.clicked.connect(self.go_home)
+        self.iceButton.clicked.connect(self.select_ice)  # ICE 버튼
+        self.hotButton.clicked.connect(self.select_hot)  # HOT 버튼
+        self.homeButton.clicked.connect(self.go_home)  # 홈으로 버튼
     
     def select_ice(self):
         self.drink_type = '아이스'
-        self.statusbar.showMessage("아이스 선택됨", 2000)
-        self.check_and_proceed()
+        self.statusbar.showMessage("ICE 아메리카노가 선택되었습니다", 1000)
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(1000, self.go_to_order3)
     
     def select_hot(self):
         self.drink_type = '핫'
-        self.statusbar.showMessage("핫 선택됨", 2000)
-        self.check_and_proceed()
-    
-    def check_and_proceed(self):
-        if self.drink_type is not None:
-            self.statusbar.showMessage(
-                f"'{self.drink_type}' 선택 완료", 
-                2000
-            )
-            from PyQt5.QtCore import QTimer
-            QTimer.singleShot(1000, self.go_to_order3)
+        self.statusbar.showMessage("HOT 아메리카노가 선택되었습니다", 1000)
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(1000, self.go_to_order3)
 
     def go_to_order3(self):
         uic.loadUi('order3.ui', self)
-        self.pushButton_3.clicked.connect(self.go_home)
-        self.pushButton.clicked.connect(self.go_to_order4)
+        self.homeButton.clicked.connect(self.go_home)
+        self.payButton.clicked.connect(self.go_to_order4)
     
     def go_to_order4(self):
         self.statusbar.showMessage("주문 처리중...", 2000)
@@ -139,8 +129,12 @@ class CafeApp(QMainWindow):
         reply.deleteLater()
 
     def go_home(self):
+        # 모든 화면에서 홈으로 돌아가기 기능
         uic.loadUi('main0.ui', self)
         self.pushButton.clicked.connect(self.show_order_page)
+        # 상태 초기화
+        self.drink_type = None
+        self.statusbar.clearMessage()
 
 
 if __name__ == '__main__':
