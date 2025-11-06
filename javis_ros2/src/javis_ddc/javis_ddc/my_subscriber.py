@@ -13,7 +13,8 @@ class TurtlesimSubscriber(Node):
         # self.subcriptions
 
     def callback(self, msg):
-        self.get_logger().info(f'tracking_id: {msg.tracking_id}\n, person_detected: {msg.person_detected}\n')
+        self.get_logger().info
+        (f'tracking_id: {msg.tracking_id}\n, person_detected: {msg.person_detected}\n, distance_to_person: {msg.distance_to_person}')
 
 def main(args = None):
     rp.init(args = args)

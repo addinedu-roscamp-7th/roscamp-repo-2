@@ -11,7 +11,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    # javis_ddc/setup.py (일부)
+    install_requires=['setuptools', 'rclpy', 'cv_bridge', 'numpy', 'opencv-python', 'pyyaml', 'nav2_simple_commander', 'torch', 'torchvision', 'dlib'],
     zip_safe=True,
     maintainer='addinedu',
     maintainer_email='addinedu@todo.todo',
@@ -26,7 +27,9 @@ setup(
         'console_scripts': [
             'ddc_node = javis_ddc.ddc_node:main',
             'my_subscriber = javis_ddc.my_subscriber:main',
-            'pose_publisher = javis_ddc.pose_publisher:main'
+            'pose_publisher = javis_ddc.pose_publisher:main',
+            'move_to_bookshelf = javis_ddc.move_to_bookshelf:main',
+            'detectTracking = javis_ddc.detectTracking:main',
         ],
     },
 )
