@@ -10,6 +10,7 @@ from cv_bridge import CvBridge
 # Pose 메시지 및 쿼터니언 변환을 위한 라이브러리
 from geometry_msgs.msg import PoseArray, Pose
 from scipy.spatial.transform import Rotation as R
+from javis_interfaces.msg import ArucoDockingData
 
 class ArucoDetector(Node):
     def __init__(self):
@@ -39,6 +40,12 @@ class ArucoDetector(Node):
             10
         )
 
+        self.aruco_docking_pub = self.create_publisher(
+            ArucoDockingData,
+            '/aruco_docking_data',
+            10
+        )
+
         self.camera_matrix = None
         self.dist_coeffs = None
         self.marker_size = 0.05
@@ -47,8 +54,9 @@ class ArucoDetector(Node):
         self.aruco_params = aruco.DetectorParameters()
         self.detector = aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
 
-        self.preview_window_name = "Dobby Aruco Preview"
-        cv2.namedWindow(self.preview_window_name, cv2.WINDOW_AUTOSIZE)
+        # 팝업창(Preview) 표시가 필요할 경우 아래 주석 해제
+        # self.preview_window_name = "Dobby Aruco Preview"
+        # cv2.namedWindow(self.preview_window_name, cv2.WINDOW_AUTOSIZE)
         
         self.get_logger().info("ArUco Detector (Pose Publishing) a-node started.")
 
@@ -131,6 +139,11 @@ class ArucoDetector(Node):
                 # ids는 [[10], [20]] 같은 형식이므로 ids[i][0]으로 ID를 가져옵니다.
                 marker_id = ids[i][0]
 
+                # marker id < 10은 버림
+                if marker_id < 10:
+                    self.get_logger().info(f"Ignoring marker ID: {marker_id} (using 10+)")
+                    continue  # 현재 반복을 중단하고 다음 마커로 넘어갑니다.
+
                 # [추가] 로그를 찍기 위해 Pose 메시지의 쿼터니언으로부터 Euler 각도 계산
                 quat_from_msg = [
                     pose_msg.orientation.x,
@@ -155,9 +168,14 @@ class ArucoDetector(Node):
                 self.get_logger().info(f'  >> Roll (끄덕임) [X]: {roll_deg:.2f} 도')
                 self.get_logger().info(f'  >> Pitch (갸웃함) [Y]: {pitch_deg:.2f} 도')
                 self.get_logger().info(f'  >> YAW (틀어짐) [Z]: {yaw_deg:.2f} 도')
-                
-            self.get_logger().info('=====================================')
 
+                marker_pose_msg = ArucoDockingData()
+                marker_pose_msg.marker_pos_z = pose_msg.position.z
+                marker_pose_msg.marker_yaw = yaw_deg
+                self.get_logger().info(f'Send DDC (ID: {marker_id}) | z: {marker_pose_msg.marker_pos_z:.3f}, yaw: {marker_pose_msg.marker_yaw:.3f}')
+                self.aruco_docking_pub.publish(marker_pose_msg)
+
+            self.get_logger().info('=====================================')
 
 
         # Rviz/Rqt용 디버그 이미지 발행
@@ -167,9 +185,9 @@ class ArucoDetector(Node):
             debug_image_msg.header.frame_id = msg.header.frame_id
             self.debug_image_pub.publish(debug_image_msg)
 
-        # 팝업창(Preview) 표시
-        cv2.imshow(self.preview_window_name, cv_image)
-        cv2.waitKey(1)
+        # 팝업창(Preview) 표시가 필요할 경우 아래 주석 해제
+        # cv2.imshow(self.preview_window_name, cv_image)
+        # cv2.waitKey(1)
             
 
 def main(args=None):
