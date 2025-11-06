@@ -37,27 +37,26 @@ class AlignVisionManager:
         self.Z_FIXED = 250.0
         self.X_SAFE_MIN, self.X_SAFE_MAX = 160, 200
         self.Y_SAFE_MIN, self.Y_SAFE_MAX = -140, 140
-        self.FORWARD_X_MM = 50.0
+        self.FORWARD_X_MM = 40.0
         self.FORWARD_Y_MM = -6
-        self.PICK_Z_HALF = 180.0
-        self.PICK_Z_DOWN = 150.0
+        self.PICK_Z_HALF = 200.0
+        self.PICK_Z_DOWN = 140.0
         
         self.detected_markers = []
 
         # 슬롯 상태 (True = 채워짐 / False = 비어있음)
         self.slot_status = {
+            0: None,
             1: None,
             2: None,
-            3: None,
         }
 
         
         self.book_to_shelf = {
-            1: 22,
-            2: 23,
-            3: 24,
-            4: 22,
-            5: 25,
+            1: 21,
+            2: 22,
+            3: 23,
+            4: 24
         }
         
         self.K = np.array([[1200.0, 0.0, 640.0],
@@ -132,8 +131,12 @@ class AlignVisionManager:
         return self.book_to_shelf.get(book_id, None)
     
     def get_book_by_shelf(self, shelf_id):
-        """책장으로 책번호가 몇 번인지 조회"""
-        return self.book_to_shelf.get(shelf_id, None)
+        """책장 ID로 해당되는 책 ID를 역조회"""
+        for book_id, shelf in self.book_to_shelf.items():
+            if shelf == shelf_id:
+                return book_id
+        print(f"❌ [get_book_by_shelf] Shelf {shelf_id}에 대응하는 책이 없습니다.")
+        return None
     
     def reset_detected_markers(self):
 
@@ -294,6 +297,7 @@ class AlignVisionManager:
                 print("⚠️ 프레임 없음 — skip")
                 continue
 
+
             gray = self.preprocess_frame(frame)
             corners, ids, _ = self.detect_func(gray)
             if ids is None or len(ids) == 0:
@@ -413,6 +417,8 @@ class AlignVisionManager:
             # 🎯 정렬 완료 조건
             if dist_pix < 60:
                 print(f"✅ 중심 정렬 완료 ({dist_pix:.1f}px)")
+                self._prev_center_dist = 300   
+                self._stagnant_count = 0
                 return self.mc.get_coords()
 
             # 🌀 정체 상태 방지
@@ -434,8 +440,14 @@ class AlignVisionManager:
             if abs(move_y) < self.MIN_MOVE: move_y = np.sign(move_y) * self.MIN_MOVE
 
             coords = self.mc.get_coords()
+            
             coords[0] += move_x
             coords[1] += move_y
+            coords[2] = 230
+            coords[3] = -180 
+            coords[4] = 0
+            coords[5] = -45
+            
             await self.safe_move(coords, speed=self.SPEED)  # ✅ 안전 이동 (send_coords + 위치 확인)
             print(f"➡️ move_x={move_x:.2f}, move_y={move_y:.2f}, dist={dist_pix:.1f}")
             time.sleep(self.SETTLE_WAIT)
@@ -444,10 +456,6 @@ class AlignVisionManager:
     # 📐 화면 중심과 아르코마커간 거리 계산
     # =========================================================
     def compute_marker_offset(self, frame, marker_id):
-        if marker_id >= 20:
-            mode = "center"   # 책장
-        else:
-            mode = "top"      # 책
         
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = self.detect_func(gray)
@@ -456,7 +464,7 @@ class AlignVisionManager:
             return None
         idx = list(ids.flatten()).index(marker_id)
         pts = corners[idx][0]
-        target = np.mean([pts[0], pts[1]], axis=0) if mode == "top" else np.mean(pts, axis=0)
+        target = np.mean(pts, axis=0)
         target = target.astype(int)
         h, w = frame.shape[:2]
         cx, cy = w // 2, h // 2
@@ -469,34 +477,64 @@ class AlignVisionManager:
     # =========================================================
     async def center_align_marker_step(self, marker_info, center_tol):
        
-        coords = self.mc.get_coords()
-        await self.safe_move(coords, speed=self.SPEED)
-       
+        print(marker_info)
         print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] Center aligning marker step (ID={marker_info["id"]})")
-       
-        frame = self.get_latest_frame(caller="center_align_marker")
+
+        if not hasattr(self, "_prev_center_dist"):
+            self._prev_center_dist = 300
+            self._stagnant_count = 0
+
+        sample_count = 0
         
-        if frame is None:
-            print("⚠️ 프레임 없음 — skip")
+        # 이부분에서 거리에 따라서 값을 여러개 받아서 정확하게 정렬
+        if self._prev_center_dist < 20:
+            sample_count = 3
+        elif self._prev_center_dist < 40:
+            sample_count = 2
+        else:
+            sample_count = 1
+            
+        print(f"🎞 샘플 수 설정: {sample_count} (prev_dist={self._prev_center_dist:.1f})")
+    
+        # 📸 여러 프레임에서 평균 dx, dy 계산
+        dx_list, dy_list, dist_list = [], [], []
+        for i in range(sample_count):
+            frame = self.get_latest_frame(caller=f"center_align_marker[{i}]")
+            if frame is None:
+                print(f"⚠️ 프레임 {i+1}/{sample_count} 없음 — skip")
+                continue
+
+            result = self.compute_marker_offset(frame, marker_info["id"])
+            if result is None:
+                print(f"⚠️ 마커 {marker_info['id']} 인식 실패 ({i+1}/{sample_count})")
+                continue
+
+            dx, dy, dist_pix, _, _ = result
+            dx_list.append(dx)
+            dy_list.append(dy)
+            dist_list.append(dist_pix)
+
+            time.sleep(0.05)  # 프레임 간 짧은 간격 (50ms 정도)
+
+        # ⚠️ 데이터 부족 시
+        if len(dx_list) == 0:
+            print("❌ 모든 프레임 인식 실패")
             return None, None
 
-        result = self.compute_marker_offset(frame, marker_info["id"])
-        if result is None:
-            print(f"⚠️ 마커 {marker_info["id"]} 인식 실패")
-            return None, None
-
-        dx, dy, dist_pix, (cx, cy), target = result
-        print(f"📏 거리: {dist_pix:.1f}px (dx={dx:.1f}, dy={dy:.1f})")
-
+        # 📊 평균 계산
+        dx_mean = np.mean(dx_list)
+        dy_mean = np.mean(dy_list)
+        dist_mean = np.mean(dist_list)
+        print(f"📏 평균 거리: {dist_mean:.1f}px (dx={dx_mean:.1f}, dy={dy_mean:.1f}) from {len(dx_list)} frames")
+        
         # 🎯 정렬 완료 조건
         if dist_pix < center_tol:
             print(f"✅ 중심 정렬 완료 ({dist_pix:.1f}px)")
-            return True, self.mc.get_coords()
-
-        # 🌀 이전 거리 비교 (정체 감지)
-        if not hasattr(self, "_prev_center_dist"):
-            self._prev_center_dist = None
+            
+            self._prev_center_dist = 300
             self._stagnant_count = 0
+            
+            return True, self.mc.get_coords()
         
         if self._prev_center_dist is not None and abs(self._prev_center_dist - dist_pix) < 1.5:
             self._stagnant_count += 1
@@ -513,6 +551,7 @@ class AlignVisionManager:
         k = 0.15 if dist_pix > 60 else 0.1 if dist_pix > 25 else 0.05
         move_x = -dy * k
         move_y = -dx * k
+        
         if abs(move_x) < self.MIN_MOVE:
             move_x = np.sign(move_x) * self.MIN_MOVE
         if abs(move_y) < self.MIN_MOVE:
@@ -521,7 +560,11 @@ class AlignVisionManager:
         coords = self.mc.get_coords()
         coords[0] += move_x
         coords[1] += move_y
-
+        coords[2] = 230
+        coords[3] = -180 
+        coords[4] = 0
+        coords[5] = -45
+        
         print(f"➡️ move_x={move_x:.2f}, move_y={move_y:.2f}, dist={dist_pix:.1f}")
         await self.safe_move(coords, speed=self.SPEED)  # ✅ 안전 이동 (send_coords + 위치 확인)
         time.sleep(self.SETTLE_WAIT)
@@ -531,7 +574,7 @@ class AlignVisionManager:
     # =========================================================
     # 🧭 Yaw 정렬
     # =========================================================
-    def align_yaw(self, marker_id):
+    async def align_yaw(self, marker_id):
         print(f"\n🧭 Yaw 정렬 시작 — ID={marker_id}")
         frame = self.get_latest_frame(caller="align_yaw")
         if frame is None:
@@ -557,14 +600,15 @@ class AlignVisionManager:
         yaw = np.degrees(np.arctan2(R[1, 0], R[0, 0]))
         print(f"📐 감지된 Yaw: {yaw:.2f}°")
         
-        angles = self.mc.get_angles()
-        if angles is None:
+        coords = self.mc.get_coords()
+        if coords is None:
             print("❌ 관절 각도 읽기 실패")
             return False
         
-        angles[5] += yaw
+        coords[5] += yaw
         
-        self.mc.send_angles(angles, self.SPEED)
+        self.safe_move(coords, speed=self.SPEED)
+        
         print(f"🧭 Yaw {yaw:.2f}° 보정 중...")
         time.sleep(self.SETTLE_WAIT + 0.5)
         print("✅ Yaw 보정 완료")
@@ -610,19 +654,19 @@ class AlignVisionManager:
 
         # 슬롯별 단계별 관절 포즈
         SLOT_POSES = {
-            1: [
+            0: [
                 [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
                 [-140.71, -34.01, -17.66, -38.58, 3.95, -9.93],
                 [-149.06, -45.35, -48.16, 7.29, 5.62, -12.56],
                 [-149.32, -58.35, -64.51, 36.73, 5.44, -12.56],
             ],
-            2: [
+            1: [
                 [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
                 [-165.67, -11.33, -58.0, -15.64, 1.58, -31.28],
                 [-164.79, -45.0, -49.83, 5.71, 6.15, -28.47],
                 [-165.05, -57.56, -65.91, 35.33, 5.62, -28.47],
             ],
-            3: [
+            2: [
                 [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
                 [166.64, -44.12, -1.05, -46.23, 4.92, -59.15],
                 [167.08, -72.68, 0.35, -14.76, 6.5, -54.14],
@@ -637,9 +681,11 @@ class AlignVisionManager:
         # =========================================================
         if mode == "DOBBY_TO_SHELF":
             
-            book_id = self.get_book_by_shelf(self, arco_id)
+            book_id = self.get_book_by_shelf(arco_id)
             
             carrier_slot_id = self.get_slot_by_book(book_id)
+            
+            print(f"arco_id:{arco_id} book_id :{book_id} carrier_slot_id:{carrier_slot_id}")
             
             if carrier_slot_id is None:
                 print(f"❌ 책 ID={book_id} 에 해당하는 슬롯을 찾을 수 없습니다!")
@@ -675,7 +721,7 @@ class AlignVisionManager:
             print("📍 책 위치로 이동 중...")
 
             approach = self.mc.get_coords()
-            approach[0] += self.FORWARD_X_MM - 3.5
+            approach[0] += self.FORWARD_X_MM
             approach[1] += self.FORWARD_Y_MM
             approach[2] = self.PICK_Z_HALF
             await self.safe_move(approach, speed=25)
@@ -689,7 +735,7 @@ class AlignVisionManager:
 
             await self.safe_move(shelf_pose, speed=30)
             
-            self.remove_book(carrier_slot_id, book_id)
+            self.remove_book(carrier_slot_id)
             
             print("✅ 도비→책장 완료")
 
@@ -725,7 +771,7 @@ class AlignVisionManager:
 
             approach = self.mc.get_coords()
             print(f"📸 현재 좌표 (approach 전): {approach}")
-            approach[0] += self.FORWARD_X_MM
+            approach[0] += (self.FORWARD_X_MM + 15)
             approach[1] += self.FORWARD_Y_MM
             approach[2] = self.PICK_Z_HALF
             print(f"➡️ 접근 좌표 (FORWARD 적용): {approach}")
@@ -740,7 +786,7 @@ class AlignVisionManager:
             print("📕 책 집기 완료 (그리퍼 닫힘)")
 
             lift = self.mc.get_coords()
-            lift[2] = self.PICK_Z_HALF
+            lift[2] = self.PICK_Z_HALF + 20
             print(f"⬆️ 리프트 좌표: {lift}")
             await self.safe_move(lift, speed=25)
 

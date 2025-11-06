@@ -6,7 +6,7 @@ from javis_dac.align_vision_manager import AlignVisionManager
 from javis_dac.mc_singleton import MyCobotManager
 import traceback
 import asyncio
-
+import time
 
 class PlaceBookActionServer(Node):
     def __init__(self):
@@ -44,12 +44,17 @@ class PlaceBookActionServer(Node):
                 self._run_place_sequence(goal_handle, feedback, result)
             )
             loop.close()
+
         except Exception as e:
-            msg = f"❌ PlaceBook failed: {e}"
+            # 🔥 전체 스택 로그 출력 (깊이 포함)
+            tb_str = traceback.format_exc()
+            msg = f"❌ PickBook failed: {type(e).__name__}: {e}\n{tb_str}"
             self.get_logger().error(msg)
+
             feedback.current_action = msg
             goal_handle.publish_feedback(feedback)
             goal_handle.abort()
+
             result.success = False
             result.message = str(e)
         return result
@@ -58,9 +63,10 @@ class PlaceBookActionServer(Node):
     # 🧩 순차 실행 시퀀스 (비동기)
     # =========================================================
     async def _run_place_sequence(self, goal_handle, feedback, result):
+        
         goal = goal_handle.request
         
-        found_target = int(goal.book_id)
+        found_target = self.align.get_shelf_by_book(int(goal.book_id))
         
         base = [200, 0, 230., -180., 0., -45.]
         
@@ -69,6 +75,7 @@ class PlaceBookActionServer(Node):
         feedback.current_action = "[STEP 1] 8방향 탐색 중..."
         goal_handle.publish_feedback(feedback)
 
+        
         for dx, dy in [(0,0), (30,0), (-30,0), (0,30), (0,-30)]:
             detected_id = await self.align.scan_for_marker(base, target_id=found_target, dx=dx, dy=dy)
 
@@ -102,48 +109,73 @@ class PlaceBookActionServer(Node):
         else:
             print("⏩ 목표 마커 감지됨 → Y축 탐색 생략")
         
-        # 2️⃣ 중심 정렬 (step-by-step 반복)
-        feedback.current_action = "[STEP 2] Center aligning marker..."
-        goal_handle.publish_feedback(feedback)
+        if found_target == 0:
+            markers_info = self.align.get_all_detected_markers()
 
-        pose = None
+        elif found_target == detected_id:
+            marker_info = {
+                "id": detected_id,
+                "pose": self.align.mc.get_coords(),
+                "dist_pix": float(300),
+                "timestamp": time.time()
+            }
+            markers_info = [marker_info]
+
         
-        align_mode = ""
-        if found_target <10:
-            align_mode = "top"
         else:
-            align_mode = "center"
+            marker_info = self.align.get_marker_info(found_target)
+            if not marker_info:
+                raise ValueError(f"❌ ID={found_target} 마커 정보를 찾을 수 없습니다.")
+            markers_info = [marker_info]  # ✅ 리스트로 감싸기
+
+        if not markers_info:
+            raise ValueError(f"❌ ID={found_target} 마커 정보를 찾을 수 없습니다.")
+        
+        for marker_info in markers_info:
             
-        for i in range(50):  # 최대 50 스텝까지만 시도
-            done, val = await self.align.center_align_marker_step(found_target, self.align.CENTER_TOL, mode=align_mode)
-
-            if done:
-                self.get_logger().info(f"✅ 중심 정렬 완료 ({i+1} steps)")
-                pose = val
-                break
-
-            if val is None:
-                self.get_logger().warn(f"⚠️ 중심 정렬 중단 (변화 없음 또는 인식 실패, step={i+1})")
-                break
-
-            # 각 스텝마다 피드백 전송 (실시간 모니터링용)
-            feedback.current_action = f"[STEP 2] Aligning... (step {i+1})"
+            # 2️⃣ 중심 정렬 (step-by-step 반복)
+            feedback.current_action = "[STEP 3] Center aligning marker..."
             goal_handle.publish_feedback(feedback)
 
-        if pose is None:
-            raise RuntimeError("❌ Center alignment failed or stagnant detected")
+            pose = marker_info["pose"]    
+            await self.align.safe_move(pose, 40)
+            pose = None
+            
+            for i in range(50):  # 최대 50 스텝까지만 시도
+                done, val = await self.align.center_align_marker_step(marker_info, self.align.CENTER_TOL)
 
+                if done:
+                    self.get_logger().info(f"✅ 중심 정렬 완료 ({i+1} steps)")
+                    pose = val
+                    break
+                
+                if(i==1):
+                    # 3️⃣ Yaw 정렬
+                    feedback.current_action = "[STEP 2] Aligning yaw..."
+                    goal_handle.publish_feedback(feedback)
+                    await self.align.align_yaw(marker_info["id"])
+                    
+                if val is None:
+                    self.get_logger().warn(f"⚠️ 중심 정렬 중단 (변화 없음 또는 인식 실패, step={i+1})")
+                    break
 
-        # 3️⃣ Yaw 정렬
-        feedback.current_action = "[STEP 3] Aligning yaw..."
-        goal_handle.publish_feedback(feedback)
-        self.align.align_yaw(found_target)
+                # 각 스텝마다 피드백 전송 (실시간 모니터링용)
+                feedback.current_action = f"[STEP 2] Aligning... (step {i+1})"
+                goal_handle.publish_feedback(feedback)
 
-        # 4️⃣ 책장 → 도비 이동
-        feedback.current_action = "[STEP 4] Moving book (Dobby → Shelf)..."
-        goal_handle.publish_feedback(feedback)
-        shelf_pose = self.align.mc.get_coords()
-        await self.align.transfer_book("DOBBY_TO_SHELF", shelf_pose)
+            if pose is None:
+                raise RuntimeError("❌ Center alignment failed or stagnant detected")
+
+            # 3️⃣ Yaw 정렬
+            feedback.current_action = "[STEP 4] Aligning yaw..."
+            goal_handle.publish_feedback(feedback)
+            await self.align.align_yaw(marker_info["id"])
+
+            # 4️⃣ 도비 → 책장 이동
+            feedback.current_action = "[STEP 4] Moving book (Dobby → Shelf)..."
+            goal_handle.publish_feedback(feedback)
+            shelf_pose = self.align.mc.get_coords()
+            await self.align.transfer_book("DOBBY_TO_SHELF", shelf_pose, found_target)
 
         # ✅ 완료
         feedback.current_action = "[DONE] PlaceBook complete!"

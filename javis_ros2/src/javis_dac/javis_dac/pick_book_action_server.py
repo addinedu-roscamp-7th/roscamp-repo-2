@@ -5,6 +5,7 @@ from javis_interfaces.action import PickBook
 from javis_dac.align_vision_manager import AlignVisionManager
 import asyncio
 import time
+import traceback
 
 class PickBookActionServer(Node):
     def __init__(self):
@@ -23,6 +24,8 @@ class PickBookActionServer(Node):
     # =========================================================
     # 🔹 전체 시퀀스를 하나의 비동기 루프에서 순차 실행
     # =========================================================
+
+
     def execute_callback(self, goal_handle):
         goal = goal_handle.request
         feedback = PickBook.Feedback()
@@ -37,12 +40,17 @@ class PickBookActionServer(Node):
                 self._run_pick_sequence(goal_handle, feedback, result)
             )
             loop.close()
+
         except Exception as e:
-            msg = f"❌ PickBook failed: {e}"
+            # 🔥 전체 스택 로그 출력 (깊이 포함)
+            tb_str = traceback.format_exc()
+            msg = f"❌ PickBook failed: {type(e).__name__}: {e}\n{tb_str}"
             self.get_logger().error(msg)
+
             feedback.current_action = msg
             goal_handle.publish_feedback(feedback)
             goal_handle.abort()
+
             result.success = False
             result.message = str(e)
         return result
@@ -93,31 +101,33 @@ class PickBookActionServer(Node):
                     print(f"✅ 목표 마커 Y축 탐색 성공 (x_offset={x_offset})")
                     break
                 
-        else:
-            
+        else:            
             print("⏩ 목표 마커 감지됨 → Y축 탐색 생략")
+        
         
         # 리스트로 받아서 [아르코마커,6좌표] 리스트 => 반납대를 위한 방법
         # 시간도 추가해서 시간을 단축?
-        
         if found_target == 0:
             markers_info = self.align.get_all_detected_markers()
             
         elif found_target == detected_id:
-
             marker_info = {
                 "id": detected_id,
                 "pose": self.align.mc.get_coords(),
-                "dist_pix": float(60),
+                "dist_pix": float(300),
                 "timestamp": time.time()
             }
             markers_info = [marker_info]
-            
+
         else:
-            markers_info = self.align.get_marker_info(found_target)
-            
+            marker_info = self.align.get_marker_info(found_target)
+            if not marker_info:
+                raise ValueError(f"❌ ID={found_target} 마커 정보를 찾을 수 없습니다.")
+            markers_info = [marker_info]  # ✅ 리스트로 감싸기
+
         if not markers_info:
             raise ValueError(f"❌ ID={found_target} 마커 정보를 찾을 수 없습니다.")
+
         
         for marker_info in markers_info:
             
@@ -127,6 +137,7 @@ class PickBookActionServer(Node):
 
             pose = marker_info["pose"]    
             await self.align.safe_move(pose, 40)
+            pose = None
             
             for i in range(50):  # 최대 50 스텝까지만 시도
                 done, val = await self.align.center_align_marker_step(marker_info, self.align.CENTER_TOL)
@@ -140,7 +151,7 @@ class PickBookActionServer(Node):
                     # 3️⃣ Yaw 정렬
                     feedback.current_action = "[STEP 2] Aligning yaw..."
                     goal_handle.publish_feedback(feedback)
-                    self.align.align_yaw(marker_info["id"])
+                    await self.align.align_yaw(marker_info["id"])
                     
                 if val is None:
                     self.get_logger().warn(f"⚠️ 중심 정렬 중단 (변화 없음 또는 인식 실패, step={i+1})")
@@ -156,7 +167,7 @@ class PickBookActionServer(Node):
             # 3️⃣ Yaw 정렬
             feedback.current_action = "[STEP 4] Aligning yaw..."
             goal_handle.publish_feedback(feedback)
-            self.align.align_yaw(marker_info["id"])
+            await self.align.align_yaw(marker_info["id"])
 
 
             # 4️⃣ 책장 → 도비 이동
