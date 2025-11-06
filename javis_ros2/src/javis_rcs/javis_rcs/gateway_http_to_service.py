@@ -161,16 +161,30 @@ def handle_kreacher_request():
         if not req_data:
             return jsonify({'ok': False, 'message': 'Request body must be JSON.'}), 400
 
-        member_id = req_data.get('member_id')
-        if member_id is None: 
-            return jsonify({'ok': False, 'message': 'Missing required field: member_id'}), 400
+        
+        order_id = req_data.get('OrderID')
+        # order_detail이 없을 경우를 대비하여 기본값으로 빈 딕셔너리({})를 사용합니다.
+        order_detail = req_data.get('OrderDetail', {})
+        
+        beverage_name = order_detail.get('beverageName') # 이제 order_detail이 None이 아니므로 안전합니다.
+        menu_id = None
+        if beverage_name == "핫아메리카노":
+            menu_id = 1
+        elif beverage_name == "아이스아메리카노":
+            menu_id = 2
+        quantity = order_detail.get('quantity', 1) # quantity가 없으면 기본값 1을 사용합니다.
+        
+        if order_id is None:
+            return jsonify({'ok': False, 'message': 'Missing required field: order_id'}), 400
 
         # clean_seat에 필요한 다른 파라미터들은 req_data에서 직접 가져와 task_data에 포함
         # OrchestratorNode의 execute_task에서 기본값 처리가 되므로, 없으면 안 보내도 됨
         task_data = {
             "task_name": "kreacher",
-            "member_id": member_id,
-            **{k: v for k, v in req_data.items() if k not in ['task_name', 'member_id']} # seat_id 외 다른 필드 포함
+            "order_id": order_id,
+            "menu_id": menu_id,
+            "quantity": quantity,
+            **{k: v for k, v in req_data.items() if k not in ['task_name', 'order_id', 'menu_id', 'quantity']} # 필수 필드 외 다른 필드 포함
         }
         
         response_from_ros = _send_task_to_orchestrator(task_data)

@@ -37,7 +37,7 @@ setup(
             'json_test_client = robot_control_service.gateway_http_to_service:main',
             'json_test_client_get = robot_control_service.gateway_http_to_service_get:main',
             'topic_test = robot_control_service.topicp_test:main',
-            
+            'kreacher = robot_control_service.kreacher_server:main'
             
 
         ],

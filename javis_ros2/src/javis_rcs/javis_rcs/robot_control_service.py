@@ -224,8 +224,10 @@ class OrchestratorNode(Node):
             
             thread.start()
         elif task_name == 'kreacher':
-            member_id = task_data.get('member_id')
-            self.get_logger().info(f"Sending 'kreacher' goal for member_id {member_id} to robot '{robot_namespace}'")
+            order_id = task_data.get('order_id')
+            menu_id = task_data.get('menu_id')
+            quantity = task_data.get('quantity')
+            self.get_logger().info(f"Sending 'kreacher' goal for order_id {order_id} to robot '{robot_namespace}'")
 
             scheduling_msg = Scheduling()
             scheduling_msg.no = self.no 
@@ -238,7 +240,7 @@ class OrchestratorNode(Node):
             scheduling_msg.task_create_time = self.date_str
             self.task_scheduling_pub.publish(scheduling_msg)
 
-            thread = threading.Thread(target=self._run_kreacher_task, args=(robot_namespace, member_id, task_data))
+            thread = threading.Thread(target=self._run_kreacher_task, args=(robot_namespace, order_id, menu_id, quantity, task_data))
             thread.start()
 
     def _run_clean_seat_task(self, robot_namespace, seat_id, task_data):
@@ -394,16 +396,16 @@ class OrchestratorNode(Node):
             if reshelving_book_node:
                 reshelving_book_node.destroy_node()
             temp_executor.shutdown()
-    def _run_kreacher_task(self, robot_namespace, member_id, task_data):
+    def _run_kreacher_task(self, robot_namespace, order_id, menu_id, quantity, task_data):
         temp_executor = SingleThreadedExecutor()
         kreacher_node = None
         try:
             kreacher_node = KreacherNode(namespace=f'{robot_namespace}/action')
             temp_executor.add_node(kreacher_node)
 
-            kwargs = {k: v for k, v in task_data.items() if k != 'member_id'}
+            kwargs = {k: v for k, v in task_data.items() if k not in ['order_id', 'menu_id', 'quantity']}
 
-            task_future = kreacher_node.run_task(member_id, **kwargs)
+            task_future = kreacher_node.run_task(order_id, menu_id, quantity, **kwargs)
             temp_executor.spin_until_future_complete(task_future)
 
             result = task_future.result()

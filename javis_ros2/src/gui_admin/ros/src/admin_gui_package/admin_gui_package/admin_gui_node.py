@@ -201,8 +201,12 @@ class AdminGUINode(Node, QMainWindow):
             path_topic_name,
             self.path_callback,
             10)
+        
         self.robot_subscriptions.append(path_sub)
         self.get_logger().info(f"Subscribing to {path_topic_name}")
+
+        
+        
 
         # 6. /amcl_pose 토픽 구독
         # /amcl_pose는 PoseWithCovarianceStamped 메시지 타입을 사용합니다.
@@ -329,6 +333,7 @@ class AdminGUINode(Node, QMainWindow):
         if (current_time - self.last_path_update_time).nanoseconds > 1e9: # 1초 (1*10^9 나노초)
             self.map_display.update_path(msg)
             self.last_path_update_time = current_time
+    
 
     def pose_callback(self, msg, robot_id):
         self.map_display.update_robot_pose(robot_id, msg.pose)
@@ -461,7 +466,8 @@ class MapDisplayWidget(QGraphicsView):
 
         pen = QPen(QColor("blue"), 0.05) # 경로 두께를 지도 스케일에 맞게 조절
         self.path_item = self.scene.addPath(path, pen)
-
+    
+    
     def update_waypoints(self, path_msg: Path):
         if self.waypoints_item:
             self.scene.removeItem(self.waypoints_item)
@@ -507,12 +513,41 @@ class MapDisplayWidget(QGraphicsView):
         if robot_id in self.robot_items:
             self.scene.removeItem(self.robot_items[robot_id])
 
-        # 월드 좌표를 Scene 좌표로 변환
-        sx, sy = self.world_to_scene(pose.position.x, pose.position.y)
+        if robot_id == 'amcl':
+            # 월드 좌표를 Scene 좌표로 변환
+            sx, sy = self.world_to_scene(pose.position.x, pose.position.y)
 
-        # 로봇을 원으로 표시 (크기는 지도 스케일에 맞게 조절)
-        pen = QPen(QColor("red"), 0.05)
-        self.robot_items[robot_id] = self.scene.addEllipse(sx - 0.2, sy - 0.2, 0.4, 0.4, pen, QColor("red"))
+            # Quaternion을 Euler 각도로 변환하여 Yaw(회전) 값을 얻음
+            q = pose.orientation
+            # siny_cosp = 2 * (q.w * q.z + q.x * q.y)
+            # cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
+            # yaw = np.arctan2(siny_cosp, cosy_cosp)
+            # yaw_deg = np.degrees(yaw)
+            
+            # 쿼터니언에서 yaw 각도 추출 (Z축 회전)
+            t3 = +2.0 * (q.w * q.z + q.x * q.y)
+            t4 = +1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+            yaw_z = np.arctan2(t3, t4)
+            yaw_deg = -np.degrees(yaw_z) # QGraphicsItem의 회전은 시계방향이 양수
+
+            # 로봇을 직사각형으로 표시 (크기는 지도 스케일에 맞게 조절)
+            rect_width = 0.5  # 미터 단위
+            rect_height = 0.3 # 미터 단위
+            pen = QPen(QColor("blue"), 0.05)
+            brush = QColor(0, 0, 255, 150) # 반투명 파란색
+            
+            # 직사각형 아이템 생성
+            rect_item = self.scene.addRect(-rect_width / 2, -rect_height / 2, rect_width, rect_height, pen, brush)
+            # 아이템의 위치와 회전 설정
+            rect_item.setPos(sx, sy)
+            rect_item.setRotation(yaw_deg)
+            self.robot_items[robot_id] = rect_item
+        else:
+            # 월드 좌표를 Scene 좌표로 변환
+            sx, sy = self.world_to_scene(pose.position.x, pose.position.y)
+            # 로봇을 원으로 표시 (크기는 지도 스케일에 맞게 조절)
+            pen = QPen(QColor("red"), 0.05)
+            self.robot_items[robot_id] = self.scene.addEllipse(sx - 0.2, sy - 0.2, 0.4, 0.4, pen, QColor("red"))
 
     def wheelEvent(self, event):
         """마우스 휠을 사용하여 지도를 확대/축소합니다."""

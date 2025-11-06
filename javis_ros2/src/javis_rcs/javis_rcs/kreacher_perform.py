@@ -21,12 +21,16 @@ class KreacherPerform(Node):
         self.task_done_future: Future | None = None
     
     def send_goal(self,
-                        member_id: int
+                        order_id: int,
+                        menu_id: int,
+                        quantity: int
                         ) -> Future :
         global kreacher_state
         goal_msg = PerformTask.Goal()
-        goal_msg.member_id = member_id
-        kreacher_state = False # 작업 시작 시 상태를 False로 변경
+        goal_msg.order_id = order_id
+        goal_msg.menu_id = menu_id
+        goal_msg.quantity = quantity
+        kreacher_state = False
         self.get_logger().info("Kreacher(KC) 액션 서버를 기다리는 중...")
         if not self._client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error('Kreacher 액션 서버가 응답하지 않습니다.')
@@ -40,7 +44,7 @@ class KreacherPerform(Node):
     def perform_callback(self, feedback):
         """액션 피드백을 수신했을 때 호출되는 콜백 함수."""
         fb = feedback.feedback
-        self.get_logger().info(f'Kreacher perform feedback: 회원 id:{fb.member_id} 진행률: {fb.progress_percentage}%')
+        self.get_logger().info(f'Kreacher perform feedback: 주문번호: {fb.order_id}진행률: {fb.progress_percentage}%')
         
 
     def goal_response_callback(self, future: Future):
@@ -61,12 +65,12 @@ class KreacherPerform(Node):
         result = future.result().result
         self.get_logger().info(f'작업 완료 결과: {result.message}')
         if self.task_done_future is not None and not self.task_done_future.done():
-            self.task_done_future.set_result({'member_id':result.member_id, 'pick_up_num':result.pick_up_num,'success': result.success, 'message': result.message})
+            self.task_done_future.set_result({'order_id':result.order_id, 'pick_up_num':result.pick_up_num,'success': result.success, 'message': result.message})
         kreacher_state = True # 작업 완료 후 상태를 True로 변경
     
-    def run_task(self, member_id: int, **kwargs) -> Future:
+    def run_task(self, order_id: int, menu_id: int, quantity: int, **kwargs) -> Future:
         """
-        지정된 member_id에 대한 perform_task 작업 실행.
+        지정된 order_id에 대한 perform_task 작업 실행.
         """
         # ✅ Node에는 create_future가 없으므로, rclpy.task.Future로 직접 생성
         self.task_done_future = Future()
@@ -74,7 +78,7 @@ class KreacherPerform(Node):
         # kwargs로부터 Pose2D / Pose 생성
 
         # Goal 전송 후, goal 응답 완료 콜백 체인 연결
-        goal_future = self.send_goal(member_id=member_id)
+        goal_future = self.send_goal(order_id=order_id, menu_id=menu_id, quantity=quantity)
         goal_future.add_done_callback(self.goal_response_callback)
 
         return self.task_done_future
@@ -87,17 +91,20 @@ def get_kreacher_state():
 def main(args=None):
     rclpy.init(args=args)
 
-    if len(sys.argv) < 2:
-        print("Usage: ros2 run javis_rcs kreacher_perform <member_id>")
+    if len(sys.argv) < 4:
+        print("Usage: ros2 run javis_rcs kreacher_perform")
         return
 
-    member_id = int(sys.argv[1])
+   
+    order_id = int(sys.argv[1])
+    menu_id = int(sys.argv[2])
+    quantity = int(sys.argv[3])
 
     # ✅ __init__ 시그니처 수정에 맞게 사용
     node = KreacherPerform(namespace='kreacher/action')
 
     try:
-        node.get_logger().info(f"Starting kreacher task for member_id: {member_id}")
+        node.get_logger().info(f"Starting kreacher task for order_id: {order_id}, menu_id: {menu_id}, quantity: {quantity}")
     except KeyboardInterrupt:
         node.get_logger().info("KreacherPerform 노드가 종료됩니다.")
     finally:

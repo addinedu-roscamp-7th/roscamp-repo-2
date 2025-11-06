@@ -115,15 +115,15 @@ class PickupBook(Node):
         ori = d.get('orientation', {})
 
         pose.position = Point(
-            x=float(pos.get('x', 0.0)),
-            y=float(pos.get('y', 0.0)),
+            x=float(pos.get('x', -0.6866304405125349)),
+            y=float(pos.get('y', -0.8551803884397844)),
             z=float(pos.get('z', 0.0)),
         )
         pose.orientation = Quaternion(
             x=float(ori.get('x', 0.0)),
             y=float(ori.get('y', 0.0)),
-            z=float(ori.get('z', 0.0)),
-            w=float(ori.get('w', 1.0)),
+            z=float(ori.get('z', -0.01509974378329657)),
+            w=float(ori.get('w', 0.9998859923699696)),
         )
         return pose
     
