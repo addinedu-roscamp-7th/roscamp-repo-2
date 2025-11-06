@@ -171,8 +171,7 @@ def handle_kreacher_request():
         if beverage_name == "핫아메리카노":
             menu_id = 1
         elif beverage_name == "아이스아메리카노":
-            menu_id = 2
-        quantity = order_detail.get('quantity', 1) # quantity가 없으면 기본값 1을 사용합니다.
+            menu_id = 2 
         
         if order_id is None:
             return jsonify({'ok': False, 'message': 'Missing required field: order_id'}), 400
@@ -183,8 +182,7 @@ def handle_kreacher_request():
             "task_name": "kreacher",
             "order_id": order_id,
             "menu_id": menu_id,
-            "quantity": quantity,
-            **{k: v for k, v in req_data.items() if k not in ['task_name', 'order_id', 'menu_id', 'quantity']} # 필수 필드 외 다른 필드 포함
+            **{k: v for k, v in req_data.items() if k not in ['task_name', 'order_id', 'menu_id']} # 필수 필드 외 다른 필드 포함
         }
         
         response_from_ros = _send_task_to_orchestrator(task_data)

@@ -5,7 +5,6 @@
 # Goal
 int32 order_id       
 int32 menu_id
-int32 quantity
 ---
 #Result
 int32 order_id

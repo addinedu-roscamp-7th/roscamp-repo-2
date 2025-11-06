@@ -36,7 +36,7 @@ class KreacherActionServer(Node):
             menu = "아이스아메리카노"
         
         
-        self.get_logger().info(f"새로운 작업 요청 수신: 주문번호={goal_request.order_id}, 메뉴={menu}, 얼음양: {goal_request.quantity}")
+        self.get_logger().info(f"새로운 작업 요청 수신: 주문번호={goal_request.order_id}, 메뉴={menu}")
         # 모든 요청을 일단 수락합니다.
         return GoalResponse.ACCEPT
 
@@ -49,7 +49,6 @@ class KreacherActionServer(Node):
         """실제 액션 작업을 수행합니다."""
         order_id = goal_handle.request.order_id
         menu_id = goal_handle.request.menu_id
-        quantity = goal_handle.request.quantity
         
         self.get_logger().info(f"작업시작 order_id={order_id}")
 
