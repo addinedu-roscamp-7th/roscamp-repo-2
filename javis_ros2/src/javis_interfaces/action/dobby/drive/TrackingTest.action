@@ -1,0 +1,6 @@
+geometry_msgs/PoseStamped goal_pose
+---
+bool success
+string message
+---
+geometry_msgs/PoseStamped part_of_path

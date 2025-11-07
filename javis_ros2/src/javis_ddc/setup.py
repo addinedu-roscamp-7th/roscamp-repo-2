@@ -30,6 +30,8 @@ setup(
             'pose_publisher = javis_ddc.pose_publisher:main',
             'move_to_bookshelf = javis_ddc.move_to_bookshelf:main',
             'detectTracking = javis_ddc.detectTracking:main',
+            'tracking_test_server = javis_ddc.tracking_test_server:main',
+            'tracking_test_client = javis_ddc.tracking_test_client:main',
         ],
     },
 )
