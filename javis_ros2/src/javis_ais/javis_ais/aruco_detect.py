@@ -4,7 +4,7 @@ import cv2.aruco as aruco
 import numpy as np
 
 from rclpy.node import Node
-from sensor_msgs.msg import Image, CameraInfo
+from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
 # Pose 메시지 및 쿼터니언 변환을 위한 라이브러리
@@ -50,7 +50,7 @@ class ArucoDetector(Node):
 
         self.aruco_docking_pub = self.create_publisher(
             ArucoDockingData,
-            '/aruco_docking_data',
+            '/ai/docking/data',
             10
         )
 
