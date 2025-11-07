@@ -16,18 +16,26 @@ class ArucoDetector(Node):
     def __init__(self):
         super().__init__('aruco_detector')
         self.bridge = CvBridge()
-        self.image_sub = self.create_subscription(
-            Image,
-            '/dobbycam/image_raw',
-            self.image_callback,
-            10
-        )
-        self.info_sub = self.create_subscription(
-            CameraInfo,
-            '/dobbycam/camera_info',
-            self.info_callback,
-            10
-        )
+
+        # Camera calibration values (Hardcoded)
+        # IMPORTANT: Replace these with your actual camera calibration values
+        self.camera_matrix = np.array([
+            [475.42043, 0.       , 318.25786],
+            [0.       , 476.55896, 257.87224],
+            [0.       , 0.       , 1.       ],
+        ], dtype=np.float32)
+        self.dist_coeffs = np.array([-0.006456, -0.046534, -0.000181, 0.002512, 0.000000], dtype=np.float32)
+
+        self.declare_parameter('video_device', '/dev/front_cam')
+        video_device = self.get_parameter('video_device').get_parameter_value().string_value
+
+        # Setup video capture
+        self.cap = cv2.VideoCapture(video_device)
+        if not self.cap.isOpened():
+            self.get_logger().error(f"Could not open video device {video_device}")
+            rclpy.shutdown()
+            return
+
         # rviz2에서 아래 publish 내용 확인 가능 (fixed frame 'camera'로 변경)
         self.pose_pub = self.create_publisher(
             PoseArray, 
@@ -46,10 +54,8 @@ class ArucoDetector(Node):
             10
         )
 
-        self.camera_matrix = None
-        self.dist_coeffs = None
         self.marker_size = 0.05
-        
+
         self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_50)
         self.aruco_params = aruco.DetectorParameters()
         self.detector = aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
@@ -57,32 +63,21 @@ class ArucoDetector(Node):
         # 팝업창(Preview) 표시가 필요할 경우 아래 주석 해제
         # self.preview_window_name = "Dobby Aruco Preview"
         # cv2.namedWindow(self.preview_window_name, cv2.WINDOW_AUTOSIZE)
-        
-        self.get_logger().info("ArUco Detector (Pose Publishing) a-node started.")
 
+        # Create a timer to process frames
+        timer_period = 0.03  # approx 30fps
+        self.timer = self.create_timer(timer_period, self.timer_callback)
 
-    def info_callback(self, msg):
-        if self.camera_matrix is None:
-            # Segfault 방지를 위해 numpy 타입 명시
-            self.camera_matrix = np.array(msg.k, dtype=np.float32).reshape(3, 3)
-            # dist_coeffs가 비어있는 경우(왜곡 없음) 처리
-            if msg.d and len(msg.d) > 0:
-                self.dist_coeffs = np.array(msg.d, dtype=np.float32)
-            else:
-                self.get_logger().warn('Camera distortion coefficients (D) are empty. Assuming zero distortion.')
-                self.dist_coeffs = np.zeros(5, dtype=np.float32)
-                
-            self.get_logger().info('Camera info received and set.')
-            # CameraInfo는 한 번만 받으면 되므로 구독 중지
-            self.destroy_subscription(self.info_sub)
+        self.get_logger().info("ArUco Detector node started with direct camera access.")
 
-    def image_callback(self, msg):
-        # dist_coeffs도 함께 확인
-        if self.camera_matrix is None or self.dist_coeffs is None:
-            self.get_logger().warn("Waiting for camera info...", once=True)
+    def timer_callback(self):
+        ret, cv_image = self.cap.read()
+        if not ret:
+            self.get_logger().warn("Failed to grab frame from camera.")
             return
 
-        cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+        # Get current timestamp
+        stamp = self.get_clock().now().to_msg()
         
         corners, ids, _ = self.detector.detectMarkers(cv_image) # 'rejected'를 '_'로 변경
 
@@ -93,8 +88,8 @@ class ArucoDetector(Node):
 
             # 발행할 PoseArray 메시지 초기화
             pose_array_msg = PoseArray()
-            pose_array_msg.header.stamp = msg.header.stamp
-            pose_array_msg.header.frame_id = msg.header.frame_id # 카메라 프레임
+            pose_array_msg.header.stamp = stamp
+            pose_array_msg.header.frame_id = "camera" # 카메라 프레임
             
             pose_list = [] # Pose 메시지들을 담을 Python 리스트
 
@@ -154,6 +149,9 @@ class ArucoDetector(Node):
                 rotation = R.from_quat(quat_from_msg)
 
                 # OpenCV/Aruco의 표준 축 순서 'xyz' (Roll, Pitch, Yaw) 사용
+                # Roll: X축 중심 회전 (위아래 끄덕임)
+                # Pitch: Y축 중심 회전 (좌우 회전)
+                # Yaw: Z축 중심 회전 (좌우 기울기)
                 euler_angles = rotation.as_euler('xyz', degrees=True)
                 roll_deg = euler_angles[0]
                 pitch_deg = euler_angles[1]
@@ -165,15 +163,16 @@ class ArucoDetector(Node):
                 self.get_logger().info(f'  pos_y (상하): {pose_msg.position.y:.3f} m')
                 self.get_logger().info(f'  pos_z (거리): {pose_msg.position.z:.3f} m')
                 # 회전 (Euler Angles)
-                self.get_logger().info(f'  >> Roll (끄덕임) [X]: {roll_deg:.2f} 도')
-                self.get_logger().info(f'  >> Pitch (갸웃함) [Y]: {pitch_deg:.2f} 도')
-                self.get_logger().info(f'  >> YAW (틀어짐) [Z]: {yaw_deg:.2f} 도')
+                self.get_logger().info(f'  >> Roll (위아래 끄덕임) [X]: {roll_deg:.2f} 도')
+                self.get_logger().info(f'  >> Pitch (좌우 회전) [Y]: {pitch_deg:.2f} 도')
+                self.get_logger().info(f'  >> Yaw (좌우 기울기) [Z]: {yaw_deg:.2f} 도')
 
                 marker_pose_msg = ArucoDockingData()
                 marker_pose_msg.marker_pos_x = pose_msg.position.x
                 marker_pose_msg.marker_pos_z = pose_msg.position.z
-                marker_pose_msg.marker_yaw = yaw_deg
-                self.get_logger().info(f'Send DDC (ID: {marker_id}) | x: {marker_pose_msg.marker_pos_x:.3f}, z: {marker_pose_msg.marker_pos_z:.3f}, yaw: {marker_pose_msg.marker_yaw:.3f}')
+                # 중요: 마커의 좌우 회전은 카메라 기준 Pitch 값임
+                marker_pose_msg.marker_pitch = pitch_deg
+                self.get_logger().info(f'Send DDC (ID: {marker_id}) | x: {marker_pose_msg.marker_pos_x:.3f}, z: {marker_pose_msg.marker_pos_z:.3f}, pitch: {marker_pose_msg.marker_pitch:.3f}')
                 self.aruco_docking_pub.publish(marker_pose_msg)
 
             self.get_logger().info('=====================================')
@@ -182,8 +181,8 @@ class ArucoDetector(Node):
         # Rviz/Rqt용 디버그 이미지 발행
         if self.debug_image_pub.get_subscription_count() > 0:
             debug_image_msg = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
-            debug_image_msg.header = msg.header
-            debug_image_msg.header.frame_id = msg.header.frame_id
+            debug_image_msg.header.stamp = stamp
+            debug_image_msg.header.frame_id = "camera"
             self.debug_image_pub.publish(debug_image_msg)
 
         # 팝업창(Preview) 표시가 필요할 경우 아래 주석 해제
