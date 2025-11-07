@@ -170,9 +170,10 @@ class ArucoDetector(Node):
                 self.get_logger().info(f'  >> YAW (틀어짐) [Z]: {yaw_deg:.2f} 도')
 
                 marker_pose_msg = ArucoDockingData()
+                marker_pose_msg.marker_pos_x = pose_msg.position.x
                 marker_pose_msg.marker_pos_z = pose_msg.position.z
                 marker_pose_msg.marker_yaw = yaw_deg
-                self.get_logger().info(f'Send DDC (ID: {marker_id}) | z: {marker_pose_msg.marker_pos_z:.3f}, yaw: {marker_pose_msg.marker_yaw:.3f}')
+                self.get_logger().info(f'Send DDC (ID: {marker_id}) | x: {marker_pose_msg.marker_pos_x:.3f}, z: {marker_pose_msg.marker_pos_z:.3f}, yaw: {marker_pose_msg.marker_yaw:.3f}')
                 self.aruco_docking_pub.publish(marker_pose_msg)
 
             self.get_logger().info('=====================================')

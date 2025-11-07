@@ -1,2 +1,3 @@
+float64 marker_pos_x
 float64 marker_pos_z
 float64 marker_yaw
