@@ -8,7 +8,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
 # Pose 메시지 및 쿼터니언 변환을 위한 라이브러리
-from geometry_msgs.msg import PoseArray, Pose
+from geometry_msgs.msg import PoseArray, Pose, Point
 from scipy.spatial.transform import Rotation as R
 from javis_interfaces.msg import ArucoDockingData
 
@@ -54,11 +54,22 @@ class ArucoDetector(Node):
             10
         )
 
+        # Publisher for normalized docking data
+        self.normalized_pub = self.create_publisher(
+            Point,
+            '/ai/docking/normalized_data',
+            10
+        )
+
         self.marker_size = 0.05
 
         self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_50)
         self.aruco_params = aruco.DetectorParameters()
         self.detector = aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
+
+        # Logging control
+        self.log_counter = 0
+        self.log_period = 30  # Log once every 30 frames (approx. 1 second)
 
         # 팝업창(Preview) 표시가 필요할 경우 아래 주석 해제
         # self.preview_window_name = "Dobby Aruco Preview"
@@ -79,9 +90,16 @@ class ArucoDetector(Node):
         # Get current timestamp
         stamp = self.get_clock().now().to_msg()
         
+        # Get current image dimensions for normalization
+        h, w, _ = cv_image.shape
+        
         corners, ids, _ = self.detector.detectMarkers(cv_image) # 'rejected'를 '_'로 변경
 
         if ids is not None:
+            # Increment log counter and determine if we should log this frame
+            self.log_counter += 1
+            do_log = (self.log_counter % self.log_period == 0)
+
             rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(
                 corners, self.marker_size, self.camera_matrix, self.dist_coeffs
             )
@@ -127,7 +145,8 @@ class ArucoDetector(Node):
             self.pose_pub.publish(pose_array_msg)
 
             # pose_array_msg.poses는 리스트이므로, for loop로
-            self.get_logger().info('===== Publishing ArUco Poses =====')
+            if do_log:
+                self.get_logger().info('===== Publishing ArUco Poses =====')
             
             for i, pose_msg in enumerate(pose_array_msg.poses):
                 # pose_msg는 리스트 안의 개별 Pose 메시지입니다.
@@ -136,7 +155,8 @@ class ArucoDetector(Node):
 
                 # marker id < 10은 버림
                 if marker_id < 10:
-                    self.get_logger().info(f"Ignoring marker ID: {marker_id} (using 10+)")
+                    if do_log:
+                        self.get_logger().info(f"Ignoring marker ID: {marker_id} (using 10+)")
                     continue  # 현재 반복을 중단하고 다음 마커로 넘어갑니다.
 
                 # [추가] 로그를 찍기 위해 Pose 메시지의 쿼터니언으로부터 Euler 각도 계산
@@ -157,25 +177,50 @@ class ArucoDetector(Node):
                 pitch_deg = euler_angles[1]
                 yaw_deg = euler_angles[2]
                 
-                self.get_logger().info(f'--- Marker ID: {marker_id} ---')
-                # 위치 (Position)
-                self.get_logger().info(f'  pos_x (좌우): {pose_msg.position.x:.3f} m')
-                self.get_logger().info(f'  pos_y (상하): {pose_msg.position.y:.3f} m')
-                self.get_logger().info(f'  pos_z (거리): {pose_msg.position.z:.3f} m')
-                # 회전 (Euler Angles)
-                self.get_logger().info(f'  >> Roll (위아래 끄덕임) [X]: {roll_deg:.2f} 도')
-                self.get_logger().info(f'  >> Pitch (좌우 회전) [Y]: {pitch_deg:.2f} 도')
-                self.get_logger().info(f'  >> Yaw (좌우 기울기) [Z]: {yaw_deg:.2f} 도')
+                if do_log:
+                    self.get_logger().info(f'--- Marker ID: {marker_id} ---')
+                    # 위치 (Position)
+                    self.get_logger().info(f'  pos_x (좌우): {pose_msg.position.x:.3f} m')
+                    self.get_logger().info(f'  pos_y (상하): {pose_msg.position.y:.3f} m')
+                    self.get_logger().info(f'  pos_z (거리): {pose_msg.position.z:.3f} m')
+                    # 회전 (Euler Angles)
+                    self.get_logger().info(f'  >> Roll (위아래 끄덕임) [X]: {roll_deg:.2f} 도')
+                    self.get_logger().info(f'  >> Pitch (좌우 회전) [Y]: {pitch_deg:.2f} 도')
+                    self.get_logger().info(f'  >> Yaw (좌우 기울기) [Z]: {yaw_deg:.2f} 도')
 
+                # (기존 코드) 메트릭 단위 데이터 발행
                 marker_pose_msg = ArucoDockingData()
                 marker_pose_msg.marker_pos_x = pose_msg.position.x
                 marker_pose_msg.marker_pos_z = pose_msg.position.z
                 # 중요: 마커의 좌우 회전은 카메라 기준 Pitch 값임
                 marker_pose_msg.marker_pitch = pitch_deg
-                self.get_logger().info(f'Send DDC (ID: {marker_id}) | x: {marker_pose_msg.marker_pos_x:.3f}, z: {marker_pose_msg.marker_pos_z:.3f}, pitch: {marker_pose_msg.marker_pitch:.3f}')
+                if do_log:
+                    self.get_logger().info(f'Send DDC (ID: {marker_id}) | x: {marker_pose_msg.marker_pos_x:.3f}, z: {marker_pose_msg.marker_pos_z:.3f}, pitch: {marker_pose_msg.marker_pitch:.3f}')
                 self.aruco_docking_pub.publish(marker_pose_msg)
 
-            self.get_logger().info('=====================================')
+                # --- 정규화된 위치/거리 계산 및 발행 (추가된 코드) ---
+                marker_corners = corners[i][0]
+                
+                # 1. 정규화된 X 위치 계산
+                center_x_pixel = np.mean(marker_corners[:, 0])
+                normalized_x = (center_x_pixel - w / 2) / (w / 2)
+
+                # 2. 정규화된 거리 (면적 기반) 계산
+                marker_area_px = cv2.contourArea(marker_corners)
+                normalized_dist = np.sqrt(marker_area_px / (h * w))
+
+                normalized_msg = Point()
+                normalized_msg.x = normalized_x      # 정규화된 x 값 (-1.0 ~ 1.0)
+                normalized_msg.y = pitch_deg         # 마커의 기울기 (pitch)
+                normalized_msg.z = normalized_dist   # 정규화된 거리 (면적 기반, 가까울수록 커짐)
+                
+                if do_log:
+                    self.get_logger().info(f'Publishing Normalized (ID: {marker_id}) | norm_x: {normalized_msg.x:.3f}, pitch: {normalized_msg.y:.3f}, norm_dist: {normalized_msg.z:.3f}')
+                self.normalized_pub.publish(normalized_msg)
+
+
+            if do_log:
+                self.get_logger().info('=====================================')
 
 
         # Rviz/Rqt용 디버그 이미지 발행
@@ -186,7 +231,7 @@ class ArucoDetector(Node):
             self.debug_image_pub.publish(debug_image_msg)
 
         # 팝업창(Preview) 표시가 필요할 경우 아래 주석 해제
-        # cv2.imshow(self.preview_window_name, cv_image)
+        # cv2.imshow(self.preview_window_name, cv2.image)
         # cv2.waitKey(1)
             
 
