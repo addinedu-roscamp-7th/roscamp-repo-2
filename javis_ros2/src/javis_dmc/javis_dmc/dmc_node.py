@@ -552,10 +552,10 @@ class JavisDmcNode(Node):
             return response
         
         # 2. 배터리 확인
-        if self.battery_manager.percentage < 40.0:
+        if self.battery_manager.level < 40.0:
             response.success = False
-            response.message = f'배터리가 부족합니다 (현재: {self.battery_manager.percentage:.0f}%, 필요: 40%)'
-            self.get_logger().warn(f'RequestGuidance 거부: 배터리 부족 ({self.battery_manager.percentage:.0f}%)')
+            response.message = f'배터리가 부족합니다 (현재: {self.battery_manager.level:.0f}%, 필요: 40%)'
+            self.get_logger().warn(f'RequestGuidance 거부: 배터리 부족 ({self.battery_manager.level:.0f}%)')
             return response
         
         # 3. 타이머 취소
@@ -1246,7 +1246,9 @@ class JavisDmcNode(Node):
         publish_feedback(0.2)
 
         person_detected = False
-        if not self.ai.is_initialized():
+        is_initialized_false = False
+        #if not self.ai.is_initialized():
+        if not is_initialized_false:
             self.get_logger().warn('AI 인터페이스가 초기화되지 않아 피안내자 등록 절차를 생략합니다.')
             person_detected = True
         else:

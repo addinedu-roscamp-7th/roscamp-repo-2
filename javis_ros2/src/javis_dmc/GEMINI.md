@@ -6,7 +6,7 @@ This document provides a comprehensive overview of the JAVIS DMC project, its ar
 
 항상 한국어로 답변해주세요.
 
-이 프로젝트는 Shopee 로봇 쇼핑 시스템입니다.
+이 프로젝트는 javis 도서관 비서 로봇 시스템입니다.
 
 모든 코드는 /docs 안의 설계문서와 정합적으로 작성되어야 합니다:
 

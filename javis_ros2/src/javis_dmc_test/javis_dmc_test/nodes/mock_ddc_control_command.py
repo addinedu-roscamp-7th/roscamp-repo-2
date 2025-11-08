@@ -47,11 +47,11 @@ class MockControlCommandService(MockServerBase):
         
         if self.is_error():
             response.success = False
-            response.message = f'Mock error 모드: {request.command} 실패'
+            response.current_state = f'Mock error 모드: {request.command} 실패'
             self.get_logger().warn(f'ControlCommand 실패: {request.command}')
         else:
             response.success = True
-            response.message = f'{request.command} 명령 처리 완료'
+            response.current_state = f'{request.command} 명령 처리 완료'
             self.get_logger().info(f'ControlCommand 성공: {request.command}')
         
         return response
