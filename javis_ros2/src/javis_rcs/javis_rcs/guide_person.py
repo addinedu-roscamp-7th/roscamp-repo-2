@@ -60,21 +60,23 @@ class GuidePerson(Node):
         if self.task_done_future is not None and not self.task_done_future.done():
             self.task_done_future.set_result({"success": result.success, "error_code":  result.error_code, "totla_distance_m": result.total_distance_m, "total_tine_sec":result.total_time_sec, "message": result.message})
 
-    def run_task(self, book_id: str, **kwargs) -> Future:
+    def run_task(self, dest_location_data: dict, **kwargs) -> Future:
         """
-        지정된 seat_id에 대한 clean_seat 작업 실행.
+        지정된 dest_location에 대한 guide_person 작업 실행.
         작업 완료 시 결과를 되돌려줄 Future를 반환합니다.
         외부(예: Orchestrator)에서 spin_until_future_complete로 기다리면 됩니다.
         """
-        # ✅ Node에는 create_future가 없으므로, rclpy.task.Future로 직접 생성
         self.task_done_future = Future()
+        try:
+            # The dest_location is passed as the first argument
+            dest_location = self._make_pose2d(dest_location_data)
 
-        # kwargs로부터 Pose2D / Pose 생성
-        dest_location = self._make_pose2d(kwargs.get('dest_location', {}))
-
-        # Goal 전송 후, goal 응답 완료 콜백 체인 연결
-        goal_future = self.send_goal(dest_location=dest_location)
-        goal_future.add_done_callback(self.goal_response_callback)
+            # Goal 전송 후, goal 응답 완료 콜백 체인 연결
+            goal_future = self.send_goal(dest_location=dest_location)
+            goal_future.add_done_callback(self.goal_response_callback)
+        except Exception as e:
+            self.get_logger().error(f"Error in run_task for guide_person: {e}")
+            self.task_done_future.set_result({'success': False, 'message': f'길 안내 처리 중 예외가 발생했습니다: {e}'})
 
         return self.task_done_future
     

@@ -38,17 +38,10 @@ from javis_dmc.task_executors.guiding_executor import GuidingExecutor, GuidingOu
 from javis_dmc.task_executors.pickup_executor import PickupExecutor, PickupOutcome
 from javis_dmc.task_executors.reshelving_executor import ReshelvingExecutor
 from javis_dmc.task_executors.sorting_executor import SortingExecutor
-from javis_interfaces.action import CleanSeat
-from javis_interfaces.action import GuidePerson
-from javis_interfaces.action import PickupBook
-from javis_interfaces.action import RearrangeBook
-from javis_interfaces.action import ReshelvingBook
-from javis_interfaces.msg import BatteryStatus
-from javis_interfaces.msg import CurrentPose
-from javis_interfaces.msg import DobbyState
-from javis_interfaces.srv import SetRobotMode
-from javis_interfaces.srv import QueryLocationInfo
-from javis_interfaces.srv import RequestGuidance
+from javis_interfaces.action import CleanSeat, GuidePerson, PickupBook, RearrangeBook, ReshelvingBook, GuideNavigation
+from javis_interfaces.msg import BatteryStatus, CurrentPose, DobbyState
+from javis_interfaces.srv import SetRobotMode, QueryLocationInfo, RequestGuidance
+from rclpy.action import ActionClient
 
 
 class JavisDmcNode(Node):
@@ -101,6 +94,8 @@ class JavisDmcNode(Node):
         
         # 도서관 위치 정보 로딩 (v4.0)
         self._library_locations = self._load_library_locations()
+
+        self.guide_nav_client = ActionClient(self, GuideNavigation, self._ns_topic(f'{self.namespace}/drive/guide_navigation'))
         
         # 세션 및 상태 추적 초기화
         self._timeouts = self._load_action_timeouts()
@@ -1232,6 +1227,10 @@ class JavisDmcNode(Node):
 
         if goal is None or not hasattr(goal, 'dest_location'):
             return GuidingOutcome(False, '목적지 정보가 전달되지 않았습니다.')
+        
+        
+    
+
 
         dest_location = goal.dest_location
         requested_name = str(getattr(goal, 'destination_name', '')).strip() or 'custom_destination'
@@ -1277,7 +1276,9 @@ class JavisDmcNode(Node):
 
         # 목적지로 안내
         set_sub_state(SubState.GUIDING_TO_DEST)
+        self.get_logger().info("Calling _navigate_with_follow_mode")
         navigation_success = self._navigate_with_follow_mode(dest_pose)
+        self.get_logger().info(f"navigation_success = {navigation_success}")
         publish_feedback(1.0 if navigation_success else 0.85)
 
         duration = time.monotonic() - start_time
@@ -1368,21 +1369,14 @@ class JavisDmcNode(Node):
         if not self.drive.is_initialized():
             self.get_logger().warn('Drive 인터페이스가 초기화되지 않았습니다.')
             return False
-
-        follow_started = False
+        
         try:
-            follow_started = self.drive.enable_follow_mode('ai/tracking/status', destination)
+            future = self.drive.enable_follow_mode('ai/tracking/status', destination)
         except Exception as exc:  # noqa: BLE001
             self.get_logger().error(f'추종 모드 활성화 실패: {exc}')
+            return False
 
-        future = self.drive.move_to_target(destination, 'guide_person')
-        success = self._wait_future_success(future, timeout=20.0)
-
-        if follow_started:
-            try:
-                self.drive.disable_follow_mode()
-            except Exception as exc:  # noqa: BLE001
-                self.get_logger().warn(f'추종 모드 비활성화 실패: {exc}')
+        success = self._wait_future_success(future, timeout=120.0)
 
         return success
 
@@ -1396,6 +1390,7 @@ class JavisDmcNode(Node):
             return 0.0
 
         target_pose = self._pose2d_to_pose(pose2d)
+        self.get_logger().info(f'target_pose: {target_pose}')
         distance = self._estimate_distance_pose(target_pose)
         future = self.drive.move_to_target(target_pose, location_name)
         self._wait_future_success(future, timeout=20.0)

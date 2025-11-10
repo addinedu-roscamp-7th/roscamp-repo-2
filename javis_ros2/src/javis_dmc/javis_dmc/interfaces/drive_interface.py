@@ -32,7 +32,7 @@ class DriveInterface(BaseInterface):
         tracking_topic: str,
         destination: Pose,
         follow_distance: float = 1.5,
-    ) -> bool:
+    ) -> Future:
         '''사람 추종 모드를 활성화한다.'''
 
     @abstractmethod
@@ -146,7 +146,7 @@ class RosDriveInterface(DriveInterface):
         tracking_topic: str,
         destination: Pose,
         follow_distance: float = 1.5,
-    ) -> bool:
+    ) -> Future:
         '''사람 추종 모드를 활성화한다.'''
         del tracking_topic  # 추후 AIS 연동 시 활용
         goal = GuideNavigation.Goal()
@@ -154,9 +154,7 @@ class RosDriveInterface(DriveInterface):
         goal.max_speed = 0.8
         goal.person_follow_distance = follow_distance
 
-        future = self._send_goal(self._guide_client, goal, store_handle=True)
-        future.add_done_callback(lambda _: None)
-        return True
+        return self._send_goal(self._guide_client, goal, store_handle='guide')
 
     def disable_follow_mode(self) -> bool:
         '''사람 추종 모드를 비활성화한다.'''
@@ -286,6 +284,7 @@ class RosDriveInterface(DriveInterface):
 
             if store_handle == 'guide':
                 self._guide_goal_handle = goal_handle
+                
             if store_handle == 'patrol':
                 self._patrol_goal_handle = goal_handle
                 self._patrol_active = True

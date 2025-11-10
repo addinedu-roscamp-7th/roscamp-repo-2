@@ -51,8 +51,8 @@ class MockGuideNavigationAction(MockServerBase):
         '''Goal 수신 시 호출'''
         self.get_logger().info(
             f'GuideNavigation Goal 수신: '
-            f'dest=({goal_request.dest_location.x:.1f}, '
-            f'{goal_request.dest_location.y:.1f})'
+            f'dest=({goal_request.destination.position.x:.1f}, '
+            f'{goal_request.destination.position.y:.1f})'
         )
         return GoalResponse.ACCEPT
     
