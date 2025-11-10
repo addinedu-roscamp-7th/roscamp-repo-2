@@ -2,12 +2,13 @@ import rclpy
 from rclpy.action import ActionServer, GoalResponse
 from rclpy.node import Node
 from geometry_msgs.msg import TransformStamped, PoseStamped
+# 필요한 메시지 타입 import
+from std_msgs.msg import Float64 # <--- Float64 메시지 타입 추가
 from javis_interfaces.action import PerformTask
 from javis_kc.move_robot_arm_client import MoveRobotArmClient
 from pymycobot.mycobot280 import MyCobot280
 import time
 import math
-import threading
 import numpy as np
 import subprocess
 from enum import Enum
@@ -35,6 +36,17 @@ class PerformTaskActionServer(Node):
         
         # 'busy' 상태를 관리하기 위한 플래그
         self._is_busy = False
+        
+        # 객체 인식 노드로부터 받은 각도를 저장할 변수 (초기값 0.0)
+        self.object_rotation_angle = 0.0 
+        
+        # ROS 구독자 선언: '/rotation_angle' 토픽 구독
+        self.angle_subscriber = self.create_subscription(
+            Float64,
+            'rotation_angle',
+            self.angle_callback, # <--- 콜백 함수 연결
+            10
+        )
 
         tf_cmd = [
             "ros2", "run", "tf2_ros", "static_transform_publisher",
@@ -43,16 +55,7 @@ class PerformTaskActionServer(Node):
         ]
         subprocess.Popen(tf_cmd)
 
-        # ==================================================================
-        # ===== 요청사항 반영: static_transform_publisher 호출 제거 =====
-        # tf_gripper_tip = [
-        #     "ros2", "run", "tf2_ros", "static_transform_publisher",
-        #     "0.0566", "-0.0566", "0.005", "-0.7854", "0.0", "0.0",
-        #     "end_effector_link", "gripper_tip_link"
-        # ]
-        # subprocess.Popen(tf_gripper_tip)
         self.get_logger().info('정적 TF 발행기(카메라) 시작. Gripper Tip은 동적으로 계산됩니다.')
-        # ==================================================================
 
 
         self._action_server = ActionServer(
@@ -66,7 +69,7 @@ class PerformTaskActionServer(Node):
         self.feedback_msg = PerformTask.Feedback()
 
         self.mc = MyCobot280("/dev/ttyJETCOBOT", 1000000)
-        self.mc.thread_lock = False
+        self.mc.thread_lock = True
         self.mc.send_angles([0.0,0.0,0.0,-90.0,0.0,-45.0], 30)
         self.mc.set_gripper_value(100, 50)
         self.get_logger().info('MyCobot 연결 완료')
@@ -82,9 +85,20 @@ class PerformTaskActionServer(Node):
         # 물체에 접근할 때의 Z축 높이 (mm)
         self.approach_height_mm = 225.0
         # 물체를 잡을 때 사용할 엔드 이펙터의 목표 자세 (RPY, degrees)
-        self.pick_orientation_rpy = [-179.0, 0.0, -45.0]
+        # R, P는 고정, Y값은 아래 execute_callback에서 덮어쓰기 위해 초기값 설정
+        self.pick_orientation_rpy = [-179.0, 0.0, -45.0] 
+        
+        # 현재 처리 중인 메뉴 ID를 저장
+        self.current_menu_id = None
         
         self.get_logger().info('액션서버 시작. 목표를 기다립니다...')
+
+    def angle_callback(self, msg):
+        """'/rotation_angle' 토픽으로부터 각도 값을 수신합니다."""
+        # rotation.py에서 보낸 각도는 0~90도 절대값입니다.
+        self.object_rotation_angle = msg.data
+        self.get_logger().debug(f"수신된 객체 회전 각도: {self.object_rotation_angle:.2f} degrees")
+
 
     def goal_callback(self, goal_request):
         """새로운 목표가 들어왔을 때 수락할지 거절할지 결정합니다."""
@@ -97,15 +111,54 @@ class PerformTaskActionServer(Node):
 
     def execute_callback(self, goal_handle):
         """목표를 수락했을 때 실제 작업을 수행하는 함수."""
-        self.get_logger().info(f'작업 실행: "{goal_handle.request.member_id}"')
+        self.get_logger().info(f'작업 실행 - order_id: {goal_handle.request.order_id}, menu_id: {goal_handle.request.menu_id}')
         
         self._is_busy = True
         
         try:
+            # menu_id에 따른 처리
+            if goal_handle.request.menu_id not in [1, 2]:
+                error_msg = f'지원하지 않는 menu_id: {goal_handle.request.menu_id}'
+                self.get_logger().error(error_msg)
+                goal_handle.abort()
+                return PerformTask.Result(order_id=goal_handle.request.order_id, success=False, pick_up_num=0, message=error_msg)
+            
+            self.get_logger().info(f'메뉴 {goal_handle.request.menu_id}번 제조를 시작합니다.')
+            
+            # 현재 처리할 메뉴 ID 설정
+            self.current_menu_id = goal_handle.request.menu_id
+            
             # 1. 클라이언트를 통해 목표 좌표를 요청
             move_robot_arm_client = MoveRobotArmClient()
             self.get_logger().info('목표 객체의 좌표를 요청합니다...')
             res = move_robot_arm_client.send_request()
+            
+            # --- 객체 각도에 따른 로봇 Yaw 각도 계산 로직 ---
+            calculated_yaw = self.pick_orientation_rpy[2] # 초기 Z축(Yaw) 각도. -45.0도
+
+            if 0.0 <= self.object_rotation_angle <= 45.0:
+                # 0 ~ 45도 사이면 '현재각도'를 Yaw 값에 더함
+                calculated_yaw -= self.object_rotation_angle
+                self.get_logger().info(f"객체 각도({self.object_rotation_angle:.2f}도) -> Yaw에 그대로 반영: {calculated_yaw:.2f}도")
+            elif 45.0 < self.object_rotation_angle <= 90.0:
+                # 45 ~ 90도 사이면 '현재각도 - 90'을 Yaw 값에 더함
+                angle_offset = self.object_rotation_angle - 90.0
+                calculated_yaw -= angle_offset
+                self.get_logger().info(f"객체 각도({self.object_rotation_angle:.2f}도) -> Yaw에 (각도-90) 반영: {calculated_yaw:.2f}도")
+            else:
+                 # 예외 처리 (각도가 범위를 벗어난 경우)
+                 self.get_logger().warn(f"객체 각도({self.object_rotation_angle:.2f}도)가 0~90도 범위를 벗어났습니다. 기본 Yaw 각도를 사용합니다.")
+
+
+            # 최종 계산된 Yaw 각도로 pick_orientation_rpy 업데이트
+            # [R, P, Y] = [roll, pitch, yaw]
+            pick_orientation_for_coords = [
+                self.pick_orientation_rpy[0],  # Roll: -179.0
+                self.pick_orientation_rpy[1],  # Pitch: 0.0
+                calculated_yaw                  # Yaw: 계산된 값
+            ]
+            # -----------------------------------------------
+
 
             # 2. 유효한 좌표인지 확인
             if res.x == 0.0 and res.y == 0.0 and res.z == 0.0:
@@ -135,9 +188,10 @@ class PerformTaskActionServer(Node):
                 ]
                 
                 # 2. 접근 위치로 가기 위한 end_effector의 좌표와 자세 계산
+                # 계산된 각도 (pick_orientation_for_coords)를 사용하여 자세 계산
                 approach_coords_ee = self._calculate_end_effector_pose(
                     approach_pos_gripper,
-                    self.pick_orientation_rpy
+                    pick_orientation_for_coords # <--- 수정된 RPY 자세 사용
                 )
                 
                 self.get_logger().info(f"계산된 end_effector 접근 좌표: {approach_coords_ee}")
@@ -145,6 +199,10 @@ class PerformTaskActionServer(Node):
                 # 3. 계산된 좌표로 로봇 팔 이동 (기존 send_angles 대체)
                 self.mc.send_coords(approach_coords_ee, 30)
                 time.sleep(3.0)
+                
+                # --- 최종 피킹 자세에 계산된 각도를 반영하기 위해 멤버 변수 업데이트 ---
+                self.pick_orientation_rpy[2] = calculated_yaw
+
 
             except tf2_ros.TransformException as ex:
                 error_msg = f'TF 변환 실패: {ex}'
@@ -157,6 +215,7 @@ class PerformTaskActionServer(Node):
             
             while self.state != RobotState.RETURNING_HOME and rclpy.ok():
                 self.control_loop()
+                self.feedback_msg.order_id = goal_handle.request.order_id
                 self.feedback_msg.progress_percentage = self.get_progress_by_state()
                 goal_handle.publish_feedback(self.feedback_msg)
                 time.sleep(1)
@@ -167,9 +226,10 @@ class PerformTaskActionServer(Node):
 
             goal_handle.succeed()
             result = PerformTask.Result()
+            result.order_id = goal_handle.request.order_id
             result.success = True
-            result.pick_up_num = 1
-            result.message = f'Task "{goal_handle.request.member_id}" completed successfully'
+            result.pick_up_num = 1 if goal_handle.request.menu_id == 1 else 2  # menu_id에 따라 다른 픽업 번호 할당
+            result.message = f'메뉴 {goal_handle.request.menu_id}번 음료 제조 완료. 픽업 번호: {result.pick_up_num}'
             self.get_logger().info('목표 수행 성공!')
             return result
 
@@ -177,6 +237,8 @@ class PerformTaskActionServer(Node):
             self.get_logger().info("작업 완료. 다음 목표를 받을 준비가 되었습니다.")
             self._is_busy = False
             self.state = RobotState.WAITING_FOR_OBJECT
+            # 작업이 끝난 후 혹시 모를 다음 목표를 위해 Yaw 각도를 초기값으로 되돌릴 수 있음 (선택 사항)
+
 
     def _rpy_deg_to_rotation_matrix(self, rpy_deg):
         """RPY 각도(degree)를 회전 행렬(numpy array)로 변환합니다."""
@@ -212,6 +274,7 @@ class PerformTaskActionServer(Node):
         R_base_to_ee = self._rpy_deg_to_rotation_matrix(end_effector_target_rpy_deg)
         
         # 오프셋 벡터를 base_link 좌표계로 변환
+        offset_in_ee_frame = np.array([0.06, -0.06, 0.005])
         offset_in_base_frame = R_base_to_ee @ offset_in_ee_frame
         
         # gripper_tip 목표 위치에서 변환된 오프셋을 빼서 end_effector 목표 위치 계산
@@ -221,7 +284,7 @@ class PerformTaskActionServer(Node):
         # myCobot의 send_coords 형식(mm, deg)으로 변환하여 반환
         return [
             P_end_effector[0] * 1000.0,
-            P_end_effector[1] * 1000.0 - 50.0,
+            P_end_effector[1] * 1000.0 - 10.0,
             P_end_effector[2] * 1000.0,
             float(end_effector_target_rpy_deg[0]),
             float(end_effector_target_rpy_deg[1]),
@@ -236,22 +299,37 @@ class PerformTaskActionServer(Node):
         if self.state == RobotState.RETURNING_HOME: return 95.0
         return 0.0
 
+    # control_loop1, control_loop2, rpy_to_quaternion, rotation_matrix_to_quaternion, 
+    # quaternion_to_rotation_matrix, transform_point, broadcast_timer_callback 
+    # 함수는 변경 없이 유지합니다.
+    # ... (생략된 기존 코드)
+
     def control_loop(self):
         """상태에 따라 로봇을 제어하는 메인 루프"""
+        if self.current_menu_id == 1:
+            self.control_loop1()
+        elif self.current_menu_id == 2:
+            self.control_loop2()
+        else:
+            self.get_logger().error(f"지원하지 않는 메뉴 ID: {self.current_menu_id}")
+
+    def control_loop1(self):
+        """메뉴 1번을 처리하는 control loop"""
         if self.state == RobotState.LOWERING_TO_PICK:
             self.get_logger().info("상태: [LOWERING_TO_PICK]")
             
             # 잡기 직전의 gripper_tip 위치 (z축으로 약간의 오프셋 추가)
             final_gripper_tip_pos = [
-                self.target_coords[0],
-                self.target_coords[1],
-                self.target_coords[2] + 0.020  # 30mm 오프셋 (미터 단위)
+                self.target_coords[0] + 0.005,
+                self.target_coords[1] - 0.020,
+                self.target_coords[2] + 0.040  # 30mm 오프셋 (미터 단위)
             ]
             
             # 최종 잡기 위치에 도달하기 위한 end_effector 좌표 계산
+            # 여기서 self.pick_orientation_rpy의 Yaw는 이미 execute_callback에서 계산된 각도로 업데이트됨
             final_pick_coords_ee = self._calculate_end_effector_pose(
                 final_gripper_tip_pos,
-                self.pick_orientation_rpy
+                self.pick_orientation_rpy # <--- 업데이트된 Yaw 각도 사용
             )
             
             self.get_logger().info(f"계산된 end_effector 최종 잡기 좌표: {final_pick_coords_ee}")
@@ -308,6 +386,95 @@ class PerformTaskActionServer(Node):
             self.get_logger().info("상태: [RETURNING_HOME]")
             self.mc.send_angles([1.23, 4.13, 0.61, 83.58, -0.43, -43.15], 30)
             time.sleep(2.5)
+
+    def control_loop2(self):
+        """메뉴 2번을 처리하는 control loop - 기본 동작은 1번과 동일하지만 다른 위치에 배출"""
+        if self.state == RobotState.LOWERING_TO_PICK:
+            self.get_logger().info("상태: [LOWERING_TO_PICK]")
+            
+            # 잡기 직전의 gripper_tip 위치 (z축으로 약간의 오프셋 추가)
+            final_gripper_tip_pos = [
+                self.target_coords[0] + 0.020,
+                self.target_coords[1] - 0.020,
+                self.target_coords[2] + 0.030  # 30mm 오프셋 (미터 단위)
+            ]
+            
+            # 최종 잡기 위치에 도달하기 위한 end_effector 좌표 계산
+            # 여기서 self.pick_orientation_rpy의 Yaw는 이미 execute_callback에서 계산된 각도로 업데이트됨
+            final_pick_coords_ee = self._calculate_end_effector_pose(
+                final_gripper_tip_pos,
+                self.pick_orientation_rpy # <--- 업데이트된 Yaw 각도 사용
+            )
+
+            #얼음 집으러가기
+            preprocess_of_picking_ice_angles = [91.4, -45.52, -38.32, -103.79, 91.58, -52.29]
+            self.mc.send_angles(preprocess_of_picking_ice_angles, 30)
+            time.sleep(2.0)
+            preprocess_of_picking_ice_angles2 = [92.46, -62.4, -37.44, -99.31, 92.72, -63.01]
+            self.mc.send_angles(preprocess_of_picking_ice_angles2, 30)
+            time.sleep(2.0)
+            #얼음집기
+            self.mc.set_gripper_value(0, 50)
+            time.sleep(1.5)
+            self.mc.send_angles(preprocess_of_picking_ice_angles, 30)
+            time.sleep(1.5)
+
+            
+            self.get_logger().info(f"계산된 end_effector 최종 잡기 좌표: {final_pick_coords_ee}")
+            # 계산된 위 좌표
+            self.mc.sync_send_coords([final_pick_coords_ee[0],final_pick_coords_ee[1],225.0,final_pick_coords_ee[3],final_pick_coords_ee[4],final_pick_coords_ee[5]], 40, 1)
+            time.sleep(1.5)
+            #얼음놓기
+            self.mc.set_gripper_value(100, 50)
+            time.sleep(1.5)
+            # 계산된 좌표로 이동
+            self.mc.sync_send_coords(final_pick_coords_ee, 40, 1)
+            time.sleep(1.5)
+            self.state = RobotState.GRIPPING
+
+        elif self.state == RobotState.GRIPPING:
+            self.get_logger().info("상태: [GRIPPING]")
+            self.mc.set_gripper_value(0, 50)
+            time.sleep(1.5)
+            self.state = RobotState.RAISING_AFTER_PICK
+
+        elif self.state == RobotState.RAISING_AFTER_PICK:
+            self.get_logger().info("상태: [RAISING_AFTER_PICK]")
+            
+            # 물체를 들어올리는 동작 (기존 로직 유지)
+            raise_angles = [-1.14, 10.89, -63.63, -40.25, -2.02, -45.87]
+            self.mc.send_angles(raise_angles, 30)
+            time.sleep(5.0)
+
+            # 이후 디스펜스 동작 (두 번째 위치에 배출하도록 각도 수정)
+            ready_to_place = [-6.32, 7.73, -42.53, -38.93, 7.64, 66.53]
+            self.mc.send_angles(ready_to_place, 30)
+            time.sleep(5.5)
+            # 두 번째 픽업 위치를 위한 각도 수정
+            close_to_dispense = [-37.88, 14.32, -42.53, -67.32, 10.45, 18.45]
+            self.mc.send_angles(close_to_dispense, 30)
+            time.sleep(9.5)
+            self.mc.send_angles(ready_to_place, 30)
+            time.sleep(5.0)
+            # 두 번째 픽업 위치를 위한 각도 수정
+            finish_to_dispense1 = [92.63, 5.62, -16.52, -76.81, 0.52, -37.7]
+            self.mc.send_angles(finish_to_dispense1, 30)
+            time.sleep(5.0)
+            finish_to_dispense2 = [93.69, -67.14, -16.69, -4.3, -2.63, -39.02]
+            self.mc.send_angles(finish_to_dispense2, 30)
+            time.sleep(5.0)
+            self.mc.set_gripper_value(100, 50)
+            time.sleep(5.0)
+            finish_to_dispense3 = [93.69, -7.91, -47.46, -35.41, -5.44, -38.32]
+            self.mc.send_angles(finish_to_dispense3, 30)
+            time.sleep(3.0)
+            self.state = RobotState.RETURNING_HOME
+
+        elif self.state == RobotState.RETURNING_HOME:
+            self.get_logger().info("상태: [RETURNING_HOME]")
+            self.mc.send_angles([1.23, 4.13, 0.61, 83.58, -0.43, -43.15], 30)
+            time.sleep(2.5)
+            self.mc.send_angles([0.0,0.0,0.0,-90.0,0.0,-45.0], 30)
 
     def rpy_to_quaternion(self, roll, pitch, yaw):
         roll_rad, pitch_rad, yaw_rad = map(math.radians, [roll, pitch, yaw])
