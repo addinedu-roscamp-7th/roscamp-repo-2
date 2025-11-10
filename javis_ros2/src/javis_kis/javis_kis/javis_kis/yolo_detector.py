@@ -26,7 +26,7 @@ class YoloDetector(Node):
         
         # 1. 모델 로드 경로 설정
         #weights_path = '/home/addinedu/roscamp-repo-2/javis_ros2/best.pt'
-        weights_path = '/home/jetcobot/roscamp-repo-2/javis_ros2/best.pt'
+        weights_path = '/home/addinedu/roscamp-repo-2/javis_ros2/best.pt'
         # YOLOv8 모델 로드
         self.get_logger().info(f"YOLOv8 모델 로드 중: {weights_path}")
         try:
