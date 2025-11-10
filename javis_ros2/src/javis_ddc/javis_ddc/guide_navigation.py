@@ -51,6 +51,7 @@ class GuideNavigation(Node):
             '/dobby_img',
             10
         )
+        self.person_detected = False
         
         self.goal_handle = None
         self.amcl_pose = None # 초기화
