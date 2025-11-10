@@ -13,7 +13,6 @@ import math
 import tf_transformations
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-from javis_interfaces.msg import TrackingStatus
 
 FACE_CASCADE_PATH = '/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml'
 
@@ -52,11 +51,7 @@ class GuideNavigation(Node):
             '/dobby_img',
             10
         )
-        self.detect_pub = self.create_publisher(
-            TrackingStatus,
-            'dobbb1/ai/tracking/status',
-            10
-        )
+        
         self.goal_handle = None
         self.amcl_pose = None # 초기화
 
@@ -317,19 +312,7 @@ class GuideNavigation(Node):
                 self.handle_tracking_loss()
                 self.pause()
 
-            trackingStatus_msg = TrackingStatus()
-            trackingStatus_msg.header.frame_id = 'map'
-            trackingStatus_msg.header.stamp = self.nav2.get_clock().now().to_msg()
-            trackingStatus_msg.person_detected = success
-            trackingStatus_msg.tracking_id = 'visitor'
-            trackingStatus_msg.person_pose.position.x = 0.0
-            trackingStatus_msg.person_pose.position.y = 0.0
-            trackingStatus_msg.person_pose.position.z = 0.0
-            trackingStatus_msg.distance_to_person = 0.0
-            trackingStatus_msg.confidence = 0.0
-            trackingStatus_msg.is_lost = False
-            trackingStatus_msg.time_since_last_seen = 0.0
-            self.detect_pub.publish(trackingStatus_msg)
+            
         else:
             # --- 2. 추적 중이 아닐 때: 재감지 시도 ---
             self.attempt_detection(frame, gray)
@@ -346,8 +329,8 @@ class GuideNavigation(Node):
             self.cmd_vel_pub.publish(stop_msg)
 
         # cv2.imshow('OpenCV_CSRT_Tracking', frame)
-        # if cv2.waitKey(1) & 0xFF == 27:
-        #     self.destroy_node()
+        if cv2.waitKey(1) & 0xFF == 27:
+            self.destroy_node()
         self.current_frame = frame
 
 
