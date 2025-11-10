@@ -3,7 +3,7 @@ from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose2D, Twist
 from nav2_simple_commander.robot_navigator import BasicNavigator
-from javis_interfaces.action import GuideNavigation
+from javis_interfaces.action import GuideNavigation as GuideNavigationAction
 from nav_msgs.msg import Path
 from action_msgs.msg import GoalStatus
 from nav_msgs.msg import Path
@@ -31,7 +31,7 @@ class GuideNavigation(Node):
         initial_pose = self.init_pose()
         self.nav2.setInitialPose(initial_pose)
 
-        self.dobby_nav2_server = ActionServer(self, GuideNavigation,
+        self.dobby_nav2_server = ActionServer(self, GuideNavigationAction,
                                               'dobby1/drive/guide_navigation',
                                               execute_callback=self.execute_callback,
                                               goal_callback=self.goal_callback,
@@ -112,8 +112,8 @@ class GuideNavigation(Node):
         self.goal_handle = goal_handle
 
         request = goal_handle.request
-        feedback_msg = GuideNavigation.Feedback()
-        result = GuideNavigation.Result()
+        feedback_msg = GuideNavigationAction.Feedback()
+        result = GuideNavigationAction.Result()
         self.goal_sent = True
         self.is_robot_moving = True # <--- 추가된 부분: 새로운 목표 시작 시 항상 움직임 상태로 설정
 
@@ -255,7 +255,7 @@ class GuideNavigation(Node):
     
     def amcl_callback(self, msg):
         self.amcl_pose = msg
-    def goal_callback(self, goal_request: GuideNavigation.Goal):
+    def goal_callback(self, goal_request: GuideNavigationAction.Goal):
         self.get_logger().info(f"이동 명령 요청 {goal_request.destination}, 최대속도: {goal_request.max_speed}, 안전최소거리: {goal_request.person_follow_distance}")
 
         return GoalResponse.ACCEPT
