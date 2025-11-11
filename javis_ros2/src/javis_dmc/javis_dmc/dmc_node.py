@@ -40,6 +40,7 @@ from javis_dmc.task_executors.reshelving_executor import ReshelvingExecutor
 from javis_dmc.task_executors.sorting_executor import SortingExecutor
 from javis_interfaces.action import CleanSeat, GuidePerson, PickupBook, RearrangeBook, ReshelvingBook, GuideNavigation
 from javis_interfaces.msg import BatteryStatus, CurrentPose, DobbyState
+from rclpy.qos import QoSProfile, DurabilityPolicy
 from javis_interfaces.srv import SetRobotMode, QueryLocationInfo, RequestGuidance
 from rclpy.action import ActionClient
 
@@ -197,10 +198,13 @@ class JavisDmcNode(Node):
         self._create_action_servers()
 
         # 퍼블리셔와 서브스크라이버 생성
+        # QoS 프로파일 생성 (TRANSIENT_LOCAL 설정)
+        qos_profile = QoSProfile(depth=10, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+
         self.state_pub = self.create_publisher(
             DobbyState,
             self._ns_topic('status/robot_state'),
-            10,
+            qos_profile,  # 기존 숫자 10 대신 qos_profile 객체 사용
         )
         self.battery_pub = self.create_publisher(
             BatteryStatus,

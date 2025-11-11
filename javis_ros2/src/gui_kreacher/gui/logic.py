@@ -114,7 +114,7 @@ class CafeApp(QMainWindow):
                 order_id = response_json.get('OrderID', 'N/A')
                 order_status = response_json.get('OrderStatus', 'N/A')
                 client = DobyVoiceAdvancedClient()
-                client.text_to_speech("주문이 완료되었스니다")
+                client.text_to_speech("주문이 완료되었습니다")
                 self.statusbar.showMessage(
                     f"주문 완료! OrderID: {order_id}, Status: {order_status}", 
                     3000

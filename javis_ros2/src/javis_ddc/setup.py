@@ -25,6 +25,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'ddc_node = javis_ddc.ddc_node:main',
             'guide_navigation = javis_ddc.guide_navigation:main',
             'my_subscriber = javis_ddc.my_subscriber:main',
             'pose_publisher = javis_ddc.pose_publisher:main',

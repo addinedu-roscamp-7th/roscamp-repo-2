@@ -56,7 +56,9 @@ class AlignVisionManager:
             1: 21,
             2: 22,
             3: 23,
-            4: 24
+            4: 24,
+            5: 25,
+            6: 26
         }
         
         self.K = np.array([[1200.0, 0.0, 640.0],
@@ -83,16 +85,20 @@ class AlignVisionManager:
             major, minor, *_ = map(int, ver.split("."))
         except:
             major, minor = 4, 5
+
+        # ✅ OpenCV 4.7 이상: 새로운 ArUco API
         if major > 4 or (major == 4 and minor >= 7):
-            params = self.aru.DetectorParameters_create()
+            params = self.aru.DetectorParameters()
             self.detector = self.aru.ArucoDetector(self.dict, params)
             self.detect_func = lambda gray: self.detector.detectMarkers(gray)
+
+        # ✅ OpenCV 4.6 이하: 구버전 API
         else:
             self.params = self.aru.DetectorParameters_create()
             self.detect_func = lambda gray: self.aru.detectMarkers(gray, self.dict, parameters=self.params)
 
         print("✅ AlignVisionManager initialized successfully.")
-        
+                
     def find_empty_slot(self):
         """비어있는 슬롯 찾기"""
         for slot_id, book_id in self.slot_status.items():
@@ -530,7 +536,6 @@ class AlignVisionManager:
         if dist_pix < center_tol:
             print(f"✅ 중심 정렬 완료 ({dist_pix:.1f}px)")
             
-            self._prev_center_dist = 300
             self._stagnant_count = 0
             
             return True, self.mc.get_coords()
@@ -547,7 +552,7 @@ class AlignVisionManager:
         self._prev_center_dist = dist_pix
 
         # 📦 이동 계산
-        k = 0.15 if dist_pix > 60 else 0.1 if dist_pix > 25 else 0.05
+        k = 0.1 if dist_pix > 60 else 0.08 if dist_pix > 25 else 0.025
         move_x = -dy * k
         move_y = -dx * k
         
@@ -673,6 +678,15 @@ class AlignVisionManager:
                 ],
             }
             
+            pick_x_offset = 15
+            pick_y_offset = 0
+            pick_z_offset = 20
+            
+            place_x_offset = -20
+            place_y_offset = 0
+            place_z_offset = 0
+            
+            
         elif dobby_num == 2:
             SLOT_POSES = {
                 0: [
@@ -695,10 +709,17 @@ class AlignVisionManager:
                 ],
             }
 
-        
+            pick_x_offset = 0
+            pick_y_offset = 10
+            pick_z_offset = 20
+            
+            place_x_offset = -20
+            place_y_offset = 30
+            place_z_offset = 0
+
         
         # =========================================================
-        # 🟦 도비 → 책장
+        # 🟦 도비 → 책장 place
         # =========================================================
         if mode == "DOBBY_TO_SHELF":
             
@@ -742,8 +763,8 @@ class AlignVisionManager:
             print("📍 책 위치로 이동 중...")
 
             approach = self.mc.get_coords()
-            approach[0] += (self.FORWARD_X_MM - 20)
-            approach[1] += self.FORWARD_Y_MM
+            approach[0] += (self.FORWARD_X_MM + place_x_offset)
+            approach[1] += (self.FORWARD_Y_MM + place_y_offset)
             approach[2] = self.PICK_Z_HALF
             await self.safe_move(approach, speed=25)
 
@@ -761,7 +782,7 @@ class AlignVisionManager:
             print("✅ 도비→책장 완료")
 
         # =========================================================
-        # 🟥 책장 → 도비
+        # 🟥 책장 → 도비 pick
         # =========================================================
         elif mode == "SHELF_TO_DOBBY":
             print("\n==============================")
@@ -792,8 +813,8 @@ class AlignVisionManager:
 
             approach = self.mc.get_coords()
             print(f"📸 현재 좌표 (approach 전): {approach}")
-            approach[0] += (self.FORWARD_X_MM + 15)
-            approach[1] += self.FORWARD_Y_MM
+            approach[0] += (self.FORWARD_X_MM + pick_x_offset)
+            approach[1] += (self.FORWARD_Y_MM + pick_y_offset)
             approach[2] = self.PICK_Z_HALF
             print(f"➡️ 접근 좌표 (FORWARD 적용): {approach}")
             await self.safe_move(approach, speed=25)
@@ -807,7 +828,7 @@ class AlignVisionManager:
             print("📕 책 집기 완료 (그리퍼 닫힘)")
 
             lift = self.mc.get_coords()
-            lift[2] = self.PICK_Z_HALF + 20
+            lift[2] = self.PICK_Z_HALF + pick_z_offset
             print(f"⬆️ 리프트 좌표: {lift}")
             await self.safe_move(lift, speed=25)
 
