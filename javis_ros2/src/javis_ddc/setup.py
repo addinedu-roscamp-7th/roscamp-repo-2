@@ -12,7 +12,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
     ],
     # javis_ddc/setup.py (일부)
-    install_requires=['setuptools', 'rclpy', 'cv_bridge', 'numpy', 'opencv-python', 'pyyaml', 'nav2_simple_commander', 'torch', 'torchvision', 'dlib'],
+    install_requires=['setuptools', 'rclpy', 'cv_bridge', 'numpy', 'opencv-python', 'pyyaml', 'nav2_simple_commander', 'torch', 'torchvision', 'dlib', 'ultralytics'],
     zip_safe=True,
     maintainer='addinedu',
     maintainer_email='addinedu@todo.todo',
