@@ -331,6 +331,7 @@ class RosDriveInterface(DriveInterface):
     def _wait_for_action(self, client, name: str) -> None:
         '''액션 서버 준비 상태를 확인한다.'''
         if client is None:
+            self.logger.warn(f'{name} 액션 서버가 준비되었습니다.')
             return
         if not client.wait_for_server(timeout_sec=1.0):
             self.logger.warn(f'{name} 액션 서버가 아직 준비되지 않았습니다.')
@@ -338,6 +339,7 @@ class RosDriveInterface(DriveInterface):
     def _wait_for_service(self, client, name: str) -> None:
         '''서비스 서버 준비 상태를 확인한다.'''
         if client is None:
+            self.logger.warn(f'{name} 액션 서버가 준비되었습니다.')
             return
         if not client.wait_for_service(timeout_sec=1.0):
             self.logger.warn(f'{name} 서비스가 아직 준비되지 않았습니다.')
