@@ -84,7 +84,8 @@ def main(args=None):
         # =========================================================
         # 🧵 Multi-threaded Executor 실행
         # =========================================================
-        executor = MultiThreadedExecutor()
+        
+    executor = MultiThreadedExecutor()
     
     if pick_node:
         executor.add_node(pick_node)
