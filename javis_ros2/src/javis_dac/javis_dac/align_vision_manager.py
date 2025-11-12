@@ -682,7 +682,7 @@ class AlignVisionManager:
             pick_y_offset = 0
             pick_z_offset = 20
             
-            place_x_offset = -20
+            place_x_offset = -10
             place_y_offset = 0
             place_z_offset = 0
             
