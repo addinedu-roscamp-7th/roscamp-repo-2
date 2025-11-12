@@ -88,12 +88,7 @@ class GuideNavigation(Node):
         self.declare_parameter('video_device', '/dev/video2')
         video_device = self.get_parameter('video_device').get_parameter_value().string_value
 
-        self.cap = cv2.VideoCapture(0) 
-
-        if not self.cap.isOpened():
-            self.get_logger().error("WebCam을 열 수 없습니다.")
-            self.destroy_node()
-            return
+        self.cap = None
 
         # --- 3. 상태 변수 ---
         self.is_robot_moving = True
@@ -111,6 +106,19 @@ class GuideNavigation(Node):
 
     def execute_callback(self, goal_handle):
         self.get_logger().info("이동 명령 실행")
+        
+        # --- 카메라 초기화 ---
+        video_device = self.get_parameter('video_device').get_parameter_value().string_value
+        self.cap = cv2.VideoCapture(0) # Using device 0 as per original code
+        if not self.cap.isOpened():
+            self.get_logger().error(f"WebCam을 열 수 없습니다: {video_device}")
+            goal_handle.abort()
+            result = GuideNavigationAction.Result()
+            result.success = False
+            result.termination_reason = f'Failed to open camera device: {video_device}'
+            return result
+
+        self.get_logger().info("카메라가 성공적으로 열렸습니다.")
         self.timer = self.create_timer(self.timer_period, self.process_frame_callback)
         self.goal_handle = goal_handle
 
@@ -118,11 +126,9 @@ class GuideNavigation(Node):
         if self.amcl_pose:
             self.start_pose = self.convert_to_pose_stamped(self.amcl_pose)
         else:
-            # Fallback to initial pose if amcl not received yet
             self.start_pose = self.init_pose() 
         self.person_lost_timestamp = None
         self.person_lost_timeout_occured = False
-
 
         request = goal_handle.request
         feedback_msg = GuideNavigationAction.Feedback()
@@ -130,11 +136,9 @@ class GuideNavigation(Node):
         self.goal_sent = True
         self.is_robot_moving = True
         
-
         self.get_logger().info("이동 시작")
 
         goal_pose = self.set_goal_pose(request)
-        dobby_path = Path()
         if self.amcl_pose is None:
             self.amcl_pose = self.init_pose_with_covariance()
         
@@ -150,8 +154,6 @@ class GuideNavigation(Node):
                 break 
 
             if self.person_lost_timeout_occured:
-                # This flag is set by process_frame_callback
-                # The task is already cancelled there.
                 break
 
             if not self.is_robot_moving:
@@ -162,11 +164,9 @@ class GuideNavigation(Node):
                 pose2d = Pose2D()
                 pose2d.x = self.amcl_pose.pose.pose.position.x
                 pose2d.y = self.amcl_pose.pose.pose.position.y
-                    
                 q = self.amcl_pose.pose.pose.orientation
                 _, _, yaw = tf_transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
                 pose2d.theta = yaw
-                    
                 feedback_msg.current_location = pose2d
                 feedback_msg.distance_remaining = feedback.distance_remaining
                 feedback_msg.status = "길안내중"
@@ -177,40 +177,68 @@ class GuideNavigation(Node):
 
         if self.person_lost_timeout_occured:
             self.get_logger().info(f"{self.person_lost_timeout_seconds}초간 사람 감지 실패. 출발 지점으로 복귀합니다.")
+            
+            # 복귀 전 사람 감지 타이머 중지
+            if self.timer:
+                self.timer.destroy()
+                self.timer = None
+
             self.nav2.goToPose(self.start_pose)
-            # Wait for the return trip to complete
             while not self.nav2.isTaskComplete():
-                # We can publish feedback here if needed
                 time.sleep(0.1)
             
             self.get_logger().info("출발 지점 복귀 완료.")
-            goal_handle.abort()
-            result.success = False
-            result.final_location = self.amcl_pose
+            goal_handle.succeed() # Abort 대신 Succeed로 변경
+            result.success = True
+            result.final_location = self.convert_to_pose2d(self.amcl_pose)
             result.termination_reason = f'Person lost for {self.person_lost_timeout_seconds} seconds, returned to start.'
+        
         elif nav2_result == GoalStatus.STATUS_SUCCEEDED:
             self.get_logger().info('목표 지점 도착 성공!')
             goal_handle.succeed()
             result.success = True
-            result.final_location = self.amcl_pose
+            result.final_location = self.convert_to_pose2d(self.amcl_pose)
             result.termination_reason = 'Navigation succeeded'
+        
         elif nav2_result == GoalStatus.STATUS_CANCELED:
             self.get_logger().info('내비게이션이 외부 요청에 의해 취소되었습니다.')
             goal_handle.canceled()
             result.success = False
+            result.final_location = self.convert_to_pose2d(self.amcl_pose)
             result.termination_reason = 'Navigation was canceled by external request'
+        
         else:
             self.get_logger().error(f'목표 지점 도착 실패! 상태: {nav2_result}')
             goal_handle.abort()
             result.success = False
+            result.final_location = self.convert_to_pose2d(self.amcl_pose)
             result.termination_reason = f'Navigation failed with status: {nav2_result}'
 
-        self.goal_sent = False
-        self.is_robot_moving = True
+        self._cleanup_goal_resources()
+        return result
+
+    def _cleanup_goal_resources(self):
+        """안내 액션에 사용된 리소스를 정리합니다 (타이머, 카메라 등)."""
+        self.get_logger().info("가이드 액션 리소스 정리.")
+        
         if self.timer:
             self.timer.destroy()
             self.timer = None
-        return result
+        
+        if self.cap and self.cap.isOpened():
+            self.cap.release()
+            self.cap = None
+            self.get_logger().info("카메라가 해제되었습니다.")
+
+        # 상태 변수 초기화
+        self.goal_sent = False
+        self.is_robot_moving = True
+        self.person_detected = False
+        self.initial_person_detected = False
+        self.initial_pause_active = False
+        if self.initial_pause_timer:
+            self.initial_pause_timer.cancel()
+            self.initial_pause_timer = None
 
     def init_pose_with_covariance(self):
         init_pose_cov = PoseWithCovarianceStamped()
@@ -257,6 +285,28 @@ class GuideNavigation(Node):
         new_pose_stamped.header = cov_stamped_msg.header
         new_pose_stamped.pose = cov_stamped_msg.pose.pose
         return new_pose_stamped
+    
+    def convert_to_pose2d(self, pose_stamped_or_cov_stamped) -> Pose2D:
+        """
+        PoseStamped 또는 PoseWithCovarianceStamped 메시지를 Pose2D 메시지로 변환합니다.
+        """
+        pose2d = Pose2D()
+        pose = None
+
+        if isinstance(pose_stamped_or_cov_stamped, PoseWithCovarianceStamped):
+            pose = pose_stamped_or_cov_stamped.pose.pose
+        elif isinstance(pose_stamped_or_cov_stamped, PoseStamped):
+            pose = pose_stamped_or_cov_stamped.pose
+        else:
+            self.get_logger().warn("Pose2D로 변환할 수 없는 알 수 없는 Pose 타입입니다.")
+            return pose2d # 기본값 Pose2D 반환
+
+        pose2d.x = pose.position.x
+        pose2d.y = pose.position.y
+        q = pose.orientation
+        _, _, yaw = tf_transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
+        pose2d.theta = yaw
+        return pose2d
     
     def amcl_callback(self, msg):
         self.amcl_pose = msg
