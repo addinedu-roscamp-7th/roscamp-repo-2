@@ -3,12 +3,14 @@ import logging
 import threading
 import time
 from typing import Dict, List
+import cv2
 
 import numpy as np
 
 from javis_dac.config import Config
 from javis_dac.mc_singleton import MyCobotManager
 from javis_dac.slot_inventory import SlotInventory
+from javis_dac.align_vision import AlignVision
 
 class RobotMove:
     _instance = None
@@ -19,6 +21,27 @@ class RobotMove:
         self.config = Config()
         self.mc = MyCobotManager.get_instance()
         self.slot_inventory = SlotInventory.get_instance()
+        self.align_vision = AlignVision.get_instance()
+        
+        self.K = np.array([[1200.0, 0.0, 640.0],
+                    [0.0, 1200.0, 360.0],
+                    [0.0, 0.0, 1.0]], np.float32)
+        self.dist = np.zeros(5, np.float32)
+        
+        self.SPEED = self.config.speed
+        self.SETTLE_WAIT = self.config.settle_wait
+        
+        self.MIN_MOVE = self.config.min_move
+        self.STEP = self.config.step
+        self.Z_FIXED = self.config.z_fixed
+        self.X_SAFE_MIN, self.X_SAFE_MAX = self.config.x_safe_min, self.config.x_safe_max
+        self.Y_SAFE_MIN, self.Y_SAFE_MAX = self.config.y_safe_min, self.config.y_safe_max
+        self.FORWARD_X_MM = self.config.forward_x_mm
+        self.FORWARD_Y_MM = self.config.forward_y_mm
+        self.PICK_Z_HALF = self.config.pick_z_half
+        self.PICK_Z_DOWN = self.config.pick_z_down
+        
+        
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
@@ -83,9 +106,39 @@ class RobotMove:
     # =========================================================
     # 🧭 Yaw 정렬
     # =========================================================
-    async def align_yaw(self, marker_id):
-        self.logger.warning("align_yaw is deprecated in RobotMove; use Detecting or AlignVision for camera-based operations.")
-        raise NotImplementedError("align_yaw is no longer handled in RobotMove.")
+    async def align_yaw(self, marker_id, corners, ids):
+        print(f"\n🧭 Yaw 정렬 시작 — ID={marker_id}")
+        if ids is None or marker_id not in ids.flatten():
+            print("❌ 마커 인식 실패 (Yaw)")
+            return False
+
+        idx = list(ids.flatten()).index(marker_id)
+        pts = corners[idx]
+        success, rvec, tvec = cv2.solvePnP(
+            np.array([[-15, 15, 0], [15, 15, 0], [15, -15, 0], [-15, -15, 0]], np.float32),
+            pts, self.K, self.dist)
+        if not success:
+            print("❌ Pose 계산 실패 (Yaw)")
+            return False
+
+        R, _ = cv2.Rodrigues(rvec)
+        yaw = np.degrees(np.arctan2(R[1, 0], R[0, 0]))
+        print(f"📐 감지된 Yaw: {yaw:.2f}°")
+
+        pose = self.mc.get_angles()
+        if pose is None:
+            print("❌ 관절 각도 읽기 실패")
+            return False
+
+        pose[5] += yaw
+        await self.send_angles_sync(pose, 50)
+
+        self.safe_move(pose, speed=self.SPEED)
+
+        print(f"🧭 Yaw {yaw:.2f}° 보정 중...")
+        time.sleep(self.SETTLE_WAIT + 0.5)
+        print("✅ Yaw 보정 완료")
+        return True
     
     # =========================================================
     # ⚙️ 동기 대기 함수
@@ -127,8 +180,27 @@ class RobotMove:
 
         home = [200, 0, 230., -180., 0., -45.]
         if dobby_num == 1:
-            slot_poses = self._slot_poses(1)
-            
+            slot_poses = {
+                0: [
+                    [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
+                    [-140.71, -34.01, -17.66, -38.58, 3.95, -9.93],
+                    [-149.06, -45.35, -48.16, 7.29, 5.62, -12.56],
+                    [-149.32, -58.35, -64.51, 36.73, 5.44, -12.56],
+                ],
+                1: [
+                    [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
+                    [-165.67, -11.33, -58.0, -15.64, 1.58, -31.28],
+                    [-164.79, -45.0, -49.83, 5.71, 6.15, -28.47],
+                    [-165.05, -57.56, -65.91, 35.33, 5.62, -28.47],
+                ],
+                2: [
+                    [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
+                    [166.64, -44.12, -1.05, -46.23, 4.92, -59.15],
+                    [167.08, -72.68, 0.35, -14.76, 6.5, -54.14],
+                    [166.81, -87.8, 1.14, -2.72, 6.32, -54.84]
+                ],
+            }
+
             pick_x_offset = self.config.pick_x_offset_dobby1
             pick_y_offset = self.config.pick_y_offset_dobby1
             pick_z_offset = self.config.pick_z_offset_dobby1
@@ -139,7 +211,26 @@ class RobotMove:
             
             
         elif dobby_num == 2:
-            slot_poses = self._slot_poses(2)
+            slot_poses = {
+                0: [
+                    [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
+                    [-140.71, -34.01, -17.66, -38.58, 3.95, -9.93],
+                    [-149.06, -45.35, -48.16, 7.29, 5.62, -12.56],
+                    [-149.32, -58.35, -64.51, 36.73, 5.44, -12.56],
+                ],
+                1: [
+                    [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
+                    [-165.67, -11.33, -58.0, -15.64, 1.58, -31.28],
+                    [-164.79, -45.0, -49.83, 5.71, 6.15, -28.47],
+                    [-165.05, -57.56, -65.91, 35.33, 5.62, -28.47],
+                ],
+                2: [
+                    [18.8, -26.36, -18.45, -45.61, 0.26, -26.36],
+                    [166.64, -44.12, -1.05, -46.23, 4.92, -59.15],
+                    [167.08, -72.68, 0.35, -14.76, 6.5, -54.14],
+                    [166.81, -87.8, 1.14, -2.72, 6.32, -54.84]
+                ],
+            }
 
             pick_x_offset = self.config.pick_x_offset_dobby2
             pick_y_offset = self.config.pick_y_offset_dobby2

@@ -2,7 +2,7 @@ import rclpy
 from rclpy.action import ActionServer
 from rclpy.node import Node
 from javis_interfaces.action import PlaceBook
-from javis_ros2.src.javis_dac.javis_dac.align_vision import AlignVision
+from javis_dac.align_vision import AlignVision
 from javis_dac.slot_inventory import SlotInventory
 from javis_dac.detecting import Detecting
 from javis_dac.robot_move import RobotMove
@@ -11,6 +11,8 @@ from javis_dac.config import Config
 import traceback
 import asyncio
 import time
+import numpy as np
+
 
 class PlaceBookActionServer_DAC1(Node):
     def __init__(self):
@@ -154,7 +156,14 @@ class PlaceBookActionServer_DAC1(Node):
                 if i == 1:
                     feedback.current_action = "[STEP 3-1] Yaw 정렬 중..."
                     goal_handle.publish_feedback(feedback)
-                    await self.robot_move.align_yaw(marker_info["id"])
+                    frame = self.align_vision.get_latest_frame(caller="align_yaw")
+                    if frame is None:
+                        print("❌ 카메라 프레임 실패 (Yaw)")
+                        return False
+
+                    gray = self.align_vision.preprocess_frame(frame)
+                    corners, ids, _ = self.detecting.aru_detect_func(gray)
+                    await self.robot_move.align_yaw(marker_info["id"], corners, ids)
 
                 if val is None:
                     self.get_logger().warn(f"⚠️ 중심 정렬 중단 (인식 실패 또는 변화 없음, step={i+1})")
@@ -168,7 +177,14 @@ class PlaceBookActionServer_DAC1(Node):
 
             feedback.current_action = "[STEP 4] 최종 Yaw 정렬 중..."
             goal_handle.publish_feedback(feedback)
-            await self.robot_move.align_yaw(marker_info["id"])
+            frame = self.align_vision.get_latest_frame(caller="align_yaw")
+            if frame is None:
+                print("❌ 카메라 프레임 실패 (Yaw)")
+                return False
+
+            gray = self.align_vision.preprocess_frame(frame)
+            corners, ids, _ = self.detecting.aru_detect_func(gray)
+            await self.robot_move.align_yaw(marker_info["id"], corners, ids)
 
             # --- 5️⃣ 도비 → 책장 이동 ---
             feedback.current_action = f"[STEP 5] 책 배치 중 (Dobby → Shelf, ID={marker_info['id']})..."

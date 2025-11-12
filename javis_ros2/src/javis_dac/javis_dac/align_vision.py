@@ -4,6 +4,7 @@ import os
 import threading
 from datetime import datetime
 import time
+import numpy as np
 
 from javis_dac.config import Config
 
@@ -29,6 +30,11 @@ class AlignVision:
         # 설정 로드
         self.config = Config()
         self.cap = self.open_camera()
+        
+        self.K = np.array([[1200.0, 0.0, 640.0],
+                    [0.0, 1200.0, 360.0],
+                    [0.0, 0.0, 1.0]], np.float32)
+        self.dist = np.zeros(5, np.float32)
     
     # =========================================================
     # 📷 카메라

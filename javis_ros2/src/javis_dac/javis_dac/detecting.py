@@ -18,8 +18,8 @@ class Detecting:
     def __init__(self):
         self.detected_markers = []
         self.logger = logging.getLogger(__name__)
-        self.align = AlignVision.get_instance()
         self.robot_move = RobotMove.get_instance()
+        self.align_vision = AlignVision.get_instance()
         self.config = Config()
 
         self.aru = cv2.aruco
@@ -99,7 +99,7 @@ class Detecting:
         MAX_STAGNANT = 6
 
         while True:
-            frame = self.align.get_latest_frame(caller="approx_align_marker")
+            frame = self.align_vision.get_latest_frame(caller="approx_align_marker")
             if frame is None:
                 self.logger.warning("⚠️ [approx_align_marker] 프레임 없음 — 재시도")
                 continue
@@ -147,7 +147,7 @@ class Detecting:
             coords[3] = -180 
             coords[4] = 0
             
-            await self.align.safe_move(coords, speed=self.align.SPEED)  # ✅ 안전 이동 (send_coords + 위치 확인)
+            await self.robot_move.safe_move(coords, speed=self.align.SPEED)  # ✅ 안전 이동 (send_coords + 위치 확인)
             self.logger.info("➡️ move_x=%.2f, move_y=%.2f, dist=%.1f", move_x, move_y, dist_pix)
             time.sleep(self.align.SETTLE_WAIT)
 
@@ -157,7 +157,7 @@ class Detecting:
     def compute_marker_offset(self, frame, marker_id):
         
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        corners, ids, _ = self.detect_func(gray)
+        corners, ids, _ = self.aru_detect_func(gray)
 
         if ids is None or marker_id not in ids.flatten():
             return None
@@ -198,7 +198,7 @@ class Detecting:
         # 📸 여러 프레임에서 평균 dx, dy 계산
         dx_list, dy_list, dist_list = [], [], []
         for i in range(sample_count):
-            frame = self.align.get_latest_frame(caller=f"center_align_marker[{i}]")
+            frame = self.align_vision.get_latest_frame(caller=f"center_align_marker[{i}]")
             if frame is None:
                 self.logger.warning("⚠️ 프레임 %s/%s 없음 — skip", i + 1, sample_count)
                 continue
@@ -257,7 +257,7 @@ class Detecting:
         coords[4] = 0
         
         self.logger.info("➡️ move_x=%.2f, move_y=%.2f, dist=%.1f", move_x, move_y, dist_pix)
-        await self.align.safe_move(coords, speed=self.config.speed)
+        await self.robot_move.safe_move(coords, speed=self.config.speed)
         time.sleep(self.config.settle_wait)
 
         return False, dist_pix
@@ -282,13 +282,13 @@ class Detecting:
         await asyncio.sleep(self.config.settle_wait + 0.2)
 
         # 프레임 획득
-        frame = self.align.get_latest_frame(caller=f"scan_dx{dx}_dy{dy}")
+        frame = self.align_vision.get_latest_frame(caller=f"scan_dx{dx}_dy{dy}")
         if frame is None:
             self.logger.warning("⚠️ 프레임 없음 — skip")
             return None
 
-        gray = self.align.preprocess_frame(frame)
-        corners, ids, _ = self.detect_func(gray)
+        gray = self.align_vision.preprocess_frame(frame)
+        corners, ids, _ = self.aru_detect_func(gray)
         if ids is None or len(ids) == 0:
             self.logger.warning("❌ 마커 감지 실패 (IDs=None)")
             return None
@@ -316,13 +316,13 @@ class Detecting:
             await self.robot_move.safe_move(target, speed=self.config.speed)
             await asyncio.sleep(self.config.settle_wait + 0.2)
 
-            frame = self.align.get_latest_frame(caller=f"y_search_x{round(x_offset,1)}_y{dy}")
+            frame = self.align_vision.get_latest_frame(caller=f"y_search_x{round(x_offset,1)}_y{dy}")
             if frame is None:
                 self.logger.warning("⚠️ 프레임 없음 — skip")
                 continue
 
-            gray = self.align.preprocess_frame(frame)
-            corners, ids, _ = self.detect_func(gray)
+            gray = self.align_vision.preprocess_frame(frame)
+            corners, ids, _ = self.aru_detect_func(gray)
             if ids is None or len(ids) == 0:
                 continue
 

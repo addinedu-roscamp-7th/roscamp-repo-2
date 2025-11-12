@@ -10,6 +10,8 @@ from javis_dac.config import Config
 import asyncio
 import time
 import traceback
+import numpy as np
+
 
 
 class PickBookActionServer_DAC1(Node):
@@ -162,7 +164,14 @@ class PickBookActionServer_DAC1(Node):
                 if i == 1:
                     feedback.current_action = "[STEP 3-1] Yaw 정렬 중..."
                     goal_handle.publish_feedback(feedback)
-                    await self.robot_move.align_yaw(marker_info["id"])
+                    frame = self.align_vision.get_latest_frame(caller="align_yaw")
+                    if frame is None:
+                        print("❌ 카메라 프레임 실패 (Yaw)")
+                        return False
+
+                    gray = self.align_vision.preprocess_frame(frame)
+                    corners, ids, _ = self.detecting.aru_detect_func(gray)
+                    await self.robot_move.align_yaw(marker_info["id"], corners, ids)
 
                 if val is None:
                     self.get_logger().warn(f"⚠️ 중심 정렬 중단 (인식 실패 또는 변화 없음, step={i+1})")
@@ -176,7 +185,15 @@ class PickBookActionServer_DAC1(Node):
 
             feedback.current_action = "[STEP 4] 최종 Yaw 정렬 중..."
             goal_handle.publish_feedback(feedback)
-            await self.robot_move.align_yaw(marker_info["id"])
+            
+            frame = self.align_vision.get_latest_frame(caller="align_yaw")
+            if frame is None:
+                print("❌ 카메라 프레임 실패 (Yaw)")
+                return False
+
+            gray = self.align_vision.preprocess_frame(frame)
+            corners, ids, _ = self.detecting.aru_detect_func(gray)
+            await self.robot_move.align_yaw(marker_info["id"], corners, ids)
 
             feedback.current_action = f"[STEP 5] 책장 → 도비 전송 중 (ID={marker_info['id']})..."
             goal_handle.publish_feedback(feedback)
