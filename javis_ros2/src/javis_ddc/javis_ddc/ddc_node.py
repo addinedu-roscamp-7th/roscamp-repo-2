@@ -8,6 +8,7 @@ from geometry_msgs.msg import PoseStamped, Twist, Point
 from nav2_msgs.action import NavigateToPose
 from javis_interfaces.msg import DobbyState
 from javis_dmc.states.state_enums import MainState
+from rclpy.qos import QoSProfile, DurabilityPolicy
 
 # DDC 노드 내부에서 사용하는 상태 정의
 class DDCState:
@@ -117,8 +118,11 @@ class DDCNode(Node):
 
         self.pid_controller = ArucoDockingPID(self)
 
+        # QoS 프로파일 생성 (TRANSIENT_LOCAL 설정)
+        qos_profile = QoSProfile(depth=10, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+
         self.create_subscription(Point, '/ai/docking/normalized_data', self.aruco_callback, 10)
-        self.create_subscription(DobbyState, 'status/robot_state', self.dobby_state_callback, 10)
+        self.create_subscription(DobbyState, 'status/robot_state', self.dobby_state_callback, qos_profile)
 
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
 
