@@ -4,12 +4,10 @@ from rclpy.action import ActionServer, ActionClient
 from rclpy.executors import MultiThreadedExecutor
 import time
 
-from geometry_msgs.msg import PoseStamped, Twist
+from geometry_msgs.msg import PoseStamped, Twist, Point
 from nav2_msgs.action import NavigateToPose
-from javis_interfaces.msg import ArucoDockingData, DobbyState
-# 참고: 아래 import가 성공하려면 javis_ddc 패키지의 package.xml에 javis_dmc에 대한 의존성(<depend>javis_dmc</depend>)이 추가되어야 할 수 있습니다.
+from javis_interfaces.msg import DobbyState
 from javis_dmc.states.state_enums import MainState
-import math
 
 # DDC 노드 내부에서 사용하는 상태 정의
 class DDCState:
@@ -17,16 +15,91 @@ class DDCState:
     NAVIGATING = 'NAVIGATING'
     DOCKING = 'DOCKING'
 
-# 도킹 관련 상수
-TARGET_DISTANCE = 0.15  # 마커로부터 최종 목표 거리 (15cm)
-DOCKING_SPEED_LINEAR = 0.05  # 도킹 시 선형 속도
-DOCKING_SPEED_ANGULAR = 0.1  # 도킹 시 각속도
-DOCKING_SPEED_STRAFE = 0.03 # 도킹 시 좌/우 이동 속도
+class ArucoDockingPID:
+    def __init__(self, node: Node):
+        self.node = node
+        self.logger = self.node.get_logger()
 
-# 허용 오차
-DISTANCE_TOLERANCE = 0.01  # 1cm
-YAW_TOLERANCE = 1.0  # 1도
-X_TOLERANCE = 0.01 # 1cm
+        # PID 파라미터 선언 및 초기화
+        self.node.declare_parameter('docking.target_z', 0.65)
+        self.node.declare_parameter('docking.stop_tolerance_z', 0.02)
+        self.node.declare_parameter('docking.stop_tolerance_x', 0.12)
+        self.node.declare_parameter('docking.kp_z', 0.20)
+        self.node.declare_parameter('docking.ki_z', 0.0)
+        self.node.declare_parameter('docking.kd_z', 0.05)
+        self.node.declare_parameter('docking.kp_x', 1.2)
+        self.node.declare_parameter('docking.ki_x', 0.0)
+        self.node.declare_parameter('docking.kd_x', 0.9)
+        self.node.declare_parameter('docking.max_linear_speed', 0.10)
+        self.node.declare_parameter('docking.max_angular_speed', 0.9)
+
+        self.target_z = self.node.get_parameter('docking.target_z').value
+        self.stop_tolerance_z = self.node.get_parameter('docking.stop_tolerance_z').value
+        self.stop_tolerance_x = self.node.get_parameter('docking.stop_tolerance_x').value
+        self.kp_z = self.node.get_parameter('docking.kp_z').value
+        self.ki_z = self.node.get_parameter('docking.ki_z').value
+        self.kd_z = self.node.get_parameter('docking.kd_z').value
+        self.kp_x = self.node.get_parameter('docking.kp_x').value
+        self.ki_x = self.node.get_parameter('docking.ki_x').value
+        self.kd_x = self.node.get_parameter('docking.kd_x').value
+        self.max_linear_speed = self.node.get_parameter('docking.max_linear_speed').value
+        self.max_angular_speed = self.node.get_parameter('docking.max_angular_speed').value
+        
+        self.target_x = 0.0
+        self.integral_z = 0.0
+        self.last_error_z = 0.0
+        self.integral_x = 0.0
+        self.last_error_x = 0.0
+        self.reached_target = False
+
+        self.logger.info(f"Aruco Docking PID 활성화 (목표 거리={self.target_z}, 중앙정렬 x={self.target_x})")
+
+    def compute_velocity(self, msg: Point) -> Twist:
+        twist = Twist()
+        if self.reached_target:
+            return twist
+
+        x, _, z = msg.x, msg.y, msg.z
+
+        error_z = self.target_z - z
+        self.integral_z += error_z
+        derivative_z = error_z - self.last_error_z
+        control_z = self.kp_z * error_z + self.ki_z * self.integral_z + self.kd_z * derivative_z
+        self.last_error_z = error_z
+        control_z = max(min(control_z, self.max_linear_speed), -self.max_linear_speed)
+
+        error_x = x - self.target_x
+        self.integral_x += error_x
+        derivative_x = error_x - self.last_error_x
+        control_x = self.kp_x * error_x + self.ki_x * self.integral_x + self.kd_x * derivative_x
+        self.last_error_x = error_x
+        control_x = -control_x
+        control_x = max(min(control_x, self.max_angular_speed), -self.max_angular_speed)
+
+        if abs(error_x) < self.stop_tolerance_x:
+            control_x = 0.0
+
+        if abs(error_z) < self.stop_tolerance_z and abs(error_x) < self.stop_tolerance_x:
+            self.reached_target = True
+            self.logger.info(f"🎯 정렬 및 목표 거리 도달: z={z:.3f}, x={x:.3f} → 정지")
+            return twist
+
+        twist.linear.x = control_z
+        twist.angular.z = control_x
+        
+        self.logger.info(
+            f"[PID] z={z:.3f} err_z={error_z:.3f} → v={control_z:.3f} | "
+            f"x={x:.3f} err_x={error_x:.3f} → w={control_x:.3f}"
+        )
+        return twist
+
+    def reset(self):
+        self.integral_z = 0.0
+        self.last_error_z = 0.0
+        self.integral_x = 0.0
+        self.last_error_x = 0.0
+        self.reached_target = False
+        self.logger.info("🔄 PID 상태 리셋 완료")
 
 class DDCNode(Node):
     def __init__(self):
@@ -42,11 +115,11 @@ class DDCNode(Node):
         # ArUco 마커 데이터 저장을 위한 변수
         self.latest_aruco_data = None
 
-        # --- 구독자 ---
-        self.create_subscription(ArucoDockingData, 'aruco_docking_data', self.aruco_callback, 10)
+        self.pid_controller = ArucoDockingPID(self)
+
+        self.create_subscription(Point, '/ai/docking/normalized_data', self.aruco_callback, 10)
         self.create_subscription(DobbyState, 'status/robot_state', self.dobby_state_callback, 10)
 
-        # --- 발행자 ---
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
 
         # --- 액션 클라이언트 ---
@@ -122,6 +195,7 @@ class DDCNode(Node):
 
         self.get_logger().info(f"내비게이션 완료. DOCKING 상태로 전환합니다.")
         self.state = DDCState.DOCKING
+        self.pid_controller.reset()
         
         # --- 3. 도킹 수행 ---
         docking_start_time = self.get_clock().now()
@@ -140,13 +214,13 @@ class DDCNode(Node):
             # 도킹 로직 실행
             self.perform_docking()
 
-            # 도킹이 성공하면 perform_docking 내부에서 self.state를 IDLE로 변경
-            if self.state == DDCState.IDLE:
-                self.get_logger().info("내비게이션 및 도킹 작업 전체 성공!")
+            if self.pid_controller.reached_target:
+                self.get_logger().info("도킹 성공! 작업 전체 성공!")
+                self.stop_robot()
+                self.state = DDCState.IDLE
                 goal_handle.succeed()
                 return NavigateToPose.Result()
             
-            # 취소 요청 확인
             if goal_handle.is_cancel_requested:
                 self.get_logger().info("작업 취소 요청 수신. 도킹을 중단합니다.")
                 self.stop_robot()
@@ -156,7 +230,6 @@ class DDCNode(Node):
 
             time.sleep(0.1) # 루프 주기
 
-        # rclpy.ok()가 False가 되면 루프 종료
         self.get_logger().warn("RCLPY가 종료되어 도킹 작업을 중단합니다.")
         self.state = DDCState.IDLE
         goal_handle.abort()
@@ -169,7 +242,7 @@ class DDCNode(Node):
     def dobby_state_callback(self, msg):
         """Dobby의 전역 상태를 수신하는 콜백"""
         self.dobby_main_state = msg.main_state
-        self.get_logger().info(f"Dobby 전역 상태 수신: {MainState(msg.main_state).name} => {msg.main_state}")
+        self.get_logger().info(f"Dobby 전역 상태 수신: {MainState(msg.main_state).name} : {msg.main_state}")
 
     def perform_docking(self):
         """정밀 도킹 로직을 수행"""
@@ -177,48 +250,10 @@ class DDCNode(Node):
             self.get_logger().warn("DOCKING 상태이지만 ArUco 데이터를 수신하지 못했습니다.", once=True)
             return
 
-        # 오차 계산
-        x_error = self.latest_aruco_data.marker_pos_x
-        z_error = self.latest_aruco_data.marker_pos_z - TARGET_DISTANCE
-        yaw_error_deg = self.latest_aruco_data.marker_yaw
-
-        # 오차가 허용 범위 내에 있는지 확인
-        if abs(x_error) < X_TOLERANCE and abs(z_error) < DISTANCE_TOLERANCE and abs(yaw_error_deg) < YAW_TOLERANCE:
-            self.get_logger().info("도킹 성공!")
-            self.state = DDCState.IDLE
-            self.stop_robot()
-            self.latest_aruco_data = None # 다음 도킹을 위해 초기화
-            return
-
-        # Twist 메시지 생성
-        twist_msg = Twist()
-
-        # 간단한 P-제어 (동시 제어)
-        # 1. Yaw (회전) 제어: 로봇이 마커를 정면으로 보도록 회전
-        if abs(yaw_error_deg) > YAW_TOLERANCE:
-            # yaw_error > 0 이면 마커가 로봇의 왼쪽에 치우쳐 있다는 의미일 수 있으므로, 왼쪽으로 회전 (양수 각속도)
-            twist_msg.angular.z = DOCKING_SPEED_ANGULAR if yaw_error_deg > 0 else -DOCKING_SPEED_ANGULAR
-        else:
-            twist_msg.angular.z = 0.0
-
-        # 2. X (좌/우) 제어: 로봇이 마커의 중앙에 오도록 좌/우로 이동
-        if abs(x_error) > X_TOLERANCE:
-            # x_error > 0 이면 마커가 카메라 오른쪽에 있으므로, 로봇을 오른쪽으로 이동 (음수 y속도)
-            twist_msg.linear.y = -DOCKING_SPEED_STRAFE if x_error > 0 else DOCKING_SPEED_STRAFE
-        else:
-            twist_msg.linear.y = 0.0
-
-        # 3. Z (앞/뒤) 제어: 로봇이 목표 거리에 도달하도록 앞/뒤로 이동
-        if abs(z_error) > DISTANCE_TOLERANCE:
-            twist_msg.linear.x = DOCKING_SPEED_LINEAR if z_error > 0 else -DOCKING_SPEED_LINEAR
-        else:
-            twist_msg.linear.x = 0.0
-            
-        self.get_logger().info(f"도킹 중... [X Err: {x_error:.3f} m, Z Err: {z_error:.3f} m, Yaw Err: {yaw_error_deg:.2f} deg] -> [Vel X: {twist_msg.linear.x:.2f}, Y: {twist_msg.linear.y:.2f}, Ang: {twist_msg.angular.z:.2f}]")
+        twist_msg = self.pid_controller.compute_velocity(self.latest_aruco_data)
         self.cmd_vel_pub.publish(twist_msg)
 
     def stop_robot(self):
-        """로봇을 정지시키는 Twist 메시지를 발행"""
         self.get_logger().info("로봇을 정지합니다.")
         stop_msg = Twist()
         self.cmd_vel_pub.publish(stop_msg)
