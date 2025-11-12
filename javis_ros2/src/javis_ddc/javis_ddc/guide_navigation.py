@@ -143,7 +143,17 @@ class GuideNavigation(Node):
             self.amcl_pose = self.init_pose_with_covariance()
         
         dobby_path = self.nav2.getPath(self.convert_to_pose_stamped(self.amcl_pose), goal_pose)
-        self._path_pub.publish(dobby_path)
+        
+        if dobby_path:
+            self._path_pub.publish(dobby_path)
+        else:
+            self.get_logger().error("경로 생성에 실패했습니다. 목표 지점에 도달할 수 없습니다.")
+            goal_handle.abort()
+            result.success = False
+            result.final_location = self.convert_to_pose2d(self.amcl_pose)
+            result.termination_reason = 'Failed to generate path to destination'
+            self._cleanup_goal_resources()
+            return result
 
         self.nav2.goToPose(goal_pose)
 
