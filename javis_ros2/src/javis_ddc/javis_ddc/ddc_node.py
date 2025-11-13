@@ -105,6 +105,7 @@ class ArucoDockingPID:
 class DDCNode(Node):
     def __init__(self):
         super().__init__('ddc_node')
+        self.get_logger().info(f"Node Namespace: {self.get_namespace()}")
         
         # 로봇의 내부 상태 초기화
         self.state = DDCState.IDLE
