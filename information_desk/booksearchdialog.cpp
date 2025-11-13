@@ -69,7 +69,7 @@ void BookSearchDialog::setupTable()
         int currentRow = row;
         QString isbn = model->item(row, 0)->text(); // 위치를 조회하기 위한 ISBN
 
-        QString urlString = QString("http://127.0.0.1:8000/infodesk/books/pickup").arg(isbn);
+        QString urlString = QString("http://192.168.0.132:4069/infodesk/books/pickup").arg(isbn);
         QNetworkRequest request((QUrl(urlString)));
         request.setRawHeader("accept", "application/json");
 
@@ -136,7 +136,7 @@ void BookSearchDialog::setupTable()
 void BookSearchDialog::on_searchBtn_clicked() // 검색 버튼
 {
     QString encodeKeyword = QUrl::toPercentEncoding(searchText);
-    QString urlString = QString("http://127.0.0.1:8000/infodesk/books?keyword=%1&page=1&per_page=5")
+    QString urlString = QString("http://192.168.0.132:4069/infodesk/books?keyword=%1&page=1&per_page=5")
                             .arg(encodeKeyword);
     QUrl url(urlString);
 

@@ -32,19 +32,12 @@ class OrderStateUpdate(BaseModel):
     orders: List[OrderState]
 
 
-
-
-
-
-
-
-
 #응답
 class OrderStatusEnum(str, Enum):
     접수 = "접수"
-    진행중 = "진행중"
+    제조중 = "제조중"
     완료 = "완료"
-    취소 = "취소"
+    픽업대기 = "픽업대기"
 #주문상태
 class OrderList(BaseModel):
     orderID: int

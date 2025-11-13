@@ -67,7 +67,6 @@ class BookInfoUpdate(BaseModel):
 #메뉴 제조 요청
 class Menu(BaseModel):
     beverageName: str
-    quantity: int
 
 
 class MenuRequest(BaseModel):

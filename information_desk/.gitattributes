@@ -1,0 +1,2 @@
+information_desk_deploy.tar.gz filter=lfs diff=lfs merge=lfs -text
+*.tar.gz filter=lfs diff=lfs merge=lfs -text

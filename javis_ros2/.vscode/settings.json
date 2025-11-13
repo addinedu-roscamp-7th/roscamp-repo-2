@@ -1,3 +1,13 @@
 {
-  "idf.pythonInstallPath": "/home/mac/venv/ros_venv/bin/python"
+  "idf.pythonInstallPath": "/home/mac/venv/ros_venv/bin/python",
+  "python.autoComplete.extraPaths": [
+    "/home/addinedu/vicpinky_ws/build/vicpinky_bringup",
+    "/home/addinedu/vicpinky_ws/install/vicpinky_bringup/lib/python3.12/site-packages",
+    "/opt/ros/jazzy/lib/python3.12/site-packages"
+  ],
+  "python.analysis.extraPaths": [
+    "/home/addinedu/vicpinky_ws/build/vicpinky_bringup",
+    "/home/addinedu/vicpinky_ws/install/vicpinky_bringup/lib/python3.12/site-packages",
+    "/opt/ros/jazzy/lib/python3.12/site-packages"
+  ]
 }

@@ -32,7 +32,7 @@ void DobbyLoan::send_pickup(){
     int member_id = 1;
     QString barcode = "B00003";
 
-    QString urlString = QString("http://127.0.0.1:8000/infodesk/books/pickup?memberID=%1&barcode=%2")
+    QString urlString = QString("http://192.168.0.132:4069/infodesk/books/pickup?memberID=%1&barcode=%2")
                             .arg(member_id)
                             .arg(barcode);
 

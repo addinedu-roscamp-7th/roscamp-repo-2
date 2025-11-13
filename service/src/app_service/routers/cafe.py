@@ -45,8 +45,13 @@ def create_order(order: Order, db: Session = Depends(get_db)):
         beverageorder = cafeCRUD.get_beverageOrder(db)
 
         #메뉴 제조 요청
+        order_detail = [rcs.Menu(beverageName=name) for name in beverage_name]
+        orders = rcs.MenuRequest(
+            OrderID = beverageorder.OrderID,
+            OrderDetail = order_detail
+        )
 
-        menu_preparation_request(order)
+        menu_preparation_request(orders)
         return OrderList(
             orderID= beverageorder.OrderID,
             orderStatus= beverageorder.OrderStatus
