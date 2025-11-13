@@ -161,10 +161,17 @@ def handle_kreacher_request():
         if not req_data:
             return jsonify({'ok': False, 'message': 'Request body must be JSON.'}), 400
 
+        # 만약 req_data가 리스트이면 첫 번째 요소를 사용
+        if isinstance(req_data, list):
+            print('test log')
+            if not req_data:
+                return jsonify({'ok': False, 'message': 'Request body is an empty list.'}), 400
+            req_data = req_data[0]
         
+        _ros_node.get_logger().info(f"Received /robot/kreacher request: {req_data}")
         order_id = req_data.get('OrderID')
         # order_detail이 없을 경우를 대비하여 기본값으로 빈 딕셔너리({})를 사용합니다.
-        order_detail = req_data.get('OrderDetail', {})
+        order_detail = req_data.get('OrderDetail', {})[0]
         
         beverage_name = order_detail.get('beverageName') # 이제 order_detail이 None이 아니므로 안전합니다.
         menu_id = None
