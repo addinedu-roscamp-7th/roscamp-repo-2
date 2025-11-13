@@ -14,7 +14,7 @@ class CafeApp(QMainWindow):
         self.drink_type = None
         
         # 서버 설정
-        self.server_url = 'http://192.168.0.132:8080/cafe/order'  # 전체 URL
+        self.server_url = 'http://192.168.0.131:8001/robot/kreacher'  # 전체 URL
         
         # QNetworkAccessManager 생성
         self.network_manager = QNetworkAccessManager()
@@ -60,18 +60,13 @@ class CafeApp(QMainWindow):
         beverage_name = f"{self.drink_type}아메리카노" if self.drink_type else "아메리카노"
         
         order_data = {
-            "totalAmount": 1500.0,
-            "paymentInfo": "카드",
-            "orderStatus": "접수",
-            "orderDetail": [
-                {
-                    "beverageName": beverage_name,
-                    "quantity": 1
-                }
-            ]
+            "OrderID": 1,  # 샘플 OrderID
+            "OrderDetail": {
+                "beverageName": beverage_name
+            }
         }
         
-        # QNetworkAccessManager로 주문 전송
+        # 서버로 전송
         self.send_order(order_data)
         
         # order4.ui로 이동
