@@ -215,8 +215,10 @@ class GuideNavigation(Node):
 
         tracks = self.tracker.update(frame)
 
-        self.person_detected = tracks.shape[0] > 0
+        
+        track = self.tracker.get_primary_target(tracks=tracks)
 
+        #self.person_detected = tracks.shape[0] > 0
         # primary_target = self.tracker.get_primary_target(tracks)
 
         # self.get_logger().info(f'{tracks}')
@@ -227,8 +229,8 @@ class GuideNavigation(Node):
         #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
         #     cv2.putText(frame, f"{track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         
-        if self.person_detected:
-            track = self.tracker.get_primary_target(tracks=tracks)
+        if track is not None:
+            
             x1, y1, x2, y2, track_id = track[:5]
             x1, y1, x2, y2, track_id = map(int, [x1, y1, x2, y2, track_id])
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
