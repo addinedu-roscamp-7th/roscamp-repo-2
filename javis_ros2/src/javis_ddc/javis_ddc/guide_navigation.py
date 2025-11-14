@@ -234,12 +234,12 @@ class GuideNavigation(Node):
             cv2.putText(frame, f"{track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         else:
             stop_msg = Twist()
-            stop_msg.linear.x = 0
-            stop_msg.linear.y = 0
-            stop_msg.linear.z = 0
-            stop_msg.angular.x = 0
-            stop_msg.angular.y = 0
-            stop_msg.angular.z = 0
+            stop_msg.linear.x = 0.0
+            stop_msg.linear.y = 0.0
+            stop_msg.linear.z = 0.0
+            stop_msg.angular.x = 0.0
+            stop_msg.angular.y = 0.0
+            stop_msg.angular.z = 0.0
 
             self._cmd_vel_pub.publish(stop_msg)
             self.get_logger().info("일시정지 중")
