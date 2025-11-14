@@ -310,8 +310,9 @@ ROS2에서 사용하는 모든 요소는 아래 명명 규칙을 따릅니다.
 <img src="https://github.com/user-attachments/assets/13966e82-1f9a-44e4-a072-a277a14cbfeb" width="360"/>
 
 - PLACE
-<img src="https://github.com/user-attachments/assets/23c9d5ea-fff6-471d-aee2-40bb81ba5762" width="360"/>
 <img src="https://github.com/user-attachments/assets/d300cb99-2d5c-4c08-8797-2930bbcb9836" width="360"/>
+<img src="https://github.com/user-attachments/assets/23c9d5ea-fff6-471d-aee2-40bb81ba5762" width="360"/>
+
 
 
 ---
