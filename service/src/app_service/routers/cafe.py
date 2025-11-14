@@ -6,6 +6,7 @@ from database import SessionLocal
 from crud import cafeCRUD
 from models.BeverageOrder import BeverageOrder
 from routers.robot_control_system import menu_preparation_request
+from schemas import robot_control_system as rcs
 
 router = APIRouter(prefix="/cafe", tags=["Cafe Orders"])
 
@@ -27,7 +28,8 @@ def create_order(order: Order, db: Session = Depends(get_db)):
             status_code=400,
             content={"error": f"허용되지 않은 OrderStatus: {order.orderStatus}"}
         )
-
+        beverage_name = [beverage.beverageName for beverage in order.orderDetail]
+        
         member_id = 6
         total_amount = order.totalAmount
         payment_info = order.paymentInfo

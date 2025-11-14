@@ -70,8 +70,8 @@ class Menu(BaseModel):
 
 
 class MenuRequest(BaseModel):
-    orderID: int
-    orderDetail: List[Menu]
+    OrderID: int
+    OrderDetail: List[Menu]
 
 
 

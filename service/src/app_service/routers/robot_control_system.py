@@ -21,7 +21,7 @@ def get_db():
 
 #도서 픽업 작업 생성 요청
 def book_pickup_request(request: rcs.BooksPickupTask):  # 도서 픽업 작업 생성 요청
-    url = "http://192.168.0.131:8001/robot/pickup"  # RCS 서버 주소
+    url = "http://192.168.0.27:8001/robot/pickup"  # RCS 서버 주소
 
     # 요청 보내기
     try:
@@ -151,7 +151,7 @@ def updateBokInfo(request: BoxInfoUpdate, db: Session = Depends(get_db)):
 
 #메뉴 제조 요청
 def menu_preparation_request(request: rcs.MenuRequest):  # 도서 픽업 작업 생성 요청
-    url = "http://192.168.0.131:8001/robot/order"  # RCS 서버 주소
+    url = "http://192.168.0.131:8001/robot/kreacher"  # RCS 서버 주소
 
     # 요청 보내기
     try:
