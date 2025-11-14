@@ -1,13 +1,18 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose2D
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Pose2D, Twist
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from javis_interfaces.action import GuideNavigation as GuideNavigationAction
 import math
 import tf_transformations
 import time
+from .reid_tracker_module import ReIDTracker
+import cv2
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 
+REID_PATH = "osnet_x0_25_msmt17.pt"
 
 class GuideNavigation(Node):
     def __init__(self):
@@ -25,19 +30,44 @@ class GuideNavigation(Node):
             10
         )
 
+        self._img_pub = self.create_publisher(
+            Image,
+            'dobby/image',
+            10
+        )
+        self._cmd_vel_pub = self.create_publisher(
+            Twist,
+            '/cmd_vel',
+            10
+        )
+
+        self.tracker = ReIDTracker(reid_model_path=REID_PATH)
+
+        self.br = CvBridge()
+        self.current_frame = None
+        self.img_timer_period = 1.0 /30.0
+        
+
         self.dobby_nav2_server = ActionServer(self, GuideNavigationAction,
                                               'dobby1/drive/guide_navigation',
                                               execute_callback=self.execute_callback,
                                               goal_callback=self.goal_callback,
                                               cancel_callback=self.cancel_callback)
+        self.timer_period = 1.0/30.0
+        self.img_pub_timer = self.create_timer(self.timer_period, self.img_pub_timer_callback)
         
-        
-
-    
 
     def execute_callback(self, goal_handle):
         self.get_logger().info("이동 명령 실행")
         request = goal_handle.request
+
+        self.cap = cv2.VideoCapture(0)
+        if not self.cap.isOpened():
+            self.get_logger().error("WebCam을 열 수 없습니다.")
+            self.destroy_node()
+            return
+
+        self._img_timer = self.create_timer(self.img_timer_period, self.img_timer_callback)
         
         goal_pose = self.set_goal_pose(request)
         self.nav2.goToPose(goal_pose)
@@ -74,14 +104,19 @@ class GuideNavigation(Node):
             goal_handle.succeed()
             result.success = True
             result.termination_reason = "도착"
+            self.destroy_cap()
         elif nav2_result == TaskResult.CANCELED:
             goal_handle.canceled()
             result.success = False
             result.termination_reason = "취소됨"
+            self.destroy_cap()
         else:
             goal_handle.abort()
             result.success = False
             result.termination_reason = "실패"
+            self.destroy_cap()
+
+        
         
         return result
     
@@ -165,6 +200,57 @@ class GuideNavigation(Node):
         _, _, yaw = tf_transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
         pose2d.theta = yaw
         return pose2d
+    
+    def img_timer_callback(self):
+        ret, frame = self.cap.read()
+        if not ret:
+            self.get_logger().info('ret is none')
+            return
+
+        tracks = self.tracker.update(frame)
+
+        self.person_detected = tracks.shape[0] > 0
+
+        # primary_target = self.tracker.get_primary_target(tracks)
+
+        # self.get_logger().info(f'{tracks}')
+        
+        # for track in tracks :
+        #     x1, y1, x2, y2, track_id = track[:5]
+        #     x1, y1, x2, y2, track_id = map(int, [x1, y1, x2, y2, track_id])
+        #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        #     cv2.putText(frame, f"{track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        if self.person_detected:
+            track = self.tracker.get_primary_target(tracks=tracks)
+            x1, y1, x2, y2, track_id = track[:5]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(frame, f"{track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        else:
+            stop_msg = Twist()
+            self._cmd_vel_pub(stop_msg)
+            self.get_logger().info("일시정지 중")
+        if cv2.waitKey(1) & 0xFF == 27 :
+            self.destroy_node()
+        self.current_frame = frame
+
+    def img_pub_timer_callback(self):
+        if self.current_frame is not None:
+            ros_image_message = self.br.cv2_to_imgmsg(self.current_frame, encoding="bgr8")
+            self._img_pub.publish(ros_image_message)
+
+    def destroy_node(self):
+        if self.cap.isOpened():
+            self.cap.release()
+        cv2.destroyAllWindows()
+        super().destroy_node()
+
+    def destroy_cap(self):
+        if self.cap.isOpened():
+            self.cap.release()
+        cv2.destroyAllWindows()
+
+        
 
 def main(args=None):
     rclpy.init(args=args)
