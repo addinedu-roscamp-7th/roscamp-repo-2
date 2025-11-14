@@ -50,7 +50,7 @@ class PerformTaskActionServer(Node):
 
         tf_cmd = [
             "ros2", "run", "tf2_ros", "static_transform_publisher",
-            "0.31", "0.505", "0.275", "0.0", "3.1415", "1.5707",
+            "0.31", "0.505", "0.280", "0.0", "3.1415", "1.5707",
             "base_link", "camera_link"
         ]
         subprocess.Popen(tf_cmd)
@@ -283,8 +283,8 @@ class PerformTaskActionServer(Node):
         
         # myCobot의 send_coords 형식(mm, deg)으로 변환하여 반환
         return [
-            P_end_effector[0] * 1000.0,
-            P_end_effector[1] * 1000.0 - 10.0,
+            P_end_effector[0] * 1000.0 + 10.0,
+            P_end_effector[1] * 1000.0 - 40.0,
             P_end_effector[2] * 1000.0,
             float(end_effector_target_rpy_deg[0]),
             float(end_effector_target_rpy_deg[1]),
@@ -320,9 +320,9 @@ class PerformTaskActionServer(Node):
             
             # 잡기 직전의 gripper_tip 위치 (z축으로 약간의 오프셋 추가)
             final_gripper_tip_pos = [
-                self.target_coords[0] + 0.005,
-                self.target_coords[1] - 0.020,
-                self.target_coords[2] + 0.040  # 30mm 오프셋 (미터 단위)
+                self.target_coords[0],
+                self.target_coords[1],
+                self.target_coords[2] + 0.030  # 30mm 오프셋 (미터 단위)
             ]
             
             # 최종 잡기 위치에 도달하기 위한 end_effector 좌표 계산
@@ -394,9 +394,9 @@ class PerformTaskActionServer(Node):
             
             # 잡기 직전의 gripper_tip 위치 (z축으로 약간의 오프셋 추가)
             final_gripper_tip_pos = [
-                self.target_coords[0] + 0.020,
-                self.target_coords[1] - 0.020,
-                self.target_coords[2] + 0.030  # 30mm 오프셋 (미터 단위)
+                self.target_coords[0],
+                self.target_coords[1],
+                self.target_coords[2] + 0.020  # 30mm 오프셋 (미터 단위)
             ]
             
             # 최종 잡기 위치에 도달하기 위한 end_effector 좌표 계산
