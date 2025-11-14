@@ -2,7 +2,7 @@ import sys
 import json
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
-from PyQt5.QtCore import QUrl, QByteArray
+from PyQt5.QtCore import QUrl, QByteArray, QTimer  # <--- QTimer 추가
 from PyQt5 import uic
 
 from tts_client import DobyVoiceAdvancedClient
@@ -14,7 +14,7 @@ class CafeApp(QMainWindow):
         self.drink_type = None
         
         # 서버 설정
-        self.server_url = 'http://192.168.0.131:8001/robot/kreacher'  # 전체 URL
+        self.server_url = 'http://192.168.0.132:4069/cafe/order'  # 전체 URL
         
         # QNetworkAccessManager 생성
         self.network_manager = QNetworkAccessManager()
@@ -39,13 +39,13 @@ class CafeApp(QMainWindow):
     def select_ice(self):
         self.drink_type = '아이스'
         self.statusbar.showMessage("ICE 아메리카노가 선택되었습니다", 1000)
-        from PyQt5.QtCore import QTimer
+        # from PyQt5.QtCore import QTimer  # <--- 상단으로 이동했으므로 제거
         QTimer.singleShot(1000, self.go_to_order3)
     
     def select_hot(self):
         self.drink_type = '핫'
         self.statusbar.showMessage("HOT 아메리카노가 선택되었습니다", 1000)
-        from PyQt5.QtCore import QTimer
+        # from PyQt5.QtCore import QTimer  # <--- 상단으로 이동했으므로 제거
         QTimer.singleShot(1000, self.go_to_order3)
 
     def go_to_order3(self):
@@ -60,18 +60,30 @@ class CafeApp(QMainWindow):
         beverage_name = f"{self.drink_type}아메리카노" if self.drink_type else "아메리카노"
         
         order_data = {
-            "OrderID": 1,  # 샘플 OrderID
-            "OrderDetail": {
-                "beverageName": beverage_name
-            }
-        }
+                          "totalAmount": 1,
+                          "paymentInfo": "카드",
+                          "orderStatus": "접수",
+                          "orderDetail": [
+                            {
+                              "beverageName": beverage_name,
+                              "quantity": 1
+                            }
+                          ]
+                        }
         
         # 서버로 전송
         self.send_order(order_data)
         
         # order4.ui로 이동
         uic.loadUi('order4.ui', self)
+        
+        QTimer.singleShot(80000, self.go_to_order5)
     
+    def go_to_order5(self):  # <--- 새로 추가된 함수
+        """1.20초 후 order5.ui로 이동합니다."""
+        uic.loadUi('order5.ui', self)
+        # order5.ui에 홈 버튼이 있다면 연결: self.homeButton.clicked.connect(self.go_home)
+
     def send_order(self, order_data):
         """QNetworkAccessManager를 사용해 POST 요청 전송"""
         try:
@@ -141,3 +153,5 @@ if __name__ == '__main__':
     window = CafeApp()
     window.show()
     sys.exit(app.exec_())
+
+
