@@ -19,9 +19,7 @@ class GuideNavigation(Node):
         super().__init__('guide_navigation')
         self.goal_pose = PoseStamped()
         self.nav2 = BasicNavigator()
-        self.nav2.waitUntilNav2Active()
-        initial_pose = self.init_pose()
-        self.nav2.setInitialPose(initial_pose)
+
         self.amcl_pose = None
         self._amcl_sub = self.create_subscription(
             PoseWithCovarianceStamped,
@@ -29,6 +27,15 @@ class GuideNavigation(Node):
             self.amcl_callback,
             10
         )
+
+        self.get_logger().info("Waiting for /amcl_pose...")
+        while self.amcl_pose is None:
+            rclpy.spin_once(self, timeout_sec=0.1)
+        self.get_logger().info("Received /amcl_pose.")
+
+        self.nav2.waitUntilNav2Active()
+        initial_pose = self.init_pose()
+        self.nav2.setInitialPose(initial_pose)
 
         self._img_pub = self.create_publisher(
             Image,
@@ -164,6 +171,7 @@ class GuideNavigation(Node):
         return goal_pose
     
     def convert_pose_with_covariance_stamped_to_pose_stamped(
+            self,
             pose_with_cov_stamped: PoseWithCovarianceStamped
             ) -> PoseStamped:
         pose_stamped = PoseStamped()
