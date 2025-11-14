@@ -147,13 +147,8 @@ class GuideNavigation(Node):
         return init_pose_cov
 
     def init_pose(self):
-        initial_yaw_degrees = -3.08823
-        q = self.get_quaternion_from_yaw(initial_yaw_degrees)
-
-        init_pose_msg = PoseStamped()
-        init_pose_msg.header.frame_id = 'map'
+        init_pose_msg = self.convert_pose_with_covariance_stamped_to_pose_stamped(self.amcl_pose)
         init_pose_msg.header.stamp = self.nav2.get_clock().now().to_msg()
-        init_pose_msg.pose = self.convert_pose_with_covariance_stamped_to_pose_stamped(self.amcl_pose)
         self.get_logger().info(f'초기 위치 : {init_pose_msg}')
         return init_pose_msg
 
