@@ -146,13 +146,7 @@ class GuideNavigation(Node):
         init_pose_msg = PoseStamped()
         init_pose_msg.header.frame_id = 'map'
         init_pose_msg.header.stamp = self.nav2.get_clock().now().to_msg()
-        init_pose_msg.pose.position.x = 0.0
-        init_pose_msg.pose.position.y = 0.0
-        init_pose_msg.pose.position.z = 0.0
-        init_pose_msg.pose.orientation.x = q[0]
-        init_pose_msg.pose.orientation.y = q[1]
-        init_pose_msg.pose.orientation.z = q[2]
-        init_pose_msg.pose.orientation.w = q[3]
+        init_pose_msg.pose = self.convert_pose_with_covariance_stamped_to_pose_stamped(self.amcl_pose)
         return init_pose_msg
 
     def set_goal_pose(self, goal):
@@ -167,6 +161,14 @@ class GuideNavigation(Node):
         goal_pose.pose.orientation.z = goal.destination.orientation.z
         goal_pose.pose.orientation.w = goal.destination.orientation.w
         return goal_pose
+    
+    def convert_pose_with_covariance_stamped_to_pose_stamped(
+            pose_with_cov_stamped: PoseWithCovarianceStamped
+            ) -> PoseStamped:
+        pose_stamped = PoseStamped()
+        pose_stamped.header = pose_with_cov_stamped.header
+        pose_stamped.pose = pose_with_cov_stamped.pose.pose
+        return pose_stamped
 
     def get_quaternion_from_yaw(self, yaw_degrees):
         yaw_radians = math.radians(yaw_degrees)
