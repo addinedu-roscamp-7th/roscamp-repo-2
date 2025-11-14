@@ -88,6 +88,7 @@ class RobotMove:
             return False
 
         diff = np.linalg.norm(np.array(end_pose[:3]) - np.array(start_pose[:3]))
+        self.logger.info("📏 [safe_move] 전: {start_pose} 후: {end_pose}")
         self.logger.info("📏 [safe_move] 실제 이동 거리: %.2f mm", diff)
 
         if diff < move_tol:

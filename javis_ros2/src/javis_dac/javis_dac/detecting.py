@@ -134,10 +134,10 @@ class Detecting:
             k = 0.1 if dist_pix > 60 else 0.08 if dist_pix > 25 else 0.025
             move_x = -dy * k
             move_y = -dx * k
-            if abs(move_x) < self.align.MIN_MOVE:
-                move_x = np.sign(move_x) * self.align.MIN_MOVE
-            if abs(move_y) < self.align.MIN_MOVE:
-                move_y = np.sign(move_y) * self.align.MIN_MOVE
+            if abs(move_x) < self.config.min_move:
+                move_x = np.sign(move_x) * self.config.min_move
+            if abs(move_y) < self.config.min_move:
+                move_y = np.sign(move_y) * self.config.min_move
 
             coords = self.robot_move.get_coords()
             
@@ -147,9 +147,9 @@ class Detecting:
             coords[3] = -180 
             coords[4] = 0
             
-            await self.robot_move.safe_move(coords, speed=self.align.SPEED)  # ✅ 안전 이동 (send_coords + 위치 확인)
+            await self.robot_move.safe_move(coords, speed=self.config.speed)  # ✅ 안전 이동 (send_coords + 위치 확인)
             self.logger.info("➡️ move_x=%.2f, move_y=%.2f, dist=%.1f", move_x, move_y, dist_pix)
-            time.sleep(self.align.SETTLE_WAIT)
+            time.sleep(self.config.settle_wait)
 
     # =========================================================
     # 📐 화면 중심과 아르코마커간 거리 계산
