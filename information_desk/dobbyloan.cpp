@@ -62,7 +62,7 @@ void DobbyLoan::send_pickup(){
                     ui->label_1->setStyleSheet("color: black; border: 1px solid black;");
                     ui->label_2->setStyleSheet("color: black; border: 1px solid black;");
                     ui->label_3->setStyleSheet("color: black; border: 1px solid black;");
-                    ui->label_4->setStyleSheet("color: black; border: 1px solid black;");
+
 
                     // boxNum에 따라 해당 라벨 색 변경
                     int num = boxNum.toInt();
@@ -76,9 +76,6 @@ void DobbyLoan::send_pickup(){
                     case 3:
                         ui->label_3->setStyleSheet("color: red; font-weight: bold; border: 1px solid black;");
                         break;
-                    case 4:
-                        ui->label_4->setStyleSheet("color: red; font-weight: bold; border: 1px solid black;");
-                        break;
                     default:
                         // 해당 없는 경우는 아무것도 안함
                         break;
@@ -90,7 +87,7 @@ void DobbyLoan::send_pickup(){
                     ui->guidL1->setText("현재 사용가능한 픽업대가 없습니다. \n불편을 끼쳐드려 죄송합니다.");
                     ui->guidL1->setAlignment(Qt::AlignCenter);
                     ui->guidL2->setVisible(false);
-                     ui->guidL3->setVisible(false);
+                    ui->guidL3->setVisible(false);
                     ui->boxTimeL->setVisible(false);
 
                     qDebug() << "자리가 없음";
