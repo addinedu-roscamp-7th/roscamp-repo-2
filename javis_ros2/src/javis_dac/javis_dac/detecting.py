@@ -222,14 +222,26 @@ class Detecting:
         dx_mean = np.mean(dx_list)
         dy_mean = np.mean(dy_list)
         dist_mean = np.mean(dist_list)
+        
+        if (not np.isfinite(dx_mean)) or (not np.isfinite(dy_mean)) or (not np.isfinite(dist_mean)):
+            fallback = None
+            for dx_raw, dy_raw, dist_raw in zip(reversed(dx_list), reversed(dy_list), reversed(dist_list)):
+                if np.isfinite(dx_raw) and np.isfinite(dy_raw) and np.isfinite(dist_raw):
+                    fallback = (dx_raw, dy_raw, dist_raw)
+                    break
+            if fallback is None:
+                self.logger.error("❌ 유효한 샘플이 없어 중심 정렬을 종료합니다.")
+                return None, None
+            dx_mean, dy_mean, dist_mean = fallback
+            self.logger.warning("⚠️ 평균 계산 실패 → 최근 유효 샘플 사용 (dx=%.1f, dy=%.1f, dist=%.1f)", dx_mean, dy_mean, dist_mean)
         self.logger.info("📏 평균 거리: %.1fpx (dx=%.1f, dy=%.1f) from %s frames", dist_mean, dx_mean, dy_mean, len(dx_list))
         
-        if dist_pix < center_tol:
-            self.logger.info("✅ 중심 정렬 완료 (%.1fpx)", dist_pix)
+        if dist_mean < center_tol:
+            self.logger.info("✅ 중심 정렬 완료 (%.1fpx)", dist_mean)
             self._stagnant_count = 0
             return True, self.robot_move.get_coords()
         
-        if self._prev_center_dist is not None and abs(self._prev_center_dist - dist_pix) < 1.5:
+        if self._prev_center_dist is not None and abs(self._prev_center_dist - dist_mean) < 1.5:
             self._stagnant_count += 1
             self.logger.warning("⚠️ 변화 없음 (%s/6)", self._stagnant_count)
             if self._stagnant_count >= 6:
@@ -238,11 +250,11 @@ class Detecting:
         else:
             self._stagnant_count = 0
 
-        self._prev_center_dist = dist_pix
+        self._prev_center_dist = dist_mean
 
-        k = 0.1 if dist_pix > 60 else 0.08 if dist_pix > 25 else 0.025
-        move_x = -dy * k
-        move_y = -dx * k
+        k = 0.1 if dist_mean > 60 else 0.08 if dist_mean > 25 else 0.025
+        move_x = -dx_mean * k
+        move_y = -dy_mean * k
         
         if abs(move_x) < self.config.min_move:
             move_x = np.sign(move_x) * self.config.min_move
@@ -256,11 +268,11 @@ class Detecting:
         coords[3] = -180 
         coords[4] = 0
         
-        self.logger.info("➡️ move_x=%.2f, move_y=%.2f, dist=%.1f", move_x, move_y, dist_pix)
+        self.logger.info("➡️ move_x=%.2f, move_y=%.2f, dist=%.1f", move_x, move_y, dist_mean)
         await self.robot_move.safe_move(coords, speed=self.config.speed)
         time.sleep(self.config.settle_wait)
 
-        return False, dist_pix
+        return False, dist_mean
     
     # =========================================================
     # 🔍 단일 위치에서 마커 감지 (base + offset 기반, ID 반환 버전)

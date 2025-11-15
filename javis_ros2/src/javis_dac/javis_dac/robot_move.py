@@ -116,7 +116,12 @@ class RobotMove:
         idx = list(ids.flatten()).index(marker_id)
         pts = corners[idx]
         success, rvec, tvec = cv2.solvePnP(
-            np.array([[-15, 15, 0], [15, 15, 0], [15, -15, 0], [-15, -15, 0]], np.float32),
+            np.array([
+                [-15, 15, 0], 
+                [15, 15, 0], 
+                [15, -15, 0], 
+                [-15, -15, 0]], 
+            np.float32),
             pts, self.K, self.dist)
         if not success:
             print("❌ Pose 계산 실패 (Yaw)")
@@ -126,15 +131,13 @@ class RobotMove:
         yaw = np.degrees(np.arctan2(R[1, 0], R[0, 0]))
         print(f"📐 감지된 Yaw: {yaw:.2f}°")
 
-        pose = self.mc.get_angles()
-        if pose is None:
+        angles = self.mc.get_angles()
+        if angles is None:
             print("❌ 관절 각도 읽기 실패")
             return False
 
-        pose[5] += yaw
-        await self.send_angles_sync(pose, 50)
-
-        self.safe_move(pose, speed=self.SPEED)
+        angles[5] += yaw
+        await self.send_angles_sync(angles, 50)
 
         print(f"🧭 Yaw {yaw:.2f}° 보정 중...")
         time.sleep(self.SETTLE_WAIT + 0.5)
