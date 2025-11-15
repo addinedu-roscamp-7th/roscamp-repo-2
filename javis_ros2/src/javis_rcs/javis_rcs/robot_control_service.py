@@ -17,6 +17,7 @@ from .pickup_book import PickupBook as PickupBookNode # PickupBook 노드 클래
 from .guide_person import GuidePerson as GuidePersonNode
 from .reshelving_book import ReshelvingBook as ReshelvingBookNode
 from .kreacher_perform import KreacherPerform as KreacherNode, get_kreacher_state
+from rclpy.qos import QoSProfile, DurabilityPolicy
 
 class OrchestratorNode(Node):
     no = 0
@@ -42,12 +43,13 @@ class OrchestratorNode(Node):
         for ns in self.robot_namespaces:
             self.robot_states[ns] = {'state': None, 'battery': None}
             # kreacher는 상태 토픽을 발행하지 않으므로 구독에서 제외
+            qos_profile = QoSProfile(depth=10, durability=DurabilityPolicy.TRANSIENT_LOCAL)
             if ns != 'kreacher':
                 self.create_subscription(
                     DobbyState,
                     f'/{ns}/status/robot_state',
                     lambda msg, namespace=ns: self.robot_state_callback(msg, namespace),
-                    10
+                    qos_profile
                 )
                 self.create_subscription(
                     BatteryStatus,
@@ -166,8 +168,10 @@ class OrchestratorNode(Node):
             self.date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             scheduling_msg.task_create_time = self.date_str
             self.task_scheduling_pub.publish(scheduling_msg)
+            self.get_logger().info(f'task_data: {task_data}')
+            shelf_approach_location = task_data.get('shelf_approach_location')
 
-            thread = threading.Thread(target=self._run_pickup_book_task, args=(robot_namespace, book_id, task_data))
+            thread = threading.Thread(target=self._run_pickup_book_task, args=(robot_namespace, shelf_approach_location,book_id, task_data))
             thread.start()
         elif task_name == 'clean_seat':
             

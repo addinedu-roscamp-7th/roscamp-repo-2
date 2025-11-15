@@ -53,6 +53,10 @@ def handle_pickup_request():
         book_id = req_data.get('book_id')
         if book_id is None: 
             return jsonify({'ok': False, 'message': 'Missing required field: book'}), 400
+        
+        _ros_node.get_logger().info(f"Received /robot/pickupbook request: {req_data}")
+        
+
 
         # clean_seat에 필요한 다른 파라미터들은 req_data에서 직접 가져와 task_data에 포함
         # OrchestratorNode의 execute_task에서 기본값 처리가 되므로, 없으면 안 보내도 됨
