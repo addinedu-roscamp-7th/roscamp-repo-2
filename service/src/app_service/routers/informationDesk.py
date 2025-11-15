@@ -208,13 +208,13 @@ def create_pickupLoan(
             taskName="pickup_book",
             book_id=barcode, 
             storage_id=locations.LOC_ID,
-            book_pick_pose=rcs.BookLoc(x=0.0, y=0.0, z=0.0).model_dump(),
+            book_pick_pose=rcs.BookLoc(x=locations.CoordinateX, y=locations.CoordinateY, z=0.0).model_dump(),
             storage_approach_location=rcs.StorageLoc(
                 x=locations.CoordinateX,
                 y=locations.CoordinateY,
                 theta=locations.CoordinateZ
             ).model_dump(),
-            storage_slot_pose=rcs.StoragePickLoc(x=0.0, y=0.0, z=0.0).model_dump(),
+            storage_slot_pose=rcs.StoragePickLoc(x=locations.CoordinateX, y=locations.CoordinateY, z=0.0).model_dump(),
             shelf_approach_location=rcs.ShelfLoc(
                 x=shelf_loc.CoordinateX,
                 y=shelf_loc.CoordinateY,
