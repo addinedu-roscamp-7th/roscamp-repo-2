@@ -86,6 +86,7 @@ class GuideNavigation(Node):
         request = goal_handle.request
 
         self.cap = cv2.VideoCapture(0)
+        self.initial_person_detected = False
         if not self.cap.isOpened():
             self.get_logger().error("WebCam을 열 수 없습니다.")
             self.destroy_node()
@@ -250,7 +251,14 @@ class GuideNavigation(Node):
         #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
         #     cv2.putText(frame, f"{track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         
+        
         if track is not None:
+            if not self.initial_person_detected:
+                stop_msg = Twist()
+                self._cmd_vel_pub.publish(stop_msg)
+                time.sleep(5)
+                self.get_logger().info('피안내자를 등록합니다.')
+                self.initial_person_detected = True
             
             x1, y1, x2, y2, track_id = track[:5]
             x1, y1, x2, y2, track_id = map(int, [x1, y1, x2, y2, track_id])
@@ -268,6 +276,7 @@ class GuideNavigation(Node):
             stop_msg = Twist()
 
             self._cmd_vel_pub.publish(stop_msg)
+            self.get_logger().info(f'stop_msg : {stop_msg}')
             self.get_logger().info("일시정지 중")
         if cv2.waitKey(1) & 0xFF == 27 :
             self.destroy_node()
