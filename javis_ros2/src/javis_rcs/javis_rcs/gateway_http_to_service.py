@@ -54,7 +54,12 @@ def handle_pickup_request():
         if book_id is None: 
             return jsonify({'ok': False, 'message': 'Missing required field: book'}), 400
         
+        shelf_approach_location = req_data.get('shelf_approach_location')
+        if shelf_approach_location is None: 
+            return jsonify({'ok': False, 'message': 'Missing required field: shelf_approach_location'}), 400
+        
         _ros_node.get_logger().info(f"Received /robot/pickupbook request: {req_data}")
+        
         
 
 
@@ -63,7 +68,8 @@ def handle_pickup_request():
         task_data = {
             "task_name": "pickup_book",
             "book_id": book_id,
-            **{k: v for k, v in req_data.items() if k not in ['task_name', 'book_id']} # seat_id 외 다른 필드 포함
+            'shelf_approach_location' : shelf_approach_location,
+            **{k: v for k, v in req_data.items() if k not in ['task_name', 'book_id', 'shelf_approach_location']} # seat_id 외 다른 필드 포함
         }
         
         response_from_ros = _send_task_to_orchestrator(task_data)

@@ -157,7 +157,7 @@ class OrchestratorNode(Node):
         if task_name == 'pickup_book':
             book_id = task_data.get('book_id')
             self.get_logger().info(f"Sending 'pickup_book' goal for book_id {book_id} to robot '{robot_namespace}'")
-
+            
             scheduling_msg = Scheduling()
             scheduling_msg.no = self.no 
             scheduling_msg.robot_name = robot_namespace
@@ -171,7 +171,7 @@ class OrchestratorNode(Node):
             self.get_logger().info(f'task_data: {task_data}')
             shelf_approach_location = task_data.get('shelf_approach_location')
 
-            thread = threading.Thread(target=self._run_pickup_book_task, args=(robot_namespace, shelf_approach_location,book_id, task_data))
+            thread = threading.Thread(target=self._run_pickup_book_task, args=(robot_namespace, book_id, task_data))
             thread.start()
         elif task_name == 'clean_seat':
             
