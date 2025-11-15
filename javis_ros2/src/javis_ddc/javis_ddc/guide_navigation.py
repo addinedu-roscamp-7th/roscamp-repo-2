@@ -11,6 +11,8 @@ from .reid_tracker_module import ReIDTracker
 import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
+
 
 REID_PATH = "osnet_x0_25_msmt17.pt"
 
@@ -19,14 +21,34 @@ class GuideNavigation(Node):
         super().__init__('guide_navigation')
         self.goal_pose = PoseStamped()
         self.nav2 = BasicNavigator()
+        self.nav2.waitUntilNav2Active()
+        self.current_frame = None
+        self.amcl_pose = self.init_pose_with_covariance()
 
-        self.amcl_pose = None
+        
+
+        self.dobby_nav2_server = ActionServer(self, GuideNavigationAction,
+                                              'dobby1/drive/guide_navigation',
+                                              execute_callback=self.execute_callback,
+                                              goal_callback=self.goal_callback,
+                                              cancel_callback=self.cancel_callback)
+        self.timer_period = 1.0/30.0
+        self.img_pub_timer = self.create_timer(self.timer_period, self.img_pub_timer_callback)
+
+        qos_profile =  QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
+        )
         self._amcl_sub = self.create_subscription(
             PoseWithCovarianceStamped,
             '/amcl_pose',
             self.amcl_callback,
-            10
+            qos_profile
         )
+
+        
 
         self.get_logger().info("Waiting for /amcl_pose...")
         while self.amcl_pose is None:
@@ -51,17 +73,12 @@ class GuideNavigation(Node):
         self.tracker = ReIDTracker(reid_model_path=REID_PATH)
 
         self.br = CvBridge()
-        self.current_frame = None
-        self.img_timer_period = 1.0 /30.0
         
+        self.img_timer_period = 1.0 /30.0
 
-        self.dobby_nav2_server = ActionServer(self, GuideNavigationAction,
-                                              'dobby1/drive/guide_navigation',
-                                              execute_callback=self.execute_callback,
-                                              goal_callback=self.goal_callback,
-                                              cancel_callback=self.cancel_callback)
-        self.timer_period = 1.0/30.0
-        self.img_pub_timer = self.create_timer(self.timer_period, self.img_pub_timer_callback)
+        self.is_goal_sent = False
+        self.is_moving = False
+        
         
 
     def execute_callback(self, goal_handle):
@@ -74,13 +91,12 @@ class GuideNavigation(Node):
             self.destroy_node()
             return
 
-        self._img_timer = self.create_timer(self.img_timer_period, self.img_timer_callback)
+        feedback_msg = GuideNavigationAction.Feedback()
         
+        self._img_timer = self.create_timer(self.img_timer_period, self.img_timer_callback)
         goal_pose = self.set_goal_pose(request)
         self.nav2.goToPose(goal_pose)
 
-        feedback_msg = GuideNavigationAction.Feedback()
-        
         while not self.nav2.isTaskComplete():
             if goal_handle.is_cancel_requested:
                 self.nav2.cancelTask()
@@ -89,6 +105,7 @@ class GuideNavigation(Node):
                 return GuideNavigationAction.Result()
 
             feedback = self.nav2.getFeedback()
+
             if feedback and self.amcl_pose:
                 current_pose = self.convert_to_pose2d(self.convert_to_pose_stamped(self.amcl_pose))
                 feedback_msg.current_location = current_pose
@@ -123,7 +140,7 @@ class GuideNavigation(Node):
             result.termination_reason = "실패"
             self.destroy_cap()
 
-        
+        self.is_goal_sent = False
         
         return result
     
@@ -133,6 +150,7 @@ class GuideNavigation(Node):
         
     def goal_callback(self, goal_request: GuideNavigationAction.Goal):
         self.get_logger().info(f"이동 명령 요청 {goal_request.destination}, 최대속도: {goal_request.max_speed}, 안전최소거리: {goal_request.person_follow_distance}")
+        self.is_goal_sent = True
         return GoalResponse.ACCEPT
     
     def cancel_callback(self, goal_handle):
@@ -206,7 +224,10 @@ class GuideNavigation(Node):
         _, _, yaw = tf_transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
         pose2d.theta = yaw
         return pose2d
-    
+
+    def end_initial_pause(self):
+        pass
+
     def img_timer_callback(self):
         ret, frame = self.cap.read()
         if not ret:
@@ -235,14 +256,16 @@ class GuideNavigation(Node):
             x1, y1, x2, y2, track_id = map(int, [x1, y1, x2, y2, track_id])
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(frame, f"{track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            if self.is_goal_sent :
+                self.is_moving = True
+            if not self.is_goal_sent:
+                self.is_moving = False
+            
         else:
+            self.is_moving = False
+
+        if not self.is_moving:
             stop_msg = Twist()
-            stop_msg.linear.x = 0.0
-            stop_msg.linear.y = 0.0
-            stop_msg.linear.z = 0.0
-            stop_msg.angular.x = 0.0
-            stop_msg.angular.y = 0.0
-            stop_msg.angular.z = 0.0
 
             self._cmd_vel_pub.publish(stop_msg)
             self.get_logger().info("일시정지 중")
