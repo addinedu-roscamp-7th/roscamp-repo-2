@@ -16,14 +16,14 @@ DOBBY 도서관 관리 로봇과 KREACHER 카페 음료제조 시스템을 하�
 <img width="1094" height="1215" alt="Image" src="https://github.com/user-attachments/assets/65fd344f-0872-4402-9ffe-656dbe3356b2" />
 
 ## 기술 스택
-<img width="925" height="540" alt="Image" src="https://github.com/user-attachments/assets/4b88d816-67a9-4c5c-9bf7-b82f33336d55" />
+<img width="691" height="262" alt="Image" src="https://github.com/user-attachments/assets/3e6f528f-ec66-4b73-aac9-4a560850434f" />
 
 ---
 ## KREACHER
 
 ### 시연영상
 - 주문 GUI
-<img src="https://github.com/user-attachments/assets/f9503bb8-1abf-4ee0-8743-f0408b6c0c5b"/>
+<img src="https://github.com/user-attachments/assets/820c66a7-2c2f-41ec-9c8e-8ba19f175cb9"/>
 
 - 핫아메리카노
 <img src="https://github.com/user-attachments/assets/8bcf9c0b-4ba2-4a1a-a077-6e5894005fad"/>
@@ -101,7 +101,8 @@ DOBBY 도서관 관리 로봇과 KREACHER 카페 음료제조 시스템을 하�
 
 
 
-
+#### ADMIN GUI
+<img width="1920" height="1080" alt="Image" src="https://github.com/user-attachments/assets/dbc1592f-edfb-458a-8508-cf6fa004fbb2">
 
 
 
