@@ -74,3 +74,11 @@ class SlotInventory:
                     return book_id
             print(f"❌ [get_book_by_shelf] Shelf {shelf_id}에 대응하는 책이 없습니다.")
             return None
+
+    def get_any_book(self):
+        """슬롯에 저장된 책 중 아무거나 하나 반환"""
+        with self._status_lock:
+            for slot_id, book_id in self.slot_status.items():
+                if book_id is not None:
+                    return book_id
+            return None

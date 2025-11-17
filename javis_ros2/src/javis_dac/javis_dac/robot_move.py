@@ -250,7 +250,10 @@ class RobotMove:
         # =========================================================
         if mode == "DOBBY_TO_SHELF":
             
-            book_id = self.slot_inventory.get_book_by_shelf(arco_id)
+            if arco_id == 0 :
+                book_id = self.slot_inventory.get_any_book()
+            else :
+                book_id = self.slot_inventory.get_book_by_shelf(arco_id)
             
             carrier_slot_id = self.slot_inventory.get_slot_by_book(book_id)
             

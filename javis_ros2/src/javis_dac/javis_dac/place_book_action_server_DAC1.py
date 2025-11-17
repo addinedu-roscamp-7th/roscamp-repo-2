@@ -118,6 +118,14 @@ class PlaceBookActionServer_DAC1(Node):
         # --- 3️⃣ 마커 정보 확보 ---
         if found_target == 0:
             markers_info = self.detecting.get_all_detected_markers()
+
+            valid_markers = []
+            for marker in markers_info:
+                if marker["id"] > 20:
+                    valid_markers.append(marker)
+
+            markers_info = valid_markers
+
         elif found_target == detected_id:
             marker_info = {
                 "id": detected_id,
