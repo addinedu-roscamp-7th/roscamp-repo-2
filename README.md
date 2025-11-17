@@ -1,8 +1,114 @@
-# roscamp-repo-2
-ROS2와 AI를 활용한 자율주행 로봇개발자 부트캠프 2팀 저장소. 자비스 도서관
 
+# J A V I S
+
+DOBBY 도서관 관리 로봇과 KREACHER 카페 음료제조 시스템을 하나의 ROS2 기반 통합 플랫폼으로 묶어, 도서 픽업·반납과 카페 주문·제조를 자동화하는 JAVIS 서비스
 
 ---
+## HW Architecture
+<img width="3549" height="1861" alt="Image" src="https://github.com/user-attachments/assets/be30b1fb-4c7c-4fd7-9094-680e46b2be9a" />
+
+## SW Architecture
+<img width="4528" height="3074" alt="Image" src="https://github.com/user-attachments/assets/a13095d2-5a04-489e-a958-878c01f90e5b" />
+
+## State Diagram
+<img width="719" height="809" alt="Image" src="https://github.com/user-attachments/assets/7883e7b0-9228-4958-a7c3-4f22e1ddbdd8" />
+
+## 기술 스택
+<img width="925" height="540" alt="Image" src="https://github.com/user-attachments/assets/4b88d816-67a9-4c5c-9bf7-b82f33336d55" />
+
+---
+## KREACHER
+
+### 시연영상
+- 주문 GUI
+<img src="https://github.com/user-attachments/assets/f9503bb8-1abf-4ee0-8743-f0408b6c0c5b"/>
+
+- 핫아메리카노
+<img src="https://github.com/user-attachments/assets/8bcf9c0b-4ba2-4a1a-a077-6e5894005fad"/>
+
+- 아이스아메리카노
+<img src="https://github.com/user-attachments/assets/75065919-f3c2-4977-9960-1645d0b4173d"/>
+
+### 기술
+<img width="878" height="473" alt="Image" src="https://github.com/user-attachments/assets/ec2428b0-6eea-4fc3-9981-fe0c6ef18268" />
+
+<img width="882" height="480" alt="Image" src="https://github.com/user-attachments/assets/8a80b000-44e5-4e06-b9fa-30efe051999e" />
+
+---
+## Dobby
+- Pick Up 요청 후 작업을 할당받은 Dobby가 책장 앞으로 이동 후 책 pickup
+  
+<img src="https://github.com/user-attachments/assets/d0d0bd77-5cb5-4fc8-9e47-9b23468030de"/>
+
+---
+### Dobby Drive
+
+<img src="https://github.com/user-attachments/assets/ce7e6dba-8987-49cb-96f2-9ed3a3f76779"/>
+
+---
+### Dobby Arm
+
+- 도서 **Pick/Place Action Server**, **시각 정렬(IBVS)**
+
+---
+
+#### 🔧 주요 기능
+
+##### 🎯 시각 정렬 과정 (Vision Alignment Demo)
+
+아래는 **정렬** 단계에서의 실제 동작 화면입니다.
+
+<img src="https://github.com/user-attachments/assets/98f0ba58-a166-4d6d-aa90-8597faae208d" width="360"/>
+<img src="https://github.com/user-attachments/assets/f2320436-40e7-4760-aaff-9e08b264e563" width="360"/>
+<img src="https://github.com/user-attachments/assets/4f3ea43a-aa41-4787-a343-41dfa6dc1f46" width="360"/>
+<img src="https://github.com/user-attachments/assets/0bdb0a96-a74a-4a5c-a4b8-2559fd77dd9f" width="360"/>
+
+---
+
+##### 🤖 Pick / Place 개요
+
+###### Pick (SHELF → DOBBY)
+- 슬롯 여유 확인  
+- 기준 포즈 이동  
+- 마커 스캔(다방향)  
+- 중심 정렬 + yaw 보정  
+- `transfer_book("SHELF_TO_DOBBY")` 실행  
+- 슬롯 상태 갱신  
+
+###### Place (DOBBY → SHELF)
+- 책장/슬롯 매핑 조회  
+- 동일한 정렬 루틴 적용  
+- `transfer_book("DOBBY_TO_SHELF")` 실행  
+- 슬롯 상태 갱신  
+
+---
+
+#### 🎥 Pick & Place 데모
+- PICK
+<img src="https://github.com/user-attachments/assets/2a4ea6d3-34e8-48d0-a5c4-39040e745f51" width="360"/>
+<img src="https://github.com/user-attachments/assets/13966e82-1f9a-44e4-a072-a277a14cbfeb" width="360"/>
+
+- PLACE
+<img src="https://github.com/user-attachments/assets/d300cb99-2d5c-4c08-8797-2930bbcb9836" width="360"/>
+<img src="https://github.com/user-attachments/assets/23c9d5ea-fff6-471d-aee2-40bb81ba5762" width="360"/>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--- 
 
 ###  프로젝트 규칙
 1. dev에서 개발하기
@@ -228,97 +334,3 @@ ROS2에서 사용하는 모든 요소는 아래 명명 규칙을 따릅니다.
 | **로깅 사용** | 디버깅 및 운영 시 시스템 상태를 확인하기 위해 `rclpy.logging` 또는 `RCLCPP_INFO/ERROR` 등을 적극적으로 활용하고, **레벨(INFO, WARN, ERROR)**을 정확히 구분하여 사용합니다. |
 | **매직 넘버** | 코드 내에서 의미가 불분명한 숫자(예: `if x > 1024:`)는 사용하지 않고, 반드시 **명명된 상수(Named Constant)**로 대체합니다. |
 | **예외 처리** | 오류 발생 가능성이 있는 부분은 `try...except` (Python) 또는 `try...catch` (C++)를 사용하여 명확하게 예외를 처리하고, 사용자에게 의미 있는 오류 메시지를 전달합니다. |
-
-
-
----
-
-## javis_dac (Dobby Arm Controller)
-
-이 패키지는 도비 로봇의 **제어 계층**으로,  
-도서 **픽업/적재 Action Server**, **시각 정렬(비전)**, **슬롯 인벤토리 관리**,  
-그리고 **JetCobot 구동 유틸리티**를 포함하고 있습니다.  
-
----
-
-### 🔧 주요 기능
-
-#### ▸ `dac_all_nodes.py`
-- 실행 중인 장비의 IP를 확인해 **dobby1 / dobby2 자동 선택**
-- 선택된 로봇에 맞춰 Pick/Place Action Server를 **MultiThreadedExecutor**로 동시 실행
-
-#### ▸ `PickBookActionServer_DAC1/2.py`
-- 슬롯 여유 확인 → 기준 자세 이동
-- 마커 다방향 스캔 및 중심/각도 정렬
-- `RobotMove.transfer_book("SHELF_TO_DOBBY", ...)` 호출까지 하나의 비동기 루프 처리
-- 모든 단계는 `PickBook.Feedback.current_action`으로 실시간 피드백 제공
-
-#### ▸ `PlaceBookActionServer_DAC1/2.py`
-- `SlotInventory`로 책–책장/슬롯 매핑 조회  
-- 선반 마커 정렬 후 `RobotMove.transfer_book("DOBBY_TO_SHELF", ...)` 수행  
-- 예외 발생 시 traceback을 feedback/result에 포함하여 원인 파악 용이
-
----
-
-## 🗂 내부 서브 모듈
-
-#### ▸ `AlignVision`
-- 0~9번 카메라 중 연결 가능한 장치를 자동 탐색  
-- 최신 프레임 저장 및 전처리(히스토그램 평활화/블러)  
-- 중심 정렬(IBVS)과 yaw 계산의 기반 데이터를 안정적으로 제공  
-
-#### ▸ `Detecting`
-- OpenCV ArUco 버전에 따라 적절한 API 선택  
-- 다중 프레임 평균화 및 마커 정체 감지  
-- 안정적 중심/각도 정렬을 위한 입력 제공
-
----
-
-## 🎯 시각 정렬 과정 (Vision Alignment Demo)
-
-아래는 **정렬** 단계에서의 실제 동작 화면입니다.
-
-<img src="https://github.com/user-attachments/assets/98f0ba58-a166-4d6d-aa90-8597faae208d" width="360"/>
-<img src="https://github.com/user-attachments/assets/f2320436-40e7-4760-aaff-9e08b264e563" width="360"/>
-<img src="https://github.com/user-attachments/assets/4f3ea43a-aa41-4787-a343-41dfa6dc1f46" width="360"/>
-<img src="https://github.com/user-attachments/assets/0bdb0a96-a74a-4a5c-a4b8-2559fd77dd9f" width="360"/>
-
----
-
-## 🤖 Pick / Place 개요
-
-### Pick (SHELF → DOBBY)
-- 슬롯 여유 확인  
-- 기준 포즈 이동  
-- 마커 스캔(다방향)  
-- 중심 정렬 + yaw 보정  
-- `transfer_book("SHELF_TO_DOBBY")` 실행  
-- 슬롯 상태 갱신  
-
-### Place (DOBBY → SHELF)
-- 책장/슬롯 매핑 조회  
-- 동일한 정렬 루틴 적용  
-- `transfer_book("DOBBY_TO_SHELF")` 실행  
-- 슬롯 상태 갱신  
-
----
-
-## 🎥 Pick & Place 데모
-- PICK
-<img src="https://github.com/user-attachments/assets/2a4ea6d3-34e8-48d0-a5c4-39040e745f51" width="360"/>
-<img src="https://github.com/user-attachments/assets/13966e82-1f9a-44e4-a072-a277a14cbfeb" width="360"/>
-
-- PLACE
-<img src="https://github.com/user-attachments/assets/d300cb99-2d5c-4c08-8797-2930bbcb9836" width="360"/>
-<img src="https://github.com/user-attachments/assets/23c9d5ea-fff6-471d-aee2-40bb81ba5762" width="360"/>
-
-
-
----
-
-## ▶ 실행
-- colcon build --packages-select javis_dac
-- source install/setup.bash
-
-- ros2 launch javis_dac dac_all.launch.py
-
