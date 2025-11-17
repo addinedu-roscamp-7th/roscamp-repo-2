@@ -28,6 +28,8 @@ class CafeApp(QMainWindow):
         # 붕붕드링크 버튼은 비활성화 상태이므로 연결하지 않음
         self.americanoBtn.clicked.connect(self.order_americano)  # 아메리카노 버튼
         self.homeButton.clicked.connect(self.go_home)  # 홈으로 버튼
+        # 메뉴 선택 음성 안내
+        DobyVoiceAdvancedClient("메뉴를 선택해주세요")
         
     def order_americano(self):
         self.drink_type = None
@@ -39,12 +41,14 @@ class CafeApp(QMainWindow):
     def select_ice(self):
         self.drink_type = '아이스'
         self.statusbar.showMessage("ICE 아메리카노가 선택되었습니다", 1000)
+        DobyVoiceAdvancedClient("아이스 아메리카노가 선택되었습니다")
         # from PyQt5.QtCore import QTimer  # <--- 상단으로 이동했으므로 제거
         QTimer.singleShot(1000, self.go_to_order3)
     
     def select_hot(self):
         self.drink_type = '핫'
         self.statusbar.showMessage("HOT 아메리카노가 선택되었습니다", 1000)
+        DobyVoiceAdvancedClient("핫 아메리카노가 선택되었습니다")
         # from PyQt5.QtCore import QTimer  # <--- 상단으로 이동했으므로 제거
         QTimer.singleShot(1000, self.go_to_order3)
 
@@ -120,8 +124,7 @@ class CafeApp(QMainWindow):
                 response_json = json.loads(response_text)
                 order_id = response_json.get('OrderID', 'N/A')
                 order_status = response_json.get('OrderStatus', 'N/A')
-                client = DobyVoiceAdvancedClient()
-                client.text_to_speech("주문이 완료되었습니다")
+                DobyVoiceAdvancedClient("주문이 완료되었습니다")
                 self.statusbar.showMessage(
                     f"주문 완료! OrderID: {order_id}, Status: {order_status}", 
                     3000
