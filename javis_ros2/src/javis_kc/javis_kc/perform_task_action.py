@@ -360,7 +360,7 @@ class PerformTaskActionServer(Node):
             ready_to_place = [91.14, -81.73, 92.54, 82.44, -0.08, -42.62]
             self.mc.send_angles(ready_to_place, 30)
             time.sleep(5.5)
-            close_to_dispense = [47.72, -71.19, 118.82, 51.94, -4.48, -7.64]
+            close_to_dispense = [89.47, -53.78, 105.46, 58.27, -2.37, -45.08]
             self.mc.send_angles(close_to_dispense, 30)
             time.sleep(9.5)
             finish_to_dispense = [85.07, -93.33, 130.42, 52.99, 1.4, -36.91]
@@ -396,7 +396,7 @@ class PerformTaskActionServer(Node):
             final_gripper_tip_pos = [
                 self.target_coords[0],
                 self.target_coords[1],
-                self.target_coords[2] + 0.020  # 30mm 오프셋 (미터 단위)
+                self.target_coords[2] + 0.030  # 30mm 오프셋 (미터 단위)
             ]
             
             # 최종 잡기 위치에 도달하기 위한 end_effector 좌표 계산
@@ -407,10 +407,10 @@ class PerformTaskActionServer(Node):
             )
 
             #얼음 집으러가기
-            preprocess_of_picking_ice_angles = [91.4, -45.52, -38.32, -103.79, 91.58, -52.29]
+            preprocess_of_picking_ice_angles = [86.57, -10.54, -4.39, -92.72, 1.31, -52.03]
             self.mc.send_angles(preprocess_of_picking_ice_angles, 30)
             time.sleep(2.0)
-            preprocess_of_picking_ice_angles2 = [92.46, -62.4, -37.44, -99.31, 92.72, -63.01]
+            preprocess_of_picking_ice_angles2 = [92.1, -66.35, -38.32, -92.28, 96.76, -64.59]
             self.mc.send_angles(preprocess_of_picking_ice_angles2, 30)
             time.sleep(2.0)
             #얼음집기
@@ -447,11 +447,11 @@ class PerformTaskActionServer(Node):
             time.sleep(5.0)
 
             # 이후 디스펜스 동작 (두 번째 위치에 배출하도록 각도 수정)
-            ready_to_place = [-6.32, 7.73, -42.53, -38.93, 7.64, 66.53]
+            ready_to_place = [47.72, 3.86, -2.81, -87.53, -2.63, 79.89]
             self.mc.send_angles(ready_to_place, 30)
             time.sleep(5.5)
             # 두 번째 픽업 위치를 위한 각도 수정
-            close_to_dispense = [-37.88, 14.32, -42.53, -67.32, 10.45, 18.45]
+            close_to_dispense = [-21.18, -1.66, -2.81, -86.74, 17.31, 18.72]
             self.mc.send_angles(close_to_dispense, 30)
             time.sleep(9.5)
             self.mc.send_angles(ready_to_place, 30)
@@ -460,7 +460,7 @@ class PerformTaskActionServer(Node):
             finish_to_dispense1 = [92.63, 5.62, -16.52, -76.81, 0.52, -37.7]
             self.mc.send_angles(finish_to_dispense1, 30)
             time.sleep(5.0)
-            finish_to_dispense2 = [93.69, -67.14, -16.69, -4.3, -2.63, -39.02]
+            finish_to_dispense2 = [96.5, -38.14, -59.32, 4.39, -2.54, -65.12]
             self.mc.send_angles(finish_to_dispense2, 30)
             time.sleep(5.0)
             self.mc.set_gripper_value(100, 50)
