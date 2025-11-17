@@ -13,7 +13,7 @@ DOBBY 도서관 관리 로봇과 KREACHER 카페 음료제조 시스템을 하�
 <img width="4528" height="3074" alt="Image" src="https://github.com/user-attachments/assets/a13095d2-5a04-489e-a958-878c01f90e5b" />
 
 ## State Diagram
-<img width="719" height="809" alt="Image" src="https://github.com/user-attachments/assets/7883e7b0-9228-4958-a7c3-4f22e1ddbdd8" />
+<img width="1094" height="1215" alt="Image" src="https://github.com/user-attachments/assets/65fd344f-0872-4402-9ffe-656dbe3356b2" />
 
 ## 기술 스택
 <img width="925" height="540" alt="Image" src="https://github.com/user-attachments/assets/4b88d816-67a9-4c5c-9bf7-b82f33336d55" />
