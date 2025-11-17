@@ -3,6 +3,8 @@
 
 DOBBY 도서관 관리 로봇과 KREACHER 카페 음료제조 시스템을 하나의 ROS2 기반 통합 플랫폼으로 묶어, 도서 픽업·반납과 카페 주문·제조를 자동화하는 JAVIS 서비스
 
+<img src="https://github.com/user-attachments/assets/d0d0bd77-5cb5-4fc8-9e47-9b23468030de"/>
+
 ---
 ## HW Architecture
 <img width="3549" height="1861" alt="Image" src="https://github.com/user-attachments/assets/be30b1fb-4c7c-4fd7-9094-680e46b2be9a" />
