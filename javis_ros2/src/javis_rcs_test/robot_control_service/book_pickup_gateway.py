@@ -43,9 +43,9 @@ def run_pickup_task(book_id: str, storage_id: int):
         pickup_goal_future = pickup_node.pickup_send_goal(
             book_id=book_id,
             storage_id=storage_id,
-            shelf_approach_location=Pose2D(x=1.0, y=2.0, theta=3.0),
+            shelf_approach_location=Pose2D(),
             book_pick_pose=Pose(), # 필요시 값 채우기
-            storage_approach_location=Pose2D(x=7.0, y=8.0, theta=9.0),
+            storage_approach_location=Pose2D(),
             storage_slot_pose=Pose() # 필요시 값 채우기
         )
 

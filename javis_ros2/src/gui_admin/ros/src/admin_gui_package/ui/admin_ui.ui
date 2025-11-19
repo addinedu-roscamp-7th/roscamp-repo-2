@@ -109,70 +109,7 @@
                </column>
               </widget>
              </item>
-             <item>
-              <widget class="QFrame" name="controlFrame">
-               <property name="frameShape">
-                <enum>QFrame::StyledPanel</enum>
-               </property>
-               <property name="frameShadow">
-                <enum>QFrame::Raised</enum>
-               </property>
-               <layout class="QVBoxLayout" name="controlButtonLayout">
-                <item>
-                 <widget class="QLabel" name="controlModeLabel">
-                  <property name="text">
-                   <string>선택 로봇 모드</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QPushButton" name="standbyModeButton">
-                  <property name="text">
-                   <string>대기 모드</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QPushButton" name="autonomousModeButton">
-                  <property name="text">
-                   <string>자율 이동 모드</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <spacer name="verticalSpacer_2">
-                  <property name="orientation">
-                   <enum>Qt::Vertical</enum>
-                  </property>
-                  <property name="sizeHint" stdset="0">
-                   <size>
-                    <width>20</width>
-                    <height>40</height>
-                   </size>
-                  </property>
-                 </spacer>
-                </item>
-               </layout>
-              </widget>
-             </item>
             </layout>
-           </item>
-           <item>
-            <widget class="QLabel" name="alertTitleLabel">
-             <property name="font">
-              <font>
-               <pointsize>12</pointsize>
-               <weight>75</weight>
-               <bold>true</bold>
-              </font>
-             </property>
-             <property name="text">
-              <string>최근 알림 4개 (1-4)</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QListWidget" name="recentAlertList"/>
            </item>
            <item>
             <spacer name="verticalSpacer">
@@ -195,16 +132,6 @@
       <widget class="QWidget" name="tab_scheduling">
        <attribute name="title">
         <string>2. 로봇 스케줄링</string>
-       </attribute>
-      </widget>
-      <widget class="QWidget" name="tab_map">
-       <attribute name="title">
-        <string>3. 지도(도면) 관리</string>
-       </attribute>
-      </widget>
-      <widget class="QWidget" name="tab_log">
-       <attribute name="title">
-        <string>4. 알람 로그</string>
        </attribute>
       </widget>
      </widget>

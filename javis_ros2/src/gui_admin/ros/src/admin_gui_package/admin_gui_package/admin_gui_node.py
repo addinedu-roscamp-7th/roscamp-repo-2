@@ -15,6 +15,7 @@ from javis_interfaces.msg import BatteryStatus
 from nav_msgs.msg import Path, OccupancyGrid
 from geometry_msgs.msg import PoseStamped
 import numpy as np
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
 class AdminGUINode(Node, QMainWindow):
     """Admin GUI Node to monitor and control robots."""
@@ -36,8 +37,6 @@ class AdminGUINode(Node, QMainWindow):
         # 모니터링 탭의 위젯들을 찾습니다.
         self.monitoring_tab = self.findChild(QWidget, 'tab_monitoring')
         self.robot_status_table = self.findChild(QTableWidget, 'robotStatusTable') 
-        self.standby_button = self.findChild(QPushButton, 'standbyModeButton')
-        self.autonomous_button = self.findChild(QPushButton, 'autonomousModeButton')
         
         # 지도 표시 위젯 생성
         self.map_display = MapDisplayWidget(self)
@@ -81,7 +80,6 @@ class AdminGUINode(Node, QMainWindow):
         # }
 
         self.init_gui_widgets()
-        self.connect_signals()
 
         self.init_ros_communication()
         
@@ -130,9 +128,7 @@ class AdminGUINode(Node, QMainWindow):
             self.scheduling_table.horizontalHeader().setStretchLastSection(True)
             self.scheduling_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
-        # 초기에는 버튼 비활성화
-        self.standby_button.setEnabled(False)
-        self.autonomous_button.setEnabled(False)
+        
 
         self.selected_robot_id = None
         
@@ -141,19 +137,19 @@ class AdminGUINode(Node, QMainWindow):
         # amcl_pose 업데이트 시간 제어를 위한 변수
         self.last_amcl_pose_update_time = self.get_clock().now()
 
-    def connect_signals(self):
-        if self.standby_button:
-            self.standby_button.clicked.connect(self.on_standby_mode_clicked)
-        if self.autonomous_button:
-            self.autonomous_button.clicked.connect(self.on_autonomous_mode_clicked)
-        if self.robot_status_table:
-            self.robot_status_table.itemSelectionChanged.connect(self.on_robot_selection_changed)
+    
 
     def init_ros_communication(self):
         # 모니터링할 로봇 목록
         robot_ids = ['dobby1', 'dobby2', 'kreacher'] # 예시 로봇 ID
 
         for robot_id in robot_ids:
+            qos_profile =  QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
+        )
             # 1. 각 로봇의 상태 토픽 구독
             topic_name = f'/{robot_id}/status/robot_state'
             sub = self.create_subscription(
@@ -161,7 +157,7 @@ class AdminGUINode(Node, QMainWindow):
                 topic_name,
                 # lambda를 사용하여 콜백에 로봇 ID 전달
                 lambda msg, rid=robot_id: self.status_callback(msg, rid),
-                10)
+                qos_profile)
             self.robot_subscriptions.append(sub)
             self.get_logger().info(f"Subscribing to {topic_name}")
 
@@ -206,7 +202,12 @@ class AdminGUINode(Node, QMainWindow):
         self.get_logger().info(f"Subscribing to {path_topic_name}")
 
         
-        
+        qos_profile =  QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
+        )
 
         # 6. /amcl_pose 토픽 구독
         # /amcl_pose는 PoseWithCovarianceStamped 메시지 타입을 사용합니다.
@@ -216,7 +217,7 @@ class AdminGUINode(Node, QMainWindow):
             PoseWithCovarianceStamped,
             amcl_pose_topic_name,
             self.amcl_pose_callback,
-            10)
+            qos_profile)
         self.robot_subscriptions.append(amcl_pose_sub)
         self.get_logger().info(f"Subscribing to {amcl_pose_topic_name}")
 
@@ -295,29 +296,9 @@ class AdminGUINode(Node, QMainWindow):
         self.scheduling_table.setItem(row_position, 5, QTableWidgetItem(str(msg.message)))
         self.scheduling_table.setItem(row_position, 6, QTableWidgetItem(msg.task_create_time))
 
-    def on_robot_selection_changed(self):
-        selected_items = self.robot_status_table.selectedItems()
-        if selected_items:
-            selected_row = selected_items[0].row()
-            robot_id_item = self.robot_status_table.item(selected_row, 0)
-            if robot_id_item:
-                self.selected_robot_id = robot_id_item.text()
-                self.get_logger().info(f"로봇 선택됨: {self.selected_robot_id}")
-                # 로봇이 선택되면 버튼 활성화
-                self.standby_button.setEnabled(True)
-                self.autonomous_button.setEnabled(True)
-        else:
-            self.selected_robot_id = None
-            # 선택이 해제되면 버튼 비활성화
-            self.standby_button.setEnabled(False)
-            self.autonomous_button.setEnabled(False)
+  
             
-    def on_standby_mode_clicked(self):
-        if self.selected_robot_id:
-            self.get_logger().info(f"로봇 {self.selected_robot_id}에게 대기 모드 명령 발행 (기능 미구현)")
-        else:
-            self.get_logger().warn("모드 명령을 내릴 로봇을 먼저 테이블에서 선택하세요.")
-
+    
     def on_autonomous_mode_clicked(self):
         if self.selected_robot_id:
             self.get_logger().info(f"로봇 {self.selected_robot_id}에게 자율 이동 모드 명령 발행 (기능 미구현)")
@@ -325,7 +306,7 @@ class AdminGUINode(Node, QMainWindow):
             self.get_logger().warn("모드 명령을 내릴 로봇을 먼저 테이블에서 선택하세요.")
 
     def path_callback(self, msg):
-        # 지도가 로드되었는지 먼저 확인합니다.
+        # 지도가 로드되었는지 먼저 확인합니다.f
         if not self.map_display.map_info:
             return
         # 1초에 한 번만 경로를 업데이트하도록 조절합니다.
@@ -394,10 +375,16 @@ class MapDisplayWidget(QGraphicsView):
 
         self.map_info = None
         self.initial_map_loaded = False # 지도가 처음 로드되었는지 확인하는 플래그
+        qos_profile =  QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
+        )
 
         # 지도 토픽 구독
         self.map_sub = self.node.create_subscription(
-            OccupancyGrid, '/map', self.map_callback, 10)
+            OccupancyGrid, '/map', self.map_callback, qos_profile)
 
     def world_to_scene(self, world_x, world_y):
         """월드 좌표를 QGraphicsScene 좌표로 변환합니다."""

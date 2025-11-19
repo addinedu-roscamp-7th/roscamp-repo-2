@@ -12,9 +12,11 @@ import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
-
+from nav2_msgs.srv import ManageLifecycleNodes
 
 REID_PATH = "osnet_x0_25_msmt17.pt"
+COMMAND_PAUSE = 1
+COMMAND_RESUME = 2
 
 class GuideNavigation(Node):
     def __init__(self):
@@ -25,7 +27,8 @@ class GuideNavigation(Node):
         self.current_frame = None
         self.amcl_pose = self.init_pose_with_covariance()
 
-        
+        self.is_pause = False
+        self.goal_pose = None
 
         self.dobby_nav2_server = ActionServer(self, GuideNavigationAction,
                                               'dobby1/drive/guide_navigation',
@@ -64,11 +67,23 @@ class GuideNavigation(Node):
             'dobby/image',
             10
         )
-        self._cmd_vel_pub = self.create_publisher(
-            Twist,
-            '/cmd_vel',
-            10
+
+
+        self.manager_cli = self.create_client(
+            ManageLifecycleNodes, 
+            '/lifecycle_manager_navigation/manage_nodes'
         )
+
+        self.get_logger().info('Lifecycle Manager 서비스 대기 중...')
+        # 서비스가 준비될 때까지 대기
+        if not self.manager_cli.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('Lifecycle Manager 서비스를 찾을 수 없습니다. Nav2가 실행 중인지 확인하세요.')
+            # 서비스를 찾지 못하면 즉시 종료
+            self.destroy_node()
+            rclpy.shutdown()
+            return
+
+        self.get_logger().info('Lifecycle Manager 서비스 준비 완료.')
 
         self.tracker = ReIDTracker(reid_model_path=REID_PATH)
 
@@ -78,72 +93,138 @@ class GuideNavigation(Node):
 
         self.is_goal_sent = False
         self.is_moving = False
+        self.cap = None
+        self._img_timer = self.create_timer(self.img_timer_period, self.img_timer_callback)
         
+    
+    def _manager_service_callback(self, future, command_name):
+        try:
+            result = future.result()
+            if result is not None and result.success:
+                self.get_logger().info(f'[{command_name}] 호출 성공. 네비게이션 상태 변경 완료.')
+            else:
+                self.get_logger().error(f'[{command_name}] 호출 실패. 결과: {result}')
+        except Exception as e:
+            self.get_logger().error(f'서비스 콜백 중 예외 발생: {e}')
+
+    def call_manager_service(self, command_value, command_name):
+        """ManageLifecycleNodes 서비스를 호출하는 함수"""
+        if not self.manager_cli.service_is_ready():
+            self.get_logger().warn(f'서비스가 준비되지 않았습니다. [{command_name}] 호출을 건너뜁니다.')
+            return
+
+        req = ManageLifecycleNodes.Request()
+        req.command = command_value
+
+        self.get_logger().info(f'[{command_name}] 서비스 호출 시도...')
         
+        future = self.manager_cli.call_async(req)
+        
+        from functools import partial
+        callback = partial(self._manager_service_callback, command_name=command_name)
+        future.add_done_callback(callback)
 
     def execute_callback(self, goal_handle):
         self.get_logger().info("이동 명령 실행")
         request = goal_handle.request
+        self.goal_pose = self.set_goal_pose(request)
 
         self.cap = cv2.VideoCapture(0)
         self.initial_person_detected = False
         if not self.cap.isOpened():
             self.get_logger().error("WebCam을 열 수 없습니다.")
-            self.destroy_node()
-            return
+            goal_handle.abort()
+            return GuideNavigationAction.Result(success=False, termination_reason="WebCam 열기 실패")
 
         feedback_msg = GuideNavigationAction.Feedback()
         
-        self._img_timer = self.create_timer(self.img_timer_period, self.img_timer_callback)
-        goal_pose = self.set_goal_pose(request)
-        self.nav2.goToPose(goal_pose)
+        
+        self.nav2.goToPose(self.goal_pose)
 
-        while not self.nav2.isTaskComplete():
+        while rclpy.ok():
+            if self.cap is None:
+                self.cap = cv2.VideoCapture(0)
+
             if goal_handle.is_cancel_requested:
                 self.nav2.cancelTask()
                 goal_handle.canceled()
-                self.get_logger().info('Goal canceled')
+                self.get_logger().info('Goal canceled by client')
+                
+                self.is_goal_sent = False
                 return GuideNavigationAction.Result()
+            if self.is_pause:
+                if self.cap is None:
+                    self.cap = cv2.VideoCapture(0)
 
+                
+                self.get_logger().info("Navigation paused. Waiting for person to reappear.")
+                while self.is_pause and rclpy.ok() and not goal_handle.is_cancel_requested:
+                    if self.amcl_pose:
+                        current_pose_2d = self.convert_to_pose2d(self.convert_to_pose_stamped(self.amcl_pose))
+                        feedback_msg.current_location = current_pose_2d
+                            
+                        dist_x = self.goal_pose.pose.position.x - current_pose_2d.x
+                        dist_y = self.goal_pose.pose.position.y - current_pose_2d.y
+                        feedback_msg.distance_remaining = math.sqrt(dist_x**2 + dist_y**2)
+
+                    feedback_msg.status = "일시중지"
+                    feedback_msg.person_detected = False
+                    goal_handle.publish_feedback(feedback_msg)
+                    time.sleep(0.2)
+                    if not rclpy.ok() or goal_handle.is_cancel_requested:
+                        break
+
+                    self.img_timer_callback()
+                    self.get_logger().info("Resuming navigation monitoring.")
+                    time.sleep(0.1) # Allow navigator to reset state after new goal is sent
+                    continue
+            
+
+            if self.nav2.isTaskComplete():
+                nav2_result = self.nav2.getResult()
+                # Task completed for a real reason
+                self.get_logger().info(f'nav2_result : {nav2_result}')
+                result = GuideNavigationAction.Result()
+                if self.amcl_pose:
+                    self.destroy_cap()
+                    result.final_location = self.convert_to_pose2d(self.convert_to_pose_stamped(self.amcl_pose))
+
+                if nav2_result == TaskResult.SUCCEEDED:
+                    goal_handle.succeed()
+                    result.success = True
+                    result.termination_reason = "도착"
+                    self.is_goal_sent = False
+                elif nav2_result == TaskResult.CANCELED:
+                    # Underlying nav task was canceled. This is not from our client. Abort.
+                    result.success = False
+                    
+                    
+                else: # FAILED
+                    goal_handle.abort()
+                    result.success = False
+                    result.termination_reason = "실패"
+                    self.is_goal_sent = False
+                
+                
+                
+                return result
+
+            # Publish feedback while navigating
             feedback = self.nav2.getFeedback()
-
             if feedback and self.amcl_pose:
-                current_pose = self.convert_to_pose2d(self.convert_to_pose_stamped(self.amcl_pose))
-                feedback_msg.current_location = current_pose
+                feedback_msg.current_location = self.convert_to_pose2d(self.convert_to_pose_stamped(self.amcl_pose))
                 feedback_msg.distance_remaining = feedback.distance_remaining
                 feedback_msg.status = "길안내중"
-                feedback_msg.person_detected = True
+                feedback_msg.person_detected = not self.is_pause
                 goal_handle.publish_feedback(feedback_msg)
             
             time.sleep(0.2)
-
-        result = GuideNavigationAction.Result()
-        nav2_result = self.nav2.getResult()
-        self.get_logger().info(f'nav2_result : {nav2_result}')
-
-        if self.amcl_pose:
-            current_pose = self.convert_to_pose2d(self.convert_to_pose_stamped(self.amcl_pose))
-            result.final_location = current_pose
-
-        if nav2_result == TaskResult.SUCCEEDED:
-            goal_handle.succeed()
-            result.success = True
-            result.termination_reason = "도착"
-            self.destroy_cap()
-        elif nav2_result == TaskResult.CANCELED:
-            goal_handle.canceled()
-            result.success = False
-            result.termination_reason = "취소됨"
-            self.destroy_cap()
-        else:
-            goal_handle.abort()
-            result.success = False
-            result.termination_reason = "실패"
-            self.destroy_cap()
-
-        self.is_goal_sent = False
         
-        return result
+        # This part is reached if rclpy is shut down or goal is canceled during pause
+        goal_handle.abort()
+        self.destroy_cap()
+        self.is_goal_sent = False
+        return GuideNavigationAction.Result(success=False, termination_reason="Aborted")
     
     def amcl_callback(self, msg):
         self.amcl_pose = msg
@@ -230,73 +311,55 @@ class GuideNavigation(Node):
         pass
 
     def img_timer_callback(self):
-        ret, frame = self.cap.read()
-        if not ret:
-            self.get_logger().info('ret is none')
+        if self.cap is None:
             return
 
+        ret, frame = self.cap.read()
+        if frame is None:
+            self.cap.release()
+            self.cap = cv2.VideoCapture(0)
+            ret, frame = self.cap.read()
+
         tracks = self.tracker.update(frame)
-
-        
         track = self.tracker.get_primary_target(tracks=tracks)
-
-        #self.person_detected = tracks.shape[0] > 0
-        # primary_target = self.tracker.get_primary_target(tracks)
-
-        # self.get_logger().info(f'{tracks}')
         
-        # for track in tracks :
-        #     x1, y1, x2, y2, track_id = track[:5]
-        #     x1, y1, x2, y2, track_id = map(int, [x1, y1, x2, y2, track_id])
-        #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        #     cv2.putText(frame, f"{track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        
-        
-        if track is not None:
-            if not self.initial_person_detected:
-                stop_msg = Twist()
-                self._cmd_vel_pub.publish(stop_msg)
-                time.sleep(5)
-                self.get_logger().info('피안내자를 등록합니다.')
-                self.initial_person_detected = True
-            
-            x1, y1, x2, y2, track_id = track[:5]
-            x1, y1, x2, y2, track_id = map(int, [x1, y1, x2, y2, track_id])
+        # Draw bounding boxes for all tracks
+        for t in tracks :
+            x1, y1, x2, y2, track_id = map(int, t[:5])
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(frame, f"{track_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            if self.is_goal_sent :
-                self.is_moving = True
-            if not self.is_goal_sent:
-                self.is_moving = False
-            
-        else:
-            self.is_moving = False
 
-        if not self.is_moving:
-            stop_msg = Twist()
+        # Pause/resume logic
+        person_detected = track is not None
+        self.get_logger().info(f'person_detected: {person_detected}')
+        if self.is_goal_sent: # Only do this if we are navigating
+            if person_detected:
+                if self.is_pause:
+                    self.get_logger().info("피안내자 감지됨, 길안내를 재개합니다.")
+                    self.nav2.goToPose(self.goal_pose)
+                    self.is_pause = False
+            else: # person not detected
+                if not self.is_pause:
+                    self.get_logger().info("피안내자 없음, 길안내를 일시중지합니다.")
+                    self.nav2.cancelTask()
+                    self.is_pause = True
 
-            self._cmd_vel_pub.publish(stop_msg)
-            self.get_logger().info(f'stop_msg : {stop_msg}')
-            self.get_logger().info("일시정지 중")
         if cv2.waitKey(1) & 0xFF == 27 :
             self.destroy_node()
-        self.current_frame = frame
+            self.destroy_cap()
 
+        self.current_frame = frame
     def img_pub_timer_callback(self):
         if self.current_frame is not None:
             ros_image_message = self.br.cv2_to_imgmsg(self.current_frame, encoding="bgr8")
+            
             self._img_pub.publish(ros_image_message)
-
-    def destroy_node(self):
-        if self.cap.isOpened():
-            self.cap.release()
-        cv2.destroyAllWindows()
-        super().destroy_node()
 
     def destroy_cap(self):
         if self.cap.isOpened():
             self.cap.release()
         cv2.destroyAllWindows()
+        self.get_logger().info('cap destroyed')
 
         
 
@@ -310,6 +373,7 @@ def main(args=None):
         node.get_logger().info('guide_navigation 종료')
     finally:
         node.destroy_node()
+        node.destroy_cap()
         rclpy.shutdown()
 
 if __name__ == '__main__':

@@ -84,7 +84,7 @@ class PickupBook(Node):
         # kwargs로부터 Pose2D / Pose 생성
         book_id = str(book_id)
         storage_id = int(kwargs.get('storage_id'))
-        shelf_approach_location = self._make_pose2d(kwargs.get('shelf_approafch_location', {}))
+        shelf_approach_location = self._make_pose2d(kwargs.get('shelf_approach_location', {}))
         book_pick_pose = self._make_pose(kwargs.get('book_pick_pose', {}))
         storage_approach_location = self._make_pose2d(kwargs.get('storage_approach_locaiton', {}))
         storage_slot_pose = self._make_pose(kwargs.get('storage_slot_pose', {}))
