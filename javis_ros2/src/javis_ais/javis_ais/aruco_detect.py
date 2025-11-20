@@ -100,6 +100,8 @@ class ArucoDetector(Node):
             self.log_counter += 1
             do_log = (self.log_counter % self.log_period == 0)
 
+            aruco.drawDetectedMarkers(cv_image, corners, ids)
+
             rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(
                 corners, self.marker_size, self.camera_matrix, self.dist_coeffs
             )

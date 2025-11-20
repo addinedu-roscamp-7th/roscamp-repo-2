@@ -1305,6 +1305,15 @@ class JavisDmcNode(Node):
         if goal is None:
             return PickupOutcome(False, '도서 픽업 Goal 정보가 제공되지 않았습니다.')
 
+        self.get_logger().info(f"--- PickupBook Goal Received ---")
+        self.get_logger().info(f"book_id: {getattr(goal, 'book_id', 'N/A')}")
+        self.get_logger().info(f"storage_id: {getattr(goal, 'storage_id', 'N/A')}")
+        self.get_logger().info(f"shelf_approach_location: {getattr(goal, 'shelf_approach_location', 'N/A')}")
+        self.get_logger().info(f"book_pick_pose: {getattr(goal, 'book_pick_pose', 'N/A')}")
+        self.get_logger().info(f"storage_approach_location: {getattr(goal, 'storage_approach_location', 'N/A')}")
+        self.get_logger().info(f"storage_slot_pose: {getattr(goal, 'storage_slot_pose', 'N/A')}")
+        self.get_logger().info(f"---------------------------------")
+
         book_id = str(getattr(goal, 'book_id', ''))
         storage_id = int(getattr(goal, 'storage_id', 0))
         total_distance = 0.0

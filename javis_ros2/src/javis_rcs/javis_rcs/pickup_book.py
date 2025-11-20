@@ -86,7 +86,7 @@ class PickupBook(Node):
         storage_id = int(kwargs.get('storage_id'))
         shelf_approach_location = self._make_pose2d(kwargs.get('shelf_approach_location', {}))
         book_pick_pose = self._make_pose(kwargs.get('book_pick_pose', {}))
-        storage_approach_location = self._make_pose2d(kwargs.get('storage_approach_locaiton', {}))
+        storage_approach_location = self._make_pose2d(kwargs.get('storage_approach_location', {}))
         storage_slot_pose = self._make_pose(kwargs.get('storage_slot_pose', {}))
 
         # Goal 전송 후, goal 응답 완료 콜백 체인 연결
